@@ -1,0 +1,93 @@
+:root {
+  /* ============================================
+     PromoControl Design Tokens
+     Theme: Real Estate Corporate Premium
+     ============================================ */
+
+  /* --- Primary Palette (Corporate Navy) --- */
+  --color-primary-900: #16324F;
+  --color-primary-700: #1F4B73;
+  --color-primary-500: #2F6EA3;
+  --color-primary-300: #6FA3D4;
+  --color-primary-100: #DCEAF6;
+  --color-primary: var(--color-primary-900);
+
+  /* --- Accent (Gold / Premium) --- */
+  --color-accent: #C8A96B;
+  --color-accent-warm: #B88A44;
+  --color-accent-light: #F4E9D7;
+
+  /* --- Neutral --- */
+  --color-gray-900: #1F2937;
+  --color-gray-700: #374151;
+  --color-gray-500: #6B7280;
+  --color-gray-300: #D1D5DB;
+  --color-gray-200: #E5E7EB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-50: #F8F9FB;
+
+  /* --- Semantic / Financial --- */
+  --color-success: #2E7D32;
+  --color-warning: #ED6C02;
+  --color-error: #D32F2F;
+  --color-info: #0288D1;
+  --color-profit: #2E7D32;
+  --color-loss: #D32F2F;
+  --color-discount: #ED6C02;
+  --color-budget: #0288D1;
+
+  /* --- Subtle Backgrounds (status chips, tags) --- */
+  --color-success-subtle: #E8F5E9;
+  --color-error-subtle: #FFEBEE;
+  --color-warning-subtle: #FFF3E0;
+  --color-info-subtle: #E3F2FD;
+  --color-primary-subtle: #DCEAF6;
+  --color-neutral-subtle: #F3F4F6;
+
+  /* --- Surfaces --- */
+  --color-bg: #F6F8FB;
+  --color-surface: #FFFFFF;
+  --color-section: #FAFBFC;
+  --color-border: #E5E7EB;
+
+  /* --- Text --- */
+  --color-text-primary: #1F2937;
+  --color-text-secondary: #6B7280;
+  --color-text-on-primary: #FFFFFF;
+  --color-text-on-accent: #1F2937;
+
+  /* --- Shape --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* --- Spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* --- Shadow (เบา — professional) --- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+  /* --- Typography --- */
+  --font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', ui-monospace, monospace;
+  --font-size-page-title: 28px;
+  --font-size-section-title: 22px;
+  --font-size-card-title: 18px;
+  --font-size-body-lg: 16px;
+  --font-size-body: 14px;
+  --font-size-caption: 12px;
+  --font-size-kpi: 32px;
+  --font-size-table: 13px;
+}

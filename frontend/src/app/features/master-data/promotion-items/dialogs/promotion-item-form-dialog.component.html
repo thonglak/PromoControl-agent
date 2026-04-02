@@ -1,0 +1,203 @@
+<h2 mat-dialog-title class="!text-lg !font-semibold" style="color: var(--color-text-primary)">
+  {{ data.mode === 'create' ? 'สร้างรายการโปรโมชั่น' : 'แก้ไขรายการโปรโมชั่น' }}
+</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="pt-2">
+
+    <!-- ══ Section 1: ข้อมูลพื้นฐาน ══ -->
+    <div class="p-4 rounded-lg mb-4" style="background: var(--color-gray-50); border: 1px solid var(--color-border)">
+      <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--color-primary-700)">
+        <app-icon name="document-text" class="w-4 h-4" />
+        ข้อมูลพื้นฐาน
+      </h3>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0">
+        @if (data.mode === "edit" && data.item) {
+          <div class="px-3 py-2 rounded-lg mb-2" style="background: var(--color-primary-100)">
+            <p class="text-xs" style="color: var(--color-gray-500)">รหัส</p>
+            <p class="text-sm font-semibold font-mono" style="color: var(--color-primary-700)">{{ data.item.code }}</p>
+          </div>
+        }
+
+        <mat-form-field appearance="outline">
+          <mat-label>ชื่อรายการ</mat-label>
+          <input matInput formControlName="name" />
+          @if (form.get('name')?.hasError('required')) { <mat-error>กรุณากรอกชื่อ</mat-error> }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>หมวดหมู่</mat-label>
+          <mat-select formControlName="category">
+            <mat-option value="discount">ส่วนลด</mat-option>
+            <mat-option value="premium">ของสมนาคุณ</mat-option>
+            <mat-option value="expense_support">สนับสนุนค่าใช้จ่าย</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>โหมดค่า</mat-label>
+          <mat-select formControlName="value_mode">
+            <mat-option value="fixed">คงที่</mat-option>
+            <mat-option value="actual">ตามจริง</mat-option>
+            <mat-option value="manual">กำหนดเอง</mat-option>
+            <mat-option value="calculated">คำนวณอัตโนมัติ</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      @if (form.get('value_mode')?.value === 'calculated') {
+        <div class="flex items-start gap-2 p-3 rounded-lg text-sm" style="background: var(--color-warning-subtle); border: 1px solid #FFC107; color: #8B6914">
+          <app-icon name="exclamation-triangle" class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--color-warning)" />
+          <span>ต้องตั้งค่าสูตรคำนวณในหน้า Fee Formula หลังบันทึก</span>
+        </div>
+      }
+    </div>
+
+    <!-- ══ Section 2: มูลค่า ══ -->
+    <div class="p-4 rounded-lg mb-4" style="background: var(--color-gray-50); border: 1px solid var(--color-border)">
+      <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--color-primary-700)">
+        <app-icon name="currency-dollar" class="w-4 h-4" />
+        มูลค่า
+      </h3>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0">
+        <mat-form-field appearance="outline">
+          <mat-label>ค่าสูงสุด</mat-label>
+          <span matPrefix class="ml-2 mr-1" style="color: var(--color-gray-400)">฿</span>
+          <input matInput currencyMask formControlName="max_value" placeholder="ไม่จำกัด" />
+          <mat-hint>จำกัดมูลค่าที่ใช้สูงสุดต่อรายการ</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>มูลค่าเริ่มต้นที่ใช้</mat-label>
+          <span matPrefix class="ml-2 mr-1" style="color: var(--color-gray-400)">฿</span>
+          <input matInput currencyMask formControlName="default_used_value" placeholder="ใช้ค่าสูงสุด" />
+          <mat-hint>ค่า pre-fill เมื่อเพิ่มรายการในบันทึกขาย</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <!-- มูลค่าเมื่อแปลงเป็นส่วนลด (เฉพาะ premium) -->
+      @if (form.get('category')?.value === 'premium') {
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>มูลค่าเมื่อแปลงเป็นส่วนลด</mat-label>
+          <span matPrefix class="ml-2 mr-1" style="color: var(--color-gray-400)">฿</span>
+          <input matInput currencyMask formControlName="discount_convert_value" placeholder="ว่าง = ใช้มูลค่าที่ใช้" />
+          <mat-hint>เมื่อติ๊กแปลงเป็นส่วนลด จะใช้ค่านี้แทนมูลค่าที่ใช้</mat-hint>
+        </mat-form-field>
+      }
+    </div>
+
+    <!-- ══ Section 3: ตั้งค่ารายการ ══ -->
+    <div class="p-4 rounded-lg mb-4" style="background: var(--color-gray-50); border: 1px solid var(--color-border)">
+      <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--color-primary-700)">
+        <app-icon name="cog-6-tooth" class="w-4 h-4" />
+        ตั้งค่ารายการ
+      </h3>
+
+      <div class="flex items-center gap-6 flex-wrap">
+        <mat-slide-toggle formControlName="is_unit_standard" color="primary">รายการมาตรฐาน (Panel 3A)</mat-slide-toggle>
+        <mat-slide-toggle formControlName="is_active" color="primary">ใช้งาน</mat-slide-toggle>
+        <mat-form-field appearance="outline" class="w-28 !mb-0">
+          <mat-label>ลำดับ</mat-label>
+          <input matInput type="number" formControlName="sort_order" />
+        </mat-form-field>
+      </div>
+
+      @if (form.get('is_unit_standard')?.value) {
+        <div class="mt-2 px-3 py-2 rounded text-xs" style="background: var(--color-success-subtle); color: var(--color-success)">
+          รายการนี้จะแสดงใน Panel 3A อัตโนมัติ (ใช้งบ UNIT_STANDARD)
+        </div>
+      } @else {
+        <div class="mt-2 px-3 py-2 rounded text-xs" style="background: var(--color-info-subtle); color: var(--color-info)">
+          รายการนี้จะอยู่ใน dropdown Panel 3B (เลือกแหล่งงบได้)
+        </div>
+      }
+    </div>
+
+    <!-- ══ Section 4: เงื่อนไขการใช้งาน ══ -->
+    <div class="p-4 rounded-lg mb-2" style="background: var(--color-gray-50); border: 1px solid var(--color-border)">
+      <h3 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--color-primary-700)">
+        <app-icon name="funnel" class="w-4 h-4" />
+        เงื่อนไขการใช้งาน
+      </h3>
+
+      <!-- a. แบบบ้าน -->
+      <div class="mb-4">
+        <p class="text-xs font-medium mb-2" style="color: var(--color-text-secondary)">แบบบ้านที่ใช้ได้</p>
+        <mat-radio-group formControlName="hm_mode" class="flex gap-4 mb-2">
+          <mat-radio-button value="all">ทุกแบบบ้าน</mat-radio-button>
+          <mat-radio-button value="specific">เฉพาะแบบบ้านที่เลือก</mat-radio-button>
+        </mat-radio-group>
+        @if (form.get('hm_mode')?.value === 'specific') {
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>เลือกแบบบ้าน</mat-label>
+            <mat-select formControlName="eligible_hm_ids" multiple>
+              @for (hm of houseModels(); track hm.id) {
+                <mat-option [value]="hm.id">{{ hm.code }} — {{ hm.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+      </div>
+
+      <!-- b. ช่วงเวลา -->
+      <div class="mb-4">
+        <p class="text-xs font-medium mb-2" style="color: var(--color-text-secondary)">ช่วงเวลาที่ใช้ได้</p>
+        <mat-radio-group formControlName="date_mode" class="flex gap-4 mb-2">
+          <mat-radio-button value="none">ไม่จำกัด</mat-radio-button>
+          <mat-radio-button value="range">กำหนดช่วงเวลา</mat-radio-button>
+        </mat-radio-group>
+        @if (form.get('date_mode')?.value === 'range') {
+          <div class="grid grid-cols-2 gap-4">
+            <mat-form-field appearance="outline">
+              <mat-label>วันเริ่มต้น</mat-label>
+              <input matInput [matDatepicker]="startPicker" formControlName="eligible_start" />
+              <mat-datepicker-toggle matSuffix [for]="startPicker" />
+              <mat-datepicker #startPicker />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>วันสิ้นสุด</mat-label>
+              <input matInput [matDatepicker]="endPicker" formControlName="eligible_end" />
+              <mat-datepicker-toggle matSuffix [for]="endPicker" />
+              <mat-datepicker #endPicker />
+            </mat-form-field>
+          </div>
+        }
+      </div>
+
+      <!-- c. ยูนิต -->
+      <div>
+        <p class="text-xs font-medium mb-2" style="color: var(--color-text-secondary)">ยูนิตที่ใช้ได้</p>
+        <mat-radio-group formControlName="unit_mode" class="flex gap-4 mb-2">
+          <mat-radio-button value="all">ทุกยูนิต</mat-radio-button>
+          <mat-radio-button value="specific">เฉพาะยูนิตที่เลือก</mat-radio-button>
+        </mat-radio-group>
+        @if (form.get('unit_mode')?.value === 'specific') {
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>เลือกยูนิต</mat-label>
+            <mat-select formControlName="eligible_unit_ids" multiple>
+              @for (u of units(); track u.id) {
+                <mat-option [value]="u.id">{{ u.unit_code }} — {{ u.unit_number }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+      </div>
+    </div>
+
+    @if (serverError()) {
+      <div class="p-3 rounded-lg text-sm" style="background: var(--color-error-subtle); border: 1px solid #EF9A9A; color: var(--color-error)">
+        {{ serverError() }}
+      </div>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="!px-6 !pb-4 !pt-2 gap-2">
+  <button mat-stroked-button (click)="dialogRef.close()">ยกเลิก</button>
+  <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
+    @if (saving()) { <mat-spinner diameter="18" class="!inline-block mr-1" /> }
+    {{ data.mode === 'create' ? 'สร้างรายการ' : 'บันทึก' }}
+  </button>
+</mat-dialog-actions>

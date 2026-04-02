@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PromoControl — Sale Entry Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --primary-light: #EFF6FF;
+            --secondary: #64748B;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --border: #E2E8F0;
+            --text: #1E293B;
+            --text-muted: #64748B;
+            --profit: #16A34A;
+            --cost: #DC2626;
+            --discount: #F59E0B;
+            --budget-remaining: #0284C7;
+            --budget-exceeded: #B91C1C;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* ===== TOP BAR ===== */
+        .topbar {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        }
+
+        .topbar-logo {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .topbar-breadcrumb {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-left: 12px;
+        }
+
+        .topbar-breadcrumb span {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .project-badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        /* ===== LAYOUT ===== */
+        .main {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .page-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ===== CARD ===== */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-icon {
+            width: 18px;
+            height: 18px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        /* ===== FORM ===== */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .form-input, .form-select {
+            padding: 9px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text);
+            background: var(--card-bg);
+            transition: border-color 0.15s;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-input.readonly {
+            background: #F1F5F9;
+            color: var(--text-muted);
+            cursor: default;
+        }
+
+        .form-input.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ===== BUDGET TABLE (Section 2) ===== */
+        .budget-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .budget-table th {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 8px 12px;
+            text-align: right;
+            border-bottom: 2px solid var(--border);
+            background: #F8FAFC;
+        }
+
+        .budget-table th:first-child {
+            text-align: left;
+        }
+
+        .budget-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .budget-table td:not(:first-child) {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+        }
+
+        .budget-table tr.total-row {
+            background: #EFF6FF;
+            font-weight: 700;
+        }
+
+        .budget-table tr.total-row td {
+            border-top: 2px solid var(--border);
+            color: var(--primary);
+            font-size: 15px;
+        }
+
+        .budget-source-name {
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .budget-source-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .remaining-positive {
+            color: var(--budget-remaining);
+            font-weight: 600;
+        }
+
+        .remaining-zero {
+            color: var(--text-muted);
+        }
+
+        .remaining-negative {
+            color: var(--budget-exceeded);
+            font-weight: 700;
+        }
+
+        .alloc-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--primary);
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .alloc-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .alloc-btn.allocated {
+            border-color: var(--profit);
+            background: #F0FDF4;
+            color: var(--profit);
+        }
+
+        .alloc-btn.allocated:hover {
+            background: var(--profit);
+            color: white;
+        }
+
+        .budget-locked-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #F1F5F9;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* ===== PROMO PANELS ===== */
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .panel-header.panel-a {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+        }
+
+        .panel-header.panel-b {
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
+        }
+
+        .panel-label {
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .panel-label.a {
+            color: #1D40AE;
+        }
+
+        .panel-label.b {
+            color: #15803D;
+        }
+
+        .panel-budget-info {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .promo-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .promo-table thead {
+            background: #F8FAFC;
+        }
+
+        .promo-table th {
+            padding: 9px 10px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .promo-table th.num {
+            text-align: right;
+        }
+
+        .promo-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .promo-table td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .promo-table tbody tr:hover {
+            background: #F8FAFC;
+        }
+
+        .promo-table select, .promo-table input[type="text"] {
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            background: white;
+        }
+
+        .promo-table select {
+            min-width: 160px;
+        }
+
+        .promo-table input[type="text"].num-input {
+            width: 120px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .promo-table input[type="text"] {
+            width: 100%;
+            min-width: 90px;
+        }
+
+        .promo-table select:focus, .promo-table input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+
+        .promo-table input.input-error {
+            border-color: var(--cost);
+            background: #FEF2F2;
+        }
+
+        /* Toggle */
+        .toggle {
+            position: relative;
+            width: 34px;
+            height: 18px;
+            appearance: none;
+            background: #CBD5E1;
+            border-radius: 9px;
+            cursor: pointer;
+            transition: background .2s;
+        }
+
+        .toggle:checked {
+            background: var(--primary);
+        }
+
+        .toggle::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 14px;
+            height: 14px;
+            background: white;
+            border-radius: 50%;
+            transition: transform .2s;
+        }
+
+        .toggle:checked::before {
+            transform: translateX(16px);
+        }
+
+        .toggle:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        /* Chips */
+        .chip {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .chip.discount {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .chip.premium {
+            background: #DBEAFE;
+            color: #1E40AF;
+        }
+
+        .chip.expense_support {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        /* Add row btn */
+        .add-row-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            margin-top: 10px;
+            background: none;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            color: var(--primary);
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            transition: all .2s;
+        }
+
+        .add-row-btn:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #94A3B8;
+            cursor: pointer;
+            padding: 3px 5px;
+            border-radius: 4px;
+            font-size: 15px;
+            line-height: 1;
+        }
+
+        .remove-btn:hover {
+            color: var(--cost);
+            background: #FEE2E2;
+        }
+
+        /* Panel subtotal */
+        .panel-subtotal {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 20px;
+            padding: 8px 10px;
+            margin-top: 8px;
+            background: #F8FAFC;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .panel-subtotal span {
+            color: var(--text-muted);
+        }
+
+        .panel-subtotal strong {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Validation warning */
+        .panel-warn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: var(--cost);
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+
+        .panel-warn.hidden {
+            display: none;
+        }
+
+        /* ===== SUMMARY PANEL (RIGHT) ===== */
+        .summary-panel {
+            position: sticky;
+            top: 68px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+        }
+
+        .summary-row .lbl {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .summary-row .val {
+            font-size: 14px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .summary-divider {
+            border-top: 2px solid var(--border);
+            margin: 4px 0;
+        }
+
+        .summary-big {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+        }
+
+        .summary-big .lbl {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .summary-big .val {
+            font-size: 22px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .live-badge {
+            background: #DCFCE7;
+            color: var(--profit);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 8px;
+            margin-left: 8px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1
+            }
+            50% {
+                opacity: .4
+            }
+        }
+
+        .text-profit {
+            color: var(--profit);
+        }
+
+        .text-cost {
+            color: var(--cost);
+        }
+
+        .text-discount {
+            color: var(--discount);
+        }
+
+        .text-budget {
+            color: var(--budget-remaining);
+        }
+
+        .text-exceeded {
+            color: var(--budget-exceeded);
+        }
+
+        .bar-wrapper {
+            margin-top: 10px;
+        }
+
+        .bar-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 3px;
+        }
+
+        .bar-track {
+            height: 7px;
+            background: #E2E8F0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width .3s, background .3s;
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .btn {
+            padding: 10px 22px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            transition: all .2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-success {
+            background: var(--profit);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #15803D;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: #F1F5F9;
+        }
+
+        /* ===== DIALOG (Inline Budget Allocation) ===== */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .overlay.show {
+            display: flex;
+        }
+
+        .dialog {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            width: 440px;
+            max-width: 95vw;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .dialog-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .dialog-form-group {
+            margin-bottom: 16px;
+        }
+
+        .dialog-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .dialog-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text);
+        }
+
+        .dialog-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .dialog-input.readonly {
+            background: #F1F5F9;
+            color: var(--text-muted);
+        }
+
+        .dialog-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .dialog-error {
+            color: var(--cost);
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            color: white;
+            z-index: 9999;
+            font-family: inherit;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: opacity .3s;
+        }
+
+        /* ===== SIMULATOR BADGE ===== */
+        .sim-badge {
+            background: #FEF3C7;
+            color: #92400E;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1100px) {
+            .main {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-panel {
+                position: static;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .form-grid, .form-grid-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .main {
+                padding: 14px;
+            }
+
+            .btn-group {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+        <div class="topbar-logo">PromoControl</div>
+        <div class="topbar-breadcrumb">/ The Garden Ville / <span>บันทึกการขาย</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+        <span class="project-badge">The Garden Ville</span>
+        <span class="sim-badge">SIMULATOR</span>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <div class="user-avatar">ส</div>
+            สมชาย ใจดี
+        </div>
+    </div>
+</div>
+
+<!-- INLINE BUDGET ALLOCATION DIALOG -->
+<div class="overlay" id="allocDialog" onclick="closeDialog(event)">
+    <div class="dialog" onclick="event.stopPropagation()">
+        <div class="dialog-title">ตั้งงบผูกยูนิต</div>
+        <div class="dialog-form-group">
+            <label class="dialog-label">แหล่งงบ</label>
+            <input class="dialog-input readonly" id="dialogSourceName" readonly>
+        </div>
+        <div class="dialog-form-group">
+            <label class="dialog-label">จำนวนเงินที่ต้องการตั้ง (บาท)</label>
+            <input class="dialog-input" id="dialogAmount" type="text" inputmode="numeric" placeholder="เช่น 200,000" oninput="formatDialogAmount(this)"
+                   style="text-align:right;font-variant-numeric:tabular-nums">
+            <div class="dialog-error" id="dialogAmountError">กรุณากรอกจำนวนเงินให้ถูกต้อง</div>
+        </div>
+        <div class="dialog-form-group">
+            <label class="dialog-label">หมายเหตุ</label>
+            <input class="dialog-input" id="dialogNote" placeholder="เช่น อนุมัติโดยผู้จัดการ">
+        </div>
+        <div class="dialog-actions">
+            <button class="btn btn-secondary" onclick="closeDialog()">ยกเลิก</button>
+            <button class="btn btn-primary" onclick="confirmAlloc()">ยืนยันตั้งงบ</button>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+    <!-- ===== LEFT COLUMN ===== -->
+    <div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px">
+            <div>
+                <div class="page-title">บันทึกการขาย</div>
+                <div class="page-sub">Sales Entry — บันทึกโปรโมชั่นและคำนวณกำไรแบบ Real-time</div>
+            </div>
+        </div>
+
+        <!-- SECTION 1: ข้อมูลยูนิต -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    ส่วนที่ 1 — ข้อมูลยูนิต
+                </div>
+            </div>
+            <div class="form-grid-3">
+                <div class="form-group">
+                    <label class="form-label">โครงการ</label>
+                    <input class="form-input readonly" value="The Garden Ville" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">รหัสยูนิต</label>
+                    <select class="form-select" id="unitSelect" onchange="onUnitChange()">
+                        <option value="">— เลือกยูนิต —</option>
+                        <option value="0">A-101 (บ้านเดี่ยว Grand)</option>
+
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">วันที่ขาย</label>
+                    <input class="form-input" type="date" id="saleDate" value="2026-03-13">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ราคาขาย (Base Price)</label>
+                    <input class="form-input num readonly" id="basePrice" readonly placeholder="—">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ราคาต้นทุน (Unit Cost)</label>
+                    <input class="form-input num readonly" id="unitCost" readonly placeholder="—">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ราคาประเมิน (Appraisal)</label>
+                    <input class="form-input num readonly" id="appraisalPrice" readonly placeholder="—">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ชื่อลูกค้า</label>
+                    <input class="form-input" id="customerName" placeholder="ชื่อ-นามสกุลลูกค้า">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">พนักงานขาย</label>
+                    <select class="form-select" id="salesperson">
+                        <option value="">— เลือกพนักงาน —</option>
+                        <option value="1">สมชาย ใจดี</option>
+                        <option value="2">สมหญิง รักดี</option>
+                        <option value="3">ประเสริฐ มั่นคง</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">หมายเหตุ</label>
+                    <input class="form-input" id="saleRemark" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)">
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: งบประมาณ (ปรับใหม่) -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="18" rx="2"/>
+                        <path d="M2 9h20M2 15h20"/>
+                    </svg>
+                    ส่วนที่ 2 — งบประมาณที่ใช้ได้
+                </div>
+                <span style="font-size:12px;color:var(--text-muted)">คลิก [+ ตั้งงบ] เพื่อผูกงบกับยูนิตนี้</span>
+            </div>
+            <table class="budget-table">
+                <thead>
+                <tr>
+                    <th>แหล่งงบ</th>
+                    <th>ตั้งงบ (บาท)</th>
+                    <th>ใช้ไป (บาท)</th>
+                    <th>คงเหลือ (บาท)</th>
+                    <th style="text-align:center">จัดการ</th>
+                </tr>
+                </thead>
+                <tbody id="budgetTableBody">
+                <tr>
+                    <td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">เลือกยูนิตก่อนเพื่อดูงบประมาณ</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SECTION 3A: รายการโปรโมชั่น งบยูนิต (Auto-load) -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg class="card-icon" style="color:#1D40AE" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                        <line x1="7" y1="7" x2="7.01" y2="7"/>
+                    </svg>
+                    ส่วนที่ 3A — รายการโปรโมชั่น (งบยูนิต)
+                </div>
+            </div>
+            <div class="panel-header panel-a">
+                <div>
+                    <div class="panel-label a">Panel 3A — ใช้งบยูนิต (UNIT_STANDARD)</div>
+                    <div style="font-size:12px;color:#3B82F6;margin-top:2px">โหลดอัตโนมัติจาก Master — แหล่งงบล็อกเป็น "งบยูนิต" เท่านั้น</div>
+                </div>
+                <div class="panel-budget-info" id="panelABudgetInfo" style="color:#1D40AE">งบยูนิต: —</div>
+            </div>
+            <div style="overflow-x:auto">
+                <table class="promo-table">
+                    <thead>
+                    <tr>
+                        <th style="width:28px">#</th>
+                        <th>รายการโปรโมชั่น</th>
+                        <th>หมวดหมู่</th>
+                        <th class="num">มูลค่าสูงสุด</th>
+                        <th class="num">มูลค่าที่ใช้</th>
+                        <th style="text-align:center">แปลงเป็น<br>ส่วนลด</th>
+                        <th>แหล่งงบ</th>
+                        <th>หมายเหตุ</th>
+                    </tr>
+                    </thead>
+                    <tbody id="panelABody"></tbody>
+                </table>
+            </div>
+            <!-- ไม่มีปุ่มเพิ่ม/ลบ — รายการ Standard โหลดมาครบอัตโนมัติ -->
+            <div class="panel-subtotal">
+                <span>รวม Panel 3A:</span>
+                <strong id="panelATotal">฿0.00</strong>
+                <span style="color:var(--text-muted)">/ งบยูนิตเหลือ:</span>
+                <strong id="panelARemainingDisplay" style="color:var(--budget-remaining)">—</strong>
+            </div>
+            <div class="panel-warn hidden" id="panelAWarn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                </svg>
+                <span id="panelAWarnText">ยอดรวม Panel 3A เกินงบยูนิตคงเหลือ</span>
+            </div>
+        </div>
+
+        <!-- SECTION 3B: รายการของแถมเพิ่มเติม -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <svg class="card-icon" style="color:#15803D" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                        <line x1="7" y1="7" x2="7.01" y2="7"/>
+                    </svg>
+                    ส่วนที่ 3B — รายการของแถมเพิ่มเติม (งบอื่น)
+                </div>
+            </div>
+            <div class="panel-header panel-b">
+                <div>
+                    <div class="panel-label b">Panel 3B — ใช้งบส่วนกลาง / งบผู้บริหาร / งบแคมเปญ</div>
+                    <div style="font-size:12px;color:#16A34A;margin-top:2px">ต้องตั้งงบก่อนจึงจะเลือกแหล่งงบนั้นได้</div>
+                </div>
+            </div>
+            <div style="overflow-x:auto">
+                <table class="promo-table">
+                    <thead>
+                    <tr>
+                        <th style="width:28px">#</th>
+                        <th>รายการโปรโมชั่น</th>
+                        <th>หมวดหมู่</th>
+                        <th class="num">มูลค่าสูงสุด</th>
+                        <th class="num">มูลค่าที่ใช้</th>
+                        <th>แหล่งงบ</th>
+                        <th>หมายเหตุ</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="panelBBody"></tbody>
+                </table>
+            </div>
+            <button class="add-row-btn" onclick="addRow('B')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                เพิ่มรายการ (งบอื่น)
+            </button>
+            <div class="panel-subtotal" id="panelBSubtotal"></div>
+            <div class="panel-warn hidden" id="panelBWarn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                </svg>
+                <span id="panelBWarnText">ยอดรวมเกินงบที่ตั้งไว้</span>
+            </div>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="btn-group">
+            <button class="btn btn-secondary" onclick="resetForm()">ล้างข้อมูล</button>
+            <button class="btn btn-primary" onclick="saveDraft()">บันทึกฉบับร่าง</button>
+            <button class="btn btn-success" onclick="confirmSale()">ยืนยันการขาย</button>
+        </div>
+    </div>
+
+    <!-- ===== RIGHT COLUMN: SUMMARY ===== -->
+    <div class="summary-panel">
+        <!-- Profit Summary -->
+        <div class="card" style="border-left:3px solid var(--primary)">
+            <div class="card-title" style="margin-bottom:14px">
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                สรุปการคำนวณ <span class="live-badge">LIVE</span>
+            </div>
+
+            <div class="summary-row">
+                <span class="lbl">ราคาขาย (Base Price)</span>
+                <span class="val" id="sumBasePrice">—</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">รวมส่วนลด (Total Discount)</span>
+                <span class="val text-discount" id="sumDiscount">0.00</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-row" style="padding:10px 0">
+                <span class="lbl" style="font-weight:700;color:var(--text);font-size:14px">ราคาสุทธิ (Net Price)</span>
+                <span class="val" id="sumNetPrice" style="font-size:17px">—</span>
+            </div>
+
+            <div class="summary-row" style="margin-top:4px">
+                <span class="lbl">ราคาต้นทุน (Unit Cost)</span>
+                <span class="val" id="sumUnitCost">—</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">ต้นทุนของแถม (Promo Cost)</span>
+                <span class="val text-cost" id="sumPromoCost">0.00</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">ค่าใช้จ่ายอุดหนุน (Expense)</span>
+                <span class="val text-cost" id="sumExpense">0.00</span>
+            </div>
+            <div class="summary-row" style="padding:6px 0;border-top:1px dashed var(--border)">
+                <span class="lbl" style="font-weight:600;color:var(--text)">ต้นทุนจากของแถม (Promo Burden)</span>
+                <span class="val text-cost" id="sumPromoBurden">0.00</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-row" style="padding:10px 0">
+                <span class="lbl" style="font-weight:700;color:var(--text);font-size:14px">ต้นทุนรวม (Total Cost)</span>
+                <span class="val text-cost" id="sumTotalCost" style="font-size:17px">—</span>
+            </div>
+
+            <div class="summary-big">
+                <span class="lbl">กำไร (Profit)</span>
+                <span class="val" id="sumProfit">—</span>
+            </div>
+
+            <div class="bar-wrapper">
+                <div class="bar-labels">
+                    <span style="color:var(--text-muted)">อัตรากำไร (Margin)</span>
+                    <span style="font-weight:600" id="marginPct">—</span>
+                </div>
+                <div class="bar-track">
+                    <div class="bar-fill" id="marginBar" style="width:0;background:var(--profit)"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Budget Summary -->
+        <div class="card" style="border-left:3px solid var(--budget-remaining)">
+            <div class="card-title" style="margin-bottom:14px">
+                <svg class="card-icon" style="color:var(--budget-remaining)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                สรุปการใช้งบประมาณ
+            </div>
+            <div class="summary-row">
+                <span class="lbl">งบยูนิต (Unit Standard)</span>
+                <span class="val" id="sumBudgetUnit">—</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">งบอื่นที่ตั้งไว้</span>
+                <span class="val" id="sumBudgetOther">—</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">รวมงบทั้งหมด</span>
+                <span class="val" id="sumBudgetTotal">—</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">งบที่ใช้รายการนี้</span>
+                <span class="val text-cost" id="sumBudgetUsed">0.00</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-row" style="padding:10px 0;border-bottom:none">
+                <span class="lbl" style="font-weight:700;color:var(--text)">งบคงเหลือ</span>
+                <span class="val text-budget" id="sumBudgetRemaining">—</span>
+            </div>
+            <div class="bar-wrapper">
+                <div class="bar-labels">
+                    <span style="color:var(--text-muted)">การใช้งบ</span>
+                    <span style="font-weight:600" id="budgetUsagePct">—</span>
+                </div>
+                <div class="bar-track">
+                    <div class="bar-fill" id="budgetUsageBar" style="width:0;background:var(--budget-remaining)"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formula Reference -->
+        <div class="card" style="background:#F8FAFC;border-style:dashed">
+            <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px">สูตรคำนวณ</div>
+            <div style="font-size:12px;color:var(--secondary);line-height:1.9;font-family:monospace">
+                net_price = base_price − Σdiscount<br>
+                promo_burden = Σpremium + Σexpense<br>
+                total_cost = unit_cost + promo_burden<br>
+                profit = net_price − total_cost<br>
+                <span style="font-family:inherit;font-size:11px;color:#94A3B8">* ใช้ effective_category เสมอ (3A+3B รวมกัน)</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==================== MOCK DATA ====================
+    const MOCK_UNITS = [
+        {code: 'A-101', model: 'บ้านเดี่ยว Grand', base_price: 3200000, unit_cost: 3000000, appraisal_price: 3000000, standard_budget: 200000},
+
+    ];
+
+    // is_unit_standard = true → Panel 3A (auto-load), false → Panel 3B (dropdown)
+    const PROMO_MASTER = [
+        // --- Standard items (Panel 3A auto-load) ---
+        // default_used_value: ถ้ากำหนด → ใช้เป็นค่าเริ่มต้น, ถ้า null → fallback ใช้ max_value
+        {id: 1, name: 'ฟรีวันโอน', category: 'expense_support', value_mode: 'actual', max_value: 60000, default_used_value: null, convertible: false, is_unit_standard: true},
+        {id: 2, name: 'แอร์', category: 'premium', value_mode: 'fixed', max_value: 50000, default_used_value: null, convertible: true, is_unit_standard: true},
+        {id: 3, name: 'กันขโมย', category: 'premium', value_mode: 'fixed', max_value: 40000, default_used_value: null, convertible: true, is_unit_standard: true},
+        {id: 4, name: 'ส่วนลด ', category: 'discount', value_mode: 'manual', max_value: 50000, default_used_value: null, convertible: false, is_unit_standard: true},
+        // --- Non-standard items (Panel 3B dropdown) ---
+        {id: 5, name: 'Gift Voucher', category: 'premium', value_mode: 'manual', max_value: 50000, default_used_value: null, convertible: true, is_unit_standard: false},
+        {id: 6, name: 'ส่วนลดเงินสด (Cash Discount)', category: 'discount', value_mode: 'manual', max_value: 5000000, default_used_value: 100000, convertible: false, is_unit_standard: false},
+        {id: 7, name: 'ค่าใช้จ่ายบวกราคา', category: 'expense_support', value_mode: 'actual', max_value: 30000, default_used_value: null, convertible: false, is_unit_standard: false},
+    ];
+
+    const STANDARD_ITEMS = PROMO_MASTER.filter(i => i.is_unit_standard);
+    const NON_STANDARD_ITEMS = PROMO_MASTER.filter(i => !i.is_unit_standard);
+
+    const BUDGET_SOURCES_B = [
+        {type: 'MANAGEMENT_SPECIAL', label: 'งบผู้บริหาร', movement_type: 'SPECIAL_BUDGET_ALLOCATE'},
+        {type: 'PROJECT_POOL', label: 'งบส่วนกลาง', movement_type: 'ALLOCATE'},
+    ];
+
+    // ==================== STATE ====================
+    let selectedUnit = null;
+    let allocations = {}; // { PROJECT_POOL: {amount,note}, MANAGEMENT_SPECIAL: {...} }
+    let panelA = []; // rows in panel 3A
+    let panelB = []; // rows in panel 3B
+    let rowId = 0;
+    let dialogSource = null; // current source being allocated
+
+    // ==================== HELPERS ====================
+    const fmt = n => (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    // format จำนวนเต็ม ใส่ comma (ไม่มีทศนิยม) สำหรับ input
+    const fmtInt = n => (!n && n !== 0) ? '' : Number(n).toLocaleString('th-TH', {maximumFractionDigits: 0});
+    // parse ตัวเลขจาก string ที่มี comma
+    const parseNum = s => parseFloat(String(s).replace(/,/g, '')) || 0;
+
+    // คำนวณ default used_value: ถ้ากำหนด default_used_value ไว้ → ใช้ค่านั้น, ถ้าไม่ได้กำหนด (null) → fallback เป็น max_value
+    function getDefaultUsedValue(item) {
+        return item.default_used_value != null ? item.default_used_value : (item.max_value || 0);
+    }
+
+    // Panel 3B: track selected IDs for duplicate prevention within Panel 3B only
+    function getSelectedPanelBIds() {
+        return new Set(panelB.filter(r => r.item_id).map(r => r.item_id));
+    }
+
+    function getEffectiveCat(row) {
+        if (!row.item_id) return '';
+        const item = PROMO_MASTER.find(i => i.id === row.item_id);
+        if (!item) return '';
+        return (item.category === 'premium' && row.convert) ? 'discount' : item.category;
+    }
+
+    function getBudgetUsedBySource() {
+        const used = {UNIT_STANDARD: 0, PROJECT_POOL: 0, MANAGEMENT_SPECIAL: 0};
+        for (const r of panelA) used.UNIT_STANDARD += (r.used_value || 0);
+        for (const r of panelB) used[r.source || 'MANAGEMENT_SPECIAL'] += (r.used_value || 0);
+        return used;
+    }
+
+    function getAllocatedBySource() {
+        return {
+            UNIT_STANDARD: selectedUnit ? selectedUnit.standard_budget : 0,
+            PROJECT_POOL: allocations.PROJECT_POOL ? allocations.PROJECT_POOL.amount : 0,
+            MANAGEMENT_SPECIAL: allocations.MANAGEMENT_SPECIAL ? allocations.MANAGEMENT_SPECIAL.amount : 0,
+        };
+    }
+
+    // ==================== UNIT CHANGE ====================
+    function onUnitChange() {
+        const idx = document.getElementById('unitSelect').value;
+        if (idx === '') {
+            selectedUnit = null;
+            allocations = {};
+            panelA = [];
+            panelB = [];
+            document.getElementById('basePrice').value = '';
+            document.getElementById('unitCost').value = '';
+            document.getElementById('appraisalPrice').value = '';
+        } else {
+            selectedUnit = MOCK_UNITS[parseInt(idx)];
+            allocations = {};
+            panelB = [];
+            // Auto-load Panel 3A: ทุกรายการ is_unit_standard=true จาก Master
+            // มูลค่าที่ใช้ default = default_used_value ถ้ามี, ไม่งั้นใช้ max_value
+            panelA = STANDARD_ITEMS.map(item => ({
+                id: rowId++,
+                item_id: item.id,
+                used_value: getDefaultUsedValue(item),
+                convert: false,
+                source: 'UNIT_STANDARD',
+                remark: ''
+            }));
+            document.getElementById('basePrice').value = fmt(selectedUnit.base_price);
+            document.getElementById('unitCost').value = fmt(selectedUnit.unit_cost);
+            document.getElementById('appraisalPrice').value = fmt(selectedUnit.appraisal_price);
+        }
+        renderAll();
+    }
+
+    // ==================== BUDGET TABLE (Section 2) ====================
+    function renderBudgetTable() {
+        const tbody = document.getElementById('budgetTableBody');
+        if (!selectedUnit) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">เลือกยูนิตก่อนเพื่อดูงบประมาณ</td></tr>';
+            return;
+        }
+        const used = getBudgetUsedBySource();
+        const rows = [];
+
+        // UNIT_STANDARD row
+        const uAlloc = selectedUnit.standard_budget;
+        const uUsed = used.UNIT_STANDARD;
+        const uLeft = uAlloc - uUsed;
+        rows.push(`<tr>
+    <td><div class="budget-source-name">งบยูนิต</div><div class="budget-source-sub">UNIT_STANDARD</div></td>
+    <td>${fmt(uAlloc)}</td>
+    <td>${uUsed > 0 ? fmt(uUsed) : '—'}</td>
+    <td class="${uLeft < 0 ? 'remaining-negative' : uLeft === 0 ? 'remaining-zero' : 'remaining-positive'}">${fmt(uLeft)}</td>
+    <td style="text-align:center"><span class="budget-locked-badge">ล็อค (จาก master)</span></td>
+  </tr>`);
+
+        // PROJECT_POOL, MANAGEMENT_SPECIAL
+        for (const src of BUDGET_SOURCES_B) {
+            const alloc = allocations[src.type] ? allocations[src.type].amount : 0;
+            const srcUsed = used[src.type] || 0;
+            const srcLeft = alloc - srcUsed;
+            const allocated = !!allocations[src.type];
+            rows.push(`<tr>
+      <td><div class="budget-source-name">${src.label}</div><div class="budget-source-sub">${src.type}</div></td>
+      <td>${alloc > 0 ? fmt(alloc) : '—'}</td>
+      <td>${srcUsed > 0 ? fmt(srcUsed) : '—'}</td>
+      <td class="${srcLeft < 0 ? 'remaining-negative' : alloc === 0 ? 'remaining-zero' : 'remaining-positive'}">${alloc > 0 ? fmt(srcLeft) : '—'}</td>
+      <td style="text-align:center">
+        <button class="alloc-btn ${allocated ? 'allocated' : ''}" onclick="openDialog('${src.type}')">
+          ${allocated ? '✓ แก้ไขงบ' : '+ ตั้งงบ'}
+        </button>
+      </td>
+    </tr>`);
+        }
+
+        // Total row
+        const totalAlloc = uAlloc + (allocations.PROJECT_POOL?.amount || 0) + (allocations.MANAGEMENT_SPECIAL?.amount || 0);
+        const totalUsed = Object.values(used).reduce((a, b) => a + b, 0);
+        const totalLeft = totalAlloc - totalUsed;
+        rows.push(`<tr class="total-row">
+    <td><strong>รวมทั้งหมด</strong></td>
+    <td>${fmt(totalAlloc)}</td>
+    <td>${totalUsed > 0 ? fmt(totalUsed) : '—'}</td>
+    <td class="${totalLeft < 0 ? 'remaining-negative' : ''}">${fmt(totalLeft)}</td>
+    <td></td>
+  </tr>`);
+
+        tbody.innerHTML = rows.join('');
+    }
+
+    // ==================== INLINE BUDGET ALLOCATION DIALOG ====================
+    function openDialog(sourceType) {
+        if (!selectedUnit) {
+            showToast('กรุณาเลือกยูนิตก่อน', 'warn');
+            return;
+        }
+        dialogSource = sourceType;
+        const src = BUDGET_SOURCES_B.find(s => s.type === sourceType);
+        document.getElementById('dialogSourceName').value = src.label + ' (' + sourceType + ')';
+        const existing = allocations[sourceType];
+        document.getElementById('dialogAmount').value = existing ? fmtInt(existing.amount) : '';
+        document.getElementById('dialogNote').value = existing ? existing.note : '';
+        document.getElementById('dialogAmountError').style.display = 'none';
+        document.getElementById('allocDialog').classList.add('show');
+        document.getElementById('dialogAmount').focus();
+    }
+
+    function closeDialog(e) {
+        if (!e || e.target.id === 'allocDialog') {
+            document.getElementById('allocDialog').classList.remove('show');
+            dialogSource = null;
+        }
+    }
+
+    function formatDialogAmount(el) {
+        const raw = String(el.value).replace(/,/g, '');
+        const num = parseFloat(raw) || 0;
+        const formatted = raw === '' ? '' : fmtInt(num);
+        if (formatted !== el.value) {
+            const cursorPos = el.selectionStart;
+            const lenDiff = formatted.length - el.value.length;
+            el.value = formatted;
+            el.setSelectionRange(cursorPos + lenDiff, cursorPos + lenDiff);
+        }
+        validateDialogAmount();
+    }
+
+    function validateDialogAmount() {
+        const v = parseNum(document.getElementById('dialogAmount').value);
+        const err = document.getElementById('dialogAmountError');
+        if (!v || v <= 0) {
+            err.style.display = 'block';
+            return false;
+        }
+        err.style.display = 'none';
+        return true;
+    }
+
+    function confirmAlloc() {
+        if (!validateDialogAmount()) return;
+        const amount = parseNum(document.getElementById('dialogAmount').value);
+        const note = document.getElementById('dialogNote').value;
+        const src = BUDGET_SOURCES_B.find(s => s.type === dialogSource);
+        allocations[dialogSource] = {amount, note};
+        document.getElementById('allocDialog').classList.remove('show');
+        showToast(`ตั้งงบ${src.label} ${fmt(amount)} บาท เรียบร้อย (movement: ${src.movement_type})`, 'success');
+        // Remove panelB rows that selected this source if it now has less budget
+        const used = getBudgetUsedBySource()[dialogSource];
+        if (used > amount) {
+            showToast(`คำเตือน: รายการใน Panel 3B ใช้งบเกินกว่าที่ตั้งใหม่`, 'warn');
+        }
+        renderAll();
+    }
+
+    // ==================== PROMO ROWS ====================
+    function addRow(panel) {
+        if (!selectedUnit) {
+            showToast('กรุณาเลือกยูนิตก่อน', 'warn');
+            return;
+        }
+        if (panel === 'A') return; // Panel 3A ไม่มีปุ่มเพิ่ม — auto-load เท่านั้น
+        const row = {id: rowId++, item_id: null, used_value: 0, convert: false, source: 'MANAGEMENT_SPECIAL', remark: ''};
+        panelB.push(row);
+        renderPanel(panel);
+        recalculate();
+    }
+
+    function removeRow(panel, id) {
+        if (panel === 'A') return; // Panel 3A ไม่มีปุ่มลบ
+        panelB = panelB.filter(r => r.id !== id);
+        renderAll();
+    }
+
+    function onItemChange(panel, id, val) {
+        // Panel A items are fixed (auto-loaded), no item change allowed
+        if (panel === 'A') return;
+        const row = panelB.find(r => r.id === id);
+        if (!row) return;
+        row.item_id = val ? parseInt(val) : null;
+        row.convert = false;
+        if (row.item_id) {
+            const item = PROMO_MASTER.find(i => i.id === row.item_id);
+            row.used_value = getDefaultUsedValue(item);
+        } else {
+            row.used_value = 0;
+        }
+        renderAll();
+    }
+
+    function onValueChange(panel, id, el) {
+        const rows = panel === 'A' ? panelA : panelB;
+        const row = rows.find(r => r.id === id);
+        if (!row) return;
+        // parse ค่าตัวเลขจาก string ที่มี comma
+        const raw = String(el.value).replace(/,/g, '');
+        row.used_value = parseFloat(raw) || 0;
+        // ใส่ comma กลับ โดยรักษา cursor position
+        const formatted = raw === '' ? '' : fmtInt(row.used_value);
+        if (formatted !== el.value) {
+            const cursorPos = el.selectionStart;
+            const lenDiff = formatted.length - el.value.length;
+            el.value = formatted;
+            el.setSelectionRange(cursorPos + lenDiff, cursorPos + lenDiff);
+        }
+        // เช็ค validation สีแดงถ้าเกิน max
+        const item = row.item_id ? PROMO_MASTER.find(i => i.id === row.item_id) : null;
+        const maxVal = item?.max_value || 0;
+        el.classList.toggle('input-error', maxVal > 0 && row.used_value > maxVal);
+        recalcSummaryOnly();
+    }
+
+    function onConvertChange(panel, id, checked) {
+        // แปลงเป็นส่วนลดได้เฉพาะ Panel 3A (งบยูนิต) เท่านั้น
+        if (panel !== 'A') return;
+        const row = panelA.find(r => r.id === id);
+        if (row) {
+            row.convert = checked;
+            recalcSummaryOnly();
+        }
+    }
+
+    function onSourceChange(id, val) {
+        const row = panelB.find(r => r.id === id);
+        if (row) {
+            row.source = val;
+            recalcSummaryOnly();
+        }
+    }
+
+    function onRemarkChange(panel, id, val) {
+        const rows = panel === 'A' ? panelA : panelB;
+        const row = rows.find(r => r.id === id);
+        if (row) row.remark = val;
+    }
+
+    // อัปเดตเฉพาะ summary/budget โดยไม่ render panel ใหม่ (ป้องกัน input หาย focus)
+    function recalcSummaryOnly() {
+        renderBudgetTable();
+        renderPanelSubtotals();
+        recalculate();
+    }
+
+    // ==================== RENDER PANELS ====================
+    function renderPanel(panel) {
+        const rows = panel === 'A' ? panelA : panelB;
+        const tbodyId = panel === 'A' ? 'panelABody' : 'panelBBody';
+        const tbody = document.getElementById(tbodyId);
+
+        if (rows.length === 0) {
+            const colSpan = panel === 'A' ? 8 : 8;
+            const msg = panel === 'A'
+                ? 'เลือกยูนิตเพื่อโหลดรายการ Standard อัตโนมัติ'
+                : 'ยังไม่มีรายการ — กด "เพิ่มรายการ" ด้านล่าง';
+            tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center;padding:24px;color:var(--text-muted);">${msg}</td></tr>`;
+            return;
+        }
+
+        const alloc = getAllocatedBySource();
+        const selectedBIds = getSelectedPanelBIds();
+
+        tbody.innerHTML = rows.map((row, idx) => {
+            const item = row.item_id ? PROMO_MASTER.find(i => i.id === row.item_id) : null;
+            const effCat = getEffectiveCat(row);
+            const catLabel = {discount: 'ส่วนลด', premium: 'ของแถม', expense_support: 'อุดหนุน'}[effCat] || '';
+            const canConvert = item?.category === 'premium';
+            const maxVal = item?.max_value || 0;
+            const valError = item && maxVal > 0 && row.used_value > maxVal;
+
+            if (panel === 'A') {
+                // Panel 3A: read-only item name (no dropdown), no delete button
+                return `<tr>
+        <td style="color:var(--text-muted);font-size:12px">${idx + 1}</td>
+        <td style="font-weight:500">${item ? item.name : '—'}</td>
+        <td>${effCat ? `<span class="chip ${effCat}">${catLabel}</span>` : ''}</td>
+        <td class="num">${maxVal > 0 ? fmt(maxVal) : '—'}</td>
+        <td><input type="text" inputmode="numeric" value="${row.used_value ? fmtInt(row.used_value) : ''}" placeholder="0" class="num-input${valError ? ' input-error' : ''}" oninput="onValueChange('A',${row.id},this)"></td>
+        <td style="text-align:center"><input type="checkbox" class="toggle" ${canConvert ? '' : 'disabled'} ${row.convert ? 'checked' : ''} onchange="onConvertChange('A',${row.id},this.checked)"></td>
+        <td><span class="budget-locked-badge">งบยูนิต (ล็อค)</span></td>
+        <td><input type="text" value="${row.remark}" placeholder="—" onchange="onRemarkChange('A',${row.id},this.value)"></td>
+      </tr>`;
+            } else {
+                // Panel 3B: dropdown with non-standard items, duplicate prevention, delete button
+                const itemOptions = NON_STANDARD_ITEMS.map(m => {
+                    const inUse = selectedBIds.has(m.id) && m.id !== row.item_id;
+                    return `<option value="${m.id}" ${m.id === row.item_id ? 'selected' : ''} ${inUse ? 'disabled style="color:#CBD5E1"' : ''}>${inUse ? '✗ ' : ''}${m.name}</option>`;
+                }).join('');
+
+                const srcOptions = BUDGET_SOURCES_B.map(s => {
+                    const hasAlloc = !!allocations[s.type];
+                    const srcLeft = hasAlloc ? (alloc[s.type] - getBudgetUsedBySource()[s.type]) : 0;
+                    let label = s.label;
+                    if (!hasAlloc) label += ' (ยังไม่ตั้งงบ)';
+                    else if (srcLeft <= 0) label += ' (งบหมด)';
+                    return `<option value="${s.type}" ${s.type === row.source ? 'selected' : ''} ${!hasAlloc ? 'disabled' : ''}>${label}</option>`;
+                }).join('');
+
+                return `<tr>
+        <td style="color:var(--text-muted);font-size:12px">${idx + 1}</td>
+        <td>
+          <select onchange="onItemChange('B',${row.id},this.value)">
+            <option value="">— เลือก —</option>
+            ${itemOptions}
+          </select>
+        </td>
+        <td>${effCat ? `<span class="chip ${effCat}">${catLabel}</span>` : ''}</td>
+        <td class="num">${maxVal > 0 ? fmt(maxVal) : '—'}</td>
+        <td><input type="text" inputmode="numeric" value="${row.used_value ? fmtInt(row.used_value) : ''}" placeholder="0" class="num-input${valError ? ' input-error' : ''}" oninput="onValueChange('B',${row.id},this)"></td>
+        <td><select onchange="onSourceChange(${row.id},this.value)">${srcOptions}</select></td>
+        <td><input type="text" value="${row.remark}" placeholder="—" onchange="onRemarkChange('B',${row.id},this.value)"></td>
+        <td><button class="remove-btn" onclick="removeRow('B',${row.id})" title="ลบ">✕</button></td>
+      </tr>`;
+            }
+        }).join('');
+    }
+
+    function renderPanelSubtotals() {
+        // Panel A subtotal + warning
+        const totalA = panelA.reduce((s, r) => s + (r.used_value || 0), 0);
+        const unitLeft = selectedUnit ? (selectedUnit.standard_budget - totalA) : 0;
+        document.getElementById('panelATotal').textContent = '฿' + (isNaN(totalA) ? '0.00' : fmt(totalA));
+        const panelARemEl = document.getElementById('panelARemainingDisplay');
+        if (selectedUnit) {
+            panelARemEl.textContent = fmt(unitLeft);
+            panelARemEl.style.color = unitLeft < 0 ? 'var(--budget-exceeded)' : 'var(--budget-remaining)';
+        } else {
+            panelARemEl.textContent = '—';
+            panelARemEl.style.color = 'var(--text-muted)';
+        }
+        document.getElementById('panelABudgetInfo').textContent = selectedUnit ? `งบยูนิต: ${fmt(selectedUnit.standard_budget)} บาท` : 'งบยูนิต: —';
+        const warnA = document.getElementById('panelAWarn');
+        if (selectedUnit && unitLeft < 0) {
+            warnA.classList.remove('hidden');
+            document.getElementById('panelAWarnText').textContent = `ยอดรวม Panel 3A เกินงบยูนิต ${fmt(Math.abs(unitLeft))} บาท!`;
+        } else {
+            warnA.classList.add('hidden');
+        }
+
+        // Panel B subtotal per source + warning
+        const alloc = getAllocatedBySource();
+        const usedB = {};
+        for (const r of panelB) {
+            const src = r.source || 'MANAGEMENT_SPECIAL';
+            usedB[src] = (usedB[src] || 0) + (r.used_value || 0);
+        }
+        let bHtml = '';
+        let bWarnMsg = '';
+        for (const src of BUDGET_SOURCES_B) {
+            const a = alloc[src.type] || 0;
+            const u = usedB[src.type] || 0;
+            if (u > 0 || a > 0) {
+                const left = a - u;
+                bHtml += `<span>${src.label}:</span> <strong>${fmt(u)} / ตั้งงบ ${fmt(a)}</strong>`;
+                if (left < 0) bWarnMsg += `${src.label} เกิน ${fmt(Math.abs(left))} บาท `;
+            }
+        }
+        document.getElementById('panelBSubtotal').innerHTML = bHtml || '<span style="color:var(--text-muted)">ยังไม่มีรายการ</span>';
+        const warnB = document.getElementById('panelBWarn');
+        if (bWarnMsg) {
+            warnB.classList.remove('hidden');
+            document.getElementById('panelBWarnText').textContent = bWarnMsg;
+        } else {
+            warnB.classList.add('hidden');
+        }
+    }
+
+    // ==================== RECALCULATE (Business Rules) ====================
+    function recalculate() {
+        const base = selectedUnit ? selectedUnit.base_price : null;
+        const cost = selectedUnit ? selectedUnit.unit_cost : null;
+
+        let totalDiscount = 0, totalPremium = 0, totalExpense = 0;
+        for (const r of [...panelA, ...panelB]) {
+            if (!r.item_id) continue;
+            const eff = getEffectiveCat(r);
+            const v = r.used_value || 0;
+            if (eff === 'discount') totalDiscount += v;
+            else if (eff === 'premium') totalPremium += v;
+            else if (eff === 'expense_support') totalExpense += v;
+        }
+
+        const netPrice = base != null ? base - totalDiscount : null;
+        const totalPromoBurden = totalPremium + totalExpense; // ต้นทุนจากของแถม
+        const totalCost = cost != null ? cost + totalPromoBurden : null;
+        const profit = netPrice != null && totalCost != null ? netPrice - totalCost : null;
+        const margin = base && profit != null ? (profit / base * 100) : null;
+
+        document.getElementById('sumBasePrice').textContent = base != null ? fmt(base) : '—';
+        document.getElementById('sumDiscount').textContent = totalDiscount > 0 ? `−${fmt(totalDiscount)}` : fmt(0);
+        document.getElementById('sumNetPrice').textContent = netPrice != null ? fmt(netPrice) : '—';
+        document.getElementById('sumUnitCost').textContent = cost != null ? fmt(cost) : '—';
+        document.getElementById('sumPromoCost').textContent = fmt(totalPremium);
+        document.getElementById('sumExpense').textContent = fmt(totalExpense);
+        document.getElementById('sumPromoBurden').textContent = fmt(totalPromoBurden);
+        document.getElementById('sumTotalCost').textContent = totalCost != null ? fmt(totalCost) : '—';
+
+        const profEl = document.getElementById('sumProfit');
+        profEl.textContent = profit != null ? fmt(profit) : '—';
+        profEl.className = 'val ' + (profit == null ? '' : profit >= 0 ? 'text-profit' : 'text-cost');
+
+        const mEl = document.getElementById('marginPct');
+        if (margin != null) {
+            mEl.textContent = margin.toFixed(1) + '%';
+            mEl.style.color = margin >= 0 ? 'var(--profit)' : 'var(--cost)';
+            const bar = document.getElementById('marginBar');
+            bar.style.width = Math.min(Math.abs(margin), 100) + '%';
+            bar.style.background = margin >= 0 ? 'var(--profit)' : 'var(--cost)';
+        } else {
+            mEl.textContent = '—';
+            document.getElementById('marginBar').style.width = '0';
+        }
+
+        // Budget
+        const alloc = getAllocatedBySource();
+        const budgetUnit = alloc.UNIT_STANDARD;
+        const budgetOther = (alloc.PROJECT_POOL || 0) + (alloc.MANAGEMENT_SPECIAL || 0);
+        const budgetTotal = budgetUnit + budgetOther;
+        const totalUsed = [...panelA, ...panelB].reduce((s, r) => s + (r.used_value || 0), 0);
+        const remaining = budgetTotal - totalUsed;
+
+        document.getElementById('sumBudgetUnit').textContent = selectedUnit ? fmt(budgetUnit) : '—';
+        document.getElementById('sumBudgetOther').textContent = selectedUnit ? fmt(budgetOther) : '—';
+        document.getElementById('sumBudgetTotal').textContent = selectedUnit ? fmt(budgetTotal) : '—';
+        document.getElementById('sumBudgetUsed').textContent = fmt(totalUsed);
+        const remEl = document.getElementById('sumBudgetRemaining');
+        remEl.textContent = selectedUnit ? fmt(remaining) : '—';
+        remEl.className = 'val ' + (remaining < 0 ? 'text-exceeded' : 'text-budget');
+
+        const usagePct = budgetTotal > 0 ? (totalUsed / budgetTotal * 100) : 0;
+        const bPctEl = document.getElementById('budgetUsagePct');
+        bPctEl.textContent = selectedUnit ? usagePct.toFixed(1) + '%' : '—';
+        const bBar = document.getElementById('budgetUsageBar');
+        bBar.style.width = selectedUnit ? Math.min(usagePct, 100) + '%' : '0';
+        bBar.style.background = usagePct <= 80 ? 'var(--budget-remaining)' : usagePct <= 100 ? 'var(--discount)' : 'var(--budget-exceeded)';
+    }
+
+    // ==================== RENDER ALL ====================
+    function renderAll() {
+        renderBudgetTable();
+        renderPanel('A');
+        renderPanel('B');
+        renderPanelSubtotals();
+        recalculate();
+    }
+
+    // ==================== ACTIONS ====================
+    function resetForm() {
+        if (!confirm('ต้องการล้างข้อมูลทั้งหมดหรือไม่?')) return;
+        document.getElementById('unitSelect').value = '';
+        document.getElementById('customerName').value = '';
+        document.getElementById('salesperson').value = '';
+        document.getElementById('saleRemark').value = '';
+        selectedUnit = null;
+        allocations = {};
+        panelA = [];
+        panelB = [];
+        rowId = 0;
+        document.getElementById('basePrice').value = '';
+        document.getElementById('unitCost').value = '';
+        document.getElementById('appraisalPrice').value = '';
+        renderAll();
+    }
+
+    function saveDraft() {
+        if (!selectedUnit) {
+            showToast('กรุณาเลือกยูนิตก่อน', 'warn');
+            return;
+        }
+        showToast('บันทึกฉบับร่างเรียบร้อย (Simulator)', 'success');
+    }
+
+    function confirmSale() {
+        if (!selectedUnit) {
+            showToast('กรุณาเลือกยูนิตก่อน', 'warn');
+            return;
+        }
+        if (!document.getElementById('customerName').value.trim()) {
+            showToast('กรุณากรอกชื่อลูกค้า', 'warn');
+            return;
+        }
+        if (!document.getElementById('salesperson').value) {
+            showToast('กรุณาเลือกพนักงานขาย', 'warn');
+            return;
+        }
+        const alloc = getAllocatedBySource();
+        const totalBudget = Object.values(alloc).reduce((a, b) => a + b, 0);
+        const totalUsed = [...panelA, ...panelB].reduce((s, r) => s + (r.used_value || 0), 0);
+        if (totalUsed > totalBudget) {
+            if (!confirm('งบที่ใช้เกินกว่างบที่ตั้งไว้ ต้องการดำเนินการต่อหรือไม่?')) return;
+        }
+        showToast('ยืนยันการขายเรียบร้อย! สร้าง budget_movements แล้ว (Simulator)', 'success');
+    }
+
+    // ==================== TOAST ====================
+    function showToast(msg, type) {
+        const d = document.createElement('div');
+        d.className = 'toast';
+        d.textContent = msg;
+        d.style.background = {success: 'var(--profit)', warn: 'var(--discount)', error: 'var(--cost)'}[type] || '#333';
+        document.body.appendChild(d);
+        setTimeout(() => {
+            d.style.opacity = '0';
+        }, 2500);
+        setTimeout(() => d.remove(), 3000);
+    }
+
+    // ==================== INIT ====================
+    renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<div class="min-h-screen flex flex-col" style="background-color: var(--color-bg)">
+
+  <!-- Header -->
+  <header style="background: var(--color-surface); border-bottom: 1px solid var(--color-border); box-shadow: var(--shadow-sm)"
+          class="px-6 py-4">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold" style="color: var(--color-primary)">เลือกโครงการ</h1>
+        @if (currentUser(); as user) {
+          <p class="text-sm mt-0.5" style="color: var(--color-gray-500)">สวัสดี, {{ user.name }}</p>
+        }
+      </div>
+      <button mat-stroked-button (click)="logout()" class="flex items-center gap-2"
+              style="border-color: var(--color-primary); color: var(--color-primary)">
+        <app-icon name="arrow-right-on-rectangle" class="w-4 h-4" />
+        <span>ออกจากระบบ</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
+
+    @if (loading()) {
+      <!-- Loading state -->
+      <div class="flex flex-col items-center justify-center py-24 gap-4">
+        <mat-spinner diameter="48" />
+        <p class="text-sm" style="color: var(--color-gray-500)">กำลังโหลดโครงการ...</p>
+      </div>
+    } @else if (projects().length === 0) {
+      <!-- Empty state -->
+      <div class="flex flex-col items-center justify-center py-24 gap-4 text-center">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center"
+             style="background-color: var(--color-primary-100)">
+          <app-icon name="building-office" class="w-8 h-8" style="color: var(--color-primary-500)" />
+        </div>
+        <div>
+          <p class="font-medium" style="color: var(--color-gray-700)">ยังไม่มีโครงการที่เข้าถึงได้</p>
+          <p class="text-sm mt-1" style="color: var(--color-gray-500)">กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์เข้าถึงโครงการ</p>
+        </div>
+      </div>
+    } @else {
+      <!-- Section title -->
+      <p class="text-sm mb-6" style="color: var(--color-gray-500)">
+        {{ projects().length }} โครงการที่คุณมีสิทธิ์เข้าถึง — คลิกเพื่อเข้าสู่โครงการ
+      </p>
+
+      <!-- Project grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (project of projects(); track project.id) {
+          <button
+            type="button"
+            (click)="selectProject(project)"
+            class="project-card text-left cursor-pointer group
+                   focus:outline-none focus:ring-2 focus:ring-offset-2"
+            style="focus-ring-color: var(--color-primary-500)"
+          >
+            <!-- Project name & code -->
+            <div class="mb-3">
+              <p class="text-xs font-mono mb-0.5" style="color: var(--color-gray-500)">{{ project.code }}</p>
+              <h3 class="font-semibold leading-snug"
+                  style="font-size: var(--font-size-card-title); color: var(--color-primary)">
+                {{ project.name }}
+              </h3>
+            </div>
+
+            <!-- Type + Status chips -->
+            <div class="flex flex-wrap gap-2 mb-4">
+              <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium"
+                    style="border-radius: var(--radius-full)"
+                    [style.background-color]="typeChipBg(project.project_type)"
+                    [style.color]="typeChipColor(project.project_type)">
+                {{ typeLabel(project.project_type) }}
+              </span>
+              <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium"
+                    style="border-radius: var(--radius-full)"
+                    [style.background-color]="statusChipBg(project.status)"
+                    [style.color]="statusChipColor(project.status)">
+                {{ statusLabel(project.status) }}
+              </span>
+            </div>
+
+            <!-- Footer: unit count + access badge -->
+            <div class="flex items-center justify-between">
+              @if (project.unit_count != null) {
+                <span class="text-sm" style="color: var(--color-gray-500)">
+                  {{ project.unit_count | number }} ยูนิต
+                </span>
+              } @else {
+                <span></span>
+              }
+
+              @if (project.access_level === 'edit') {
+                <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium"
+                      style="border-radius: var(--radius-full);
+                             background-color: var(--color-accent-light);
+                             color: var(--color-accent-warm)">
+                  แก้ไขได้
+                </span>
+              } @else {
+                <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-medium"
+                      style="border-radius: var(--radius-full);
+                             background-color: var(--color-neutral-subtle);
+                             color: var(--color-gray-500)">
+                  ดูอย่างเดียว
+                </span>
+              }
+            </div>
+          </button>
+        }
+      </div>
+    }
+
+  </main>
+</div>

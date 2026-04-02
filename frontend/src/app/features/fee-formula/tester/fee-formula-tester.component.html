@@ -1,0 +1,181 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <app-page-header title="ทดสอบสูตรคำนวณ" subtitle="ทดสอบผลลัพธ์การคำนวณค่าธรรมเนียมจากสูตรที่ตั้งไว้" />
+
+  <mat-tab-group animationDuration="200ms">
+
+    <!-- ══ Tab 1: ทดสอบรายยูนิต ══ -->
+    <mat-tab label="ทดสอบรายยูนิต">
+      <div class="pt-4">
+        <div class="section-card mb-4">
+          <form [formGroup]="singleForm" class="flex flex-wrap gap-4 items-end">
+
+            <mat-form-field appearance="outline" class="w-56">
+              <mat-label>สูตร (ทั้งหมด = ว่าง)</mat-label>
+              <mat-select formControlName="formulaId">
+                <mat-option [value]="null">ทั้งหมด</mat-option>
+                @for (f of formulas(); track f.id) {
+                  <mat-option [value]="f.id">{{ f.promotion_item_name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="w-48">
+              <mat-label>ยูนิต</mat-label>
+              <mat-select formControlName="unitId">
+                @for (u of units(); track u.id) {
+                  <mat-option [value]="u.id">{{ u.unit_code }}</mat-option>
+                }
+              </mat-select>
+              @if (singleForm.get('unitId')?.hasError('required')) { <mat-error>กรุณาเลือกยูนิต</mat-error> }
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="w-44">
+              <mat-label>วันที่ขาย</mat-label>
+              <input matInput [matDatepicker]="salePicker" formControlName="saleDate" />
+              <mat-datepicker-toggle matSuffix [for]="salePicker" />
+              <mat-datepicker #salePicker />
+            </mat-form-field>
+
+            @if (hasManualInput()) {
+              <mat-form-field appearance="outline" class="w-44">
+                <mat-label>ค่ากำหนดเอง</mat-label>
+                <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+                <input matInput currencyMask formControlName="manualInput" />
+              </mat-form-field>
+            }
+
+            <button mat-flat-button color="primary" (click)="calculate()" [disabled]="calculating()" class="h-14">
+              @if (calculating()) { <mat-spinner diameter="18" class="!inline-block mr-1" /> }
+              คำนวณ
+            </button>
+          </form>
+        </div>
+
+        <!-- Results -->
+        @if (testResult()) {
+          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+            <div class="p-4 bg-slate-50 border-b border-slate-200">
+              <div class="flex flex-wrap gap-6 text-sm">
+                <div>
+                  <span class="text-slate-500">รวมค่าคำนวณ:</span>
+                  <span class="ml-1 font-semibold text-slate-800">{{ formatCurrency(testResult()!.total_calculated) }}</span>
+                </div>
+                <div>
+                  <span class="text-slate-500">ค่าปกติ:</span>
+                  <span class="ml-1 font-semibold text-slate-800">{{ formatCurrency(testResult()!.total_normal) }}</span>
+                </div>
+                <div>
+                  <span class="text-slate-500">ส่วนต่าง:</span>
+                  <span class="ml-1 font-semibold" [class.text-green-600]="testResult()!.total_savings > 0" [class.text-slate-800]="testResult()!.total_savings === 0">{{ formatCurrency(testResult()!.total_savings) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="divide-y divide-slate-100">
+              @for (item of testResult()!.results; track item.promotion_item_id) {
+                <div class="p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-medium text-slate-800">{{ item.promotion_item_name }}</span>
+                    <span class="text-lg font-semibold text-slate-800">{{ formatCurrency(item.calculated_value) }}</span>
+                  </div>
+                  <div class="flex flex-wrap gap-4 text-xs text-slate-500">
+                    <span>ฐาน: {{ formatCurrency(item.formula.base_amount) }}</span>
+                    <span>อัตรา: {{ formatRate(item.effective_rate) }}</span>
+                    <span>สัดส่วน: {{ formatShare(item.effective_buyer_share) }}</span>
+                    @if (item.applied_policy) {
+                      <span class="text-blue-600">Policy: {{ item.applied_policy.policy_name }}</span>
+                    } @else {
+                      <span class="text-slate-400">ไม่มี Policy</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </mat-tab>
+
+    <!-- ══ Tab 2: ทดสอบทั้งโครงการ ══ -->
+    <mat-tab label="ทดสอบทั้งโครงการ">
+      <div class="pt-4">
+        <div class="section-card mb-4">
+          <form [formGroup]="batchForm" class="flex flex-wrap gap-4 items-end">
+
+            <mat-form-field appearance="outline" class="w-56">
+              <mat-label>สูตร (ทั้งหมด = ว่าง)</mat-label>
+              <mat-select formControlName="formulaId">
+                <mat-option [value]="null">ทั้งหมด</mat-option>
+                @for (f of formulas(); track f.id) {
+                  <mat-option [value]="f.id">{{ f.promotion_item_name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="w-44">
+              <mat-label>วันที่ขาย</mat-label>
+              <input matInput [matDatepicker]="batchDatePicker" formControlName="saleDate" />
+              <mat-datepicker-toggle matSuffix [for]="batchDatePicker" />
+              <mat-datepicker #batchDatePicker />
+            </mat-form-field>
+
+            <button mat-flat-button color="primary" (click)="calculateBatch()" [disabled]="calculatingBatch()" class="h-14">
+              @if (calculatingBatch()) { <mat-spinner diameter="18" class="!inline-block mr-1" /> }
+              คำนวณทุกยูนิต
+            </button>
+          </form>
+        </div>
+
+        <!-- Batch results table -->
+        @if (batchResults().length > 0) {
+          <div class="bg-white rounded-lg border border-slate-200 overflow-hidden relative">
+            @if (calculatingBatch()) {
+              <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10"><mat-spinner diameter="36" /></div>
+            }
+
+            <div class="overflow-auto">
+              <table mat-table [dataSource]="batchDataSource" matSort #batchSort="matSort" class="w-full min-w-[800px]">
+
+                <ng-container matColumnDef="unit_code">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">ยูนิต</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm !font-mono !text-slate-700">{{ r.unit_code }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="base_amount">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">ฐาน</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm !text-right !text-slate-700">{{ formatCurrency(r.base_amount) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="rate">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">อัตรา</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm !text-right !text-slate-700">{{ formatRate(r.rate) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="buyer_share">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">สัดส่วน</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm !text-right !text-slate-700">{{ formatShare(r.buyer_share) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="calculated_value">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">ค่าคำนวณ</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm !text-right !font-semibold !text-slate-800">{{ formatCurrency(r.calculated_value) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="matched_policy">
+                  <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">Policy</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm !text-slate-600">{{ r.matched_policy ?? '—' }}</td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="batchColumns; sticky: true"></tr>
+                <tr mat-row *matRowDef="let row; columns: batchColumns;" class="hover:bg-slate-50 transition-colors even:bg-slate-50/40"></tr>
+              </table>
+            </div>
+
+            <mat-paginator #batchPaginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons class="border-t border-slate-200" />
+          </div>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

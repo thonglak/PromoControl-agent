@@ -1,0 +1,81 @@
+<div class="p-2">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6 px-4 pt-4">
+    <h2 class="text-lg font-semibold text-slate-800">สร้างผู้ดูแลระบบ</h2>
+    <button mat-icon-button type="button" (click)="onCancel()" [disabled]="loading()"
+            aria-label="ปิด">
+      <app-icon name="x-mark" />
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-4 px-4 pb-4">
+
+    <!-- ชื่อ -->
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>ชื่อ-นามสกุล</mat-label>
+      <input matInput formControlName="name" placeholder="ผู้ดูแลระบบ" />
+      @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+        <mat-error>กรุณากรอกชื่อ</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- อีเมล -->
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>อีเมล</mat-label>
+      <input matInput type="email" formControlName="email"
+             placeholder="admin@example.com" autocomplete="off" />
+      @if (form.get('email')?.hasError('required') && form.get('email')?.touched) {
+        <mat-error>กรุณากรอกอีเมล</mat-error>
+      } @else if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+        <mat-error>รูปแบบอีเมลไม่ถูกต้อง</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- รหัสผ่าน -->
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>รหัสผ่าน</mat-label>
+      <input matInput [type]="showPassword() ? 'text' : 'password'"
+             formControlName="password" autocomplete="new-password" />
+      <button mat-icon-button matSuffix type="button"
+              (click)="showPassword.set(!showPassword())"
+              [attr.aria-label]="showPassword() ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'">
+        <app-icon [name]="showPassword() ? 'eye-slash' : 'eye'" />
+      </button>
+      @if (form.get('password')?.hasError('required') && form.get('password')?.touched) {
+        <mat-error>กรุณากรอกรหัสผ่าน</mat-error>
+      } @else if (form.get('password')?.hasError('minlength') && form.get('password')?.touched) {
+        <mat-error>รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- ยืนยันรหัสผ่าน -->
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>ยืนยันรหัสผ่าน</mat-label>
+      <input matInput [type]="showPassword() ? 'text' : 'password'"
+             formControlName="confirmPassword" autocomplete="new-password" />
+      @if (form.get('confirmPassword')?.hasError('required') && form.get('confirmPassword')?.touched) {
+        <mat-error>กรุณายืนยันรหัสผ่าน</mat-error>
+      } @else if (form.hasError('passwordsMismatch') && form.get('confirmPassword')?.touched) {
+        <mat-error>รหัสผ่านไม่ตรงกัน</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- Buttons -->
+    <div class="flex gap-3 pt-2">
+      <button mat-stroked-button type="button" class="flex-1"
+              (click)="onCancel()" [disabled]="loading()">
+        ยกเลิก
+      </button>
+      <button mat-flat-button color="primary" type="submit" class="flex-1"
+              [disabled]="form.invalid || loading()">
+        @if (loading()) {
+          <mat-spinner diameter="20" />
+        } @else {
+          สร้างผู้ดูแลระบบ
+        }
+      </button>
+    </div>
+
+  </form>
+</div>

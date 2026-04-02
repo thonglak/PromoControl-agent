@@ -1,0 +1,139 @@
+<!-- Sidebar: 240px (expanded) / 56px (collapsed) -->
+<nav
+  class="sidebar h-full flex flex-col overflow-hidden transition-[width] duration-200 ease-in-out"
+  [class.w-60]="!collapsed"
+  [class.w-14]="collapsed"
+>
+
+  <!-- ── Sidebar Header: Project info ───────────────────────────────────── -->
+  <div class="border-b border-white/10 flex-shrink-0"
+       [class.p-3]="!collapsed"
+       [class.py-3]="collapsed">
+
+    @if (!collapsed) {
+      <!-- Expanded: show project name, badge, change button -->
+      <div class="flex items-start gap-2">
+        <div class="flex-1 min-w-0">
+          <p class="text-[10px] text-white/40 uppercase tracking-wide mb-0.5 font-medium">PromoControl</p>
+          <p class="text-sm font-semibold text-white truncate leading-tight">
+            {{ selectedProject()?.name ?? '—' }}
+          </p>
+          @if (selectedProject()) {
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold mt-1.5 leading-none"
+                  style="background-color: var(--color-accent-light); color: var(--color-accent-warm)">
+              {{ selectedProject()?.access_level === 'edit' ? 'แก้ไขได้' : 'ดูอย่างเดียว' }}
+            </span>
+          }
+        </div>
+        <!-- Change project button -->
+        <button mat-icon-button
+                matTooltip="เปลี่ยนโครงการ"
+                matTooltipPosition="right"
+                (click)="changeProject()"
+                class="flex-shrink-0 !w-7 !h-7">
+          <app-icon name="arrow-right-on-rectangle" class="w-4 h-4 text-white/70" />
+        </button>
+      </div>
+    } @else {
+      <!-- Collapsed: icon only -->
+      <div class="flex justify-center">
+        <button mat-icon-button
+                matTooltip="{{ selectedProject()?.name ?? 'เปลี่ยนโครงการ' }}"
+                matTooltipPosition="right"
+                (click)="changeProject()">
+          <app-icon name="building-office" class="w-5 h-5 text-white/70" />
+        </button>
+      </div>
+    }
+  </div>
+
+  <!-- ── Menu items ─────────────────────────────────────────────────────── -->
+  <div class="flex-1 overflow-y-auto overflow-x-hidden py-2 space-y-0.5">
+
+    @for (item of filteredMenu(); track item.label) {
+
+      @if (!item.children) {
+        <!-- ── Leaf item ─────────────────────────────────────────────── -->
+        <a
+          [routerLink]="item.path"
+          routerLinkActive
+          #rla="routerLinkActive"
+          [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
+          class="sidebar-menu-item flex items-center gap-3 mx-2 no-underline cursor-pointer"
+          [class.active]="rla.isActive"
+          [matTooltip]="collapsed ? item.label : ''"
+          matTooltipPosition="right"
+        >
+          @if (item.icon) {
+            <app-icon [name]="item.icon" class="menu-icon w-5 h-5 flex-shrink-0" />
+          }
+          @if (!collapsed) {
+            <span class="truncate">{{ item.label }}</span>
+          }
+        </a>
+
+      } @else {
+        <!-- ── Group item ─────────────────────────────────────────────── -->
+        <div>
+          <button
+            type="button"
+            (click)="toggleGroup(item.label)"
+            class="sidebar-menu-item w-full flex items-center mx-2 cursor-pointer"
+            [class.active]="isGroupActive(item)"
+            [style.width]="'calc(100% - 16px)'"
+            [matTooltip]="collapsed ? item.label : ''"
+            matTooltipPosition="right"
+          >
+            @if (item.icon) {
+              <app-icon [name]="item.icon" class="menu-icon w-5 h-5 flex-shrink-0" />
+            }
+            @if (!collapsed) {
+              <span class="flex-1 text-left truncate ml-3">{{ item.label }}</span>
+              <app-icon
+                [name]="isExpanded(item.label) ? 'chevron-down' : 'chevron-right'"
+                class="w-4 h-4 flex-shrink-0 text-white/40"
+              />
+            }
+          </button>
+
+          <!-- Submenu -->
+          @if (!collapsed && isExpanded(item.label)) {
+            <div class="ml-8 mt-0.5 mb-1 space-y-0.5 border-l border-white/10 pl-2">
+              @for (child of item.children; track child.path) {
+                <a
+                  [routerLink]="child.path"
+                  routerLinkActive
+                  #crla="routerLinkActive"
+                  [routerLinkActiveOptions]="{ exact: child.exact ?? false }"
+                  class="sidebar-submenu-item flex items-center px-3 py-2 text-sm transition-colors
+                         cursor-pointer no-underline"
+                  [class.active]="crla.isActive"
+                  style="border-radius: var(--radius-sm)"
+                >
+                  {{ child.label }}
+                </a>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+
+  </div>
+
+  <!-- ── Collapse toggle (desktop) ──────────────────────────────────────── -->
+  <div class="border-t border-white/10 flex-shrink-0 p-2 flex justify-center">
+    <button
+      mat-icon-button
+      (click)="collapseToggle.emit()"
+      [matTooltip]="collapsed ? 'ขยาย Sidebar' : 'ย่อ Sidebar'"
+      matTooltipPosition="right"
+    >
+      <app-icon
+        [name]="collapsed ? 'chevron-right' : 'chevron-left'"
+        class="w-4 h-4 text-white/40"
+      />
+    </button>
+  </div>
+
+</nav>

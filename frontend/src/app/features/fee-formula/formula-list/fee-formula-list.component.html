@@ -1,0 +1,111 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="page-title m-0">สูตรคำนวณค่าธรรมเนียม</h1>
+      <p class="text-caption mt-1" style="color: var(--color-gray-500)">จัดการสูตรคำนวณสำหรับรายการที่มีโหมด "คำนวณอัตโนมัติ"</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700">
+        <app-icon name="adjustments-horizontal" class="w-5 h-5" />
+      </button>
+      @if (canWrite()) {
+        <button mat-flat-button color="primary" (click)="openCreate()" class="flex items-center gap-2">
+          <app-icon name="plus" class="w-4 h-4" /> สร้างสูตร
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Table card -->
+  <div class="bg-white rounded-lg border border-slate-200 overflow-hidden relative">
+    @if (loading()) {
+      <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10"><mat-spinner diameter="36" /></div>
+    }
+
+    <div class="overflow-auto">
+      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" class="w-full min-w-[900px]">
+
+        <!-- Promotion Item -->
+        <ng-container matColumnDef="promotion_item">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">รายการ</th>
+          <td mat-cell *matCellDef="let r" class="!text-sm !text-slate-800">
+            <span class="font-mono text-slate-500">{{ r.promotion_item_code }}</span>
+            <span class="mx-1 text-slate-300">—</span>
+            <span class="font-medium">{{ r.promotion_item_name }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Base Field -->
+        <ng-container matColumnDef="base_field">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">ฐานคำนวณ</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" [ngClass]="baseFieldClass(r.base_field)">{{ baseFieldLabel(r.base_field) }}</span>
+            @if (r.base_field === 'manual_input' && r.manual_input_label) {
+              <span class="text-xs text-slate-500 ml-1">({{ r.manual_input_label }})</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Default Rate -->
+        <ng-container matColumnDef="default_rate">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">อัตรา</th>
+          <td mat-cell *matCellDef="let r" class="!text-sm !text-right !text-slate-700 !font-medium">{{ formatRate(r.default_rate) }}</td>
+        </ng-container>
+
+        <!-- Buyer Share -->
+        <ng-container matColumnDef="buyer_share">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">สัดส่วนผู้ซื้อ</th>
+          <td mat-cell *matCellDef="let r" class="!text-sm !text-right !text-slate-700">{{ formatShare(r.buyer_share) }}</td>
+        </ng-container>
+
+        <!-- Policies -->
+        <ng-container matColumnDef="policies">
+          <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">Policy</th>
+          <td mat-cell *matCellDef="let r" class="!text-center">
+            <span class="text-sm"
+                  [class.text-green-600]="r.active_policies_count > 0"
+                  [class.text-slate-400]="r.active_policies_count === 0">
+              {{ r.active_policies_count }} / {{ r.policies_count }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Actions -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">จัดการ</th>
+          <td mat-cell *matCellDef="let r" class="!text-center">
+            <div class="flex justify-center gap-1">
+              @if (canWrite()) {
+                <button mat-icon-button matTooltip="แก้ไข" class="!text-slate-500 hover:!text-blue-600" (click)="openEdit(r)">
+                  <app-icon name="pencil-square" class="w-4 h-4" />
+                </button>
+              }
+              <button mat-icon-button matTooltip="มาตรการ/นโยบาย" class="!text-slate-500 hover:!text-indigo-600" (click)="viewPolicies(r)">
+                <app-icon name="document-text" class="w-4 h-4" />
+              </button>
+              @if (canWrite()) {
+                <button mat-icon-button matTooltip="ลบ" class="!text-slate-500 hover:!text-red-600" (click)="confirmDelete(r)">
+                  <app-icon name="trash" class="w-4 h-4" />
+                </button>
+              }
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns(); sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns();" class="hover:bg-slate-50 transition-colors even:bg-slate-50/40"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell text-center py-12 text-slate-400" [attr.colspan]="displayedColumns().length">
+            <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p>ยังไม่มีสูตรคำนวณ</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <mat-paginator [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons class="border-t border-slate-200" />
+  </div>
+</div>

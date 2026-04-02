@@ -1,0 +1,176 @@
+<div class="p-6 space-y-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <!-- Header -->
+  <app-page-header title="แดชบอร์ด" [subtitle]="projectName()">
+    @if (canWrite()) {
+      <div actions class="flex gap-2">
+        <button mat-flat-button color="primary" (click)="goToSales()">
+          <app-icon name="document-text" class="w-4 h-4 mr-1"></app-icon>
+          บันทึกการขาย
+        </button>
+        <button mat-stroked-button (click)="goToBudget()">
+          <app-icon name="banknotes" class="w-4 h-4 mr-1"></app-icon>
+          จัดการงบ
+        </button>
+      </div>
+    }
+  </app-page-header>
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="flex justify-center items-center py-20">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  }
+
+  <!-- Error -->
+  @if (error()) {
+    <div class="p-4 text-sm" style="background-color: var(--color-error-subtle); border: 1px solid var(--color-error); border-radius: var(--radius-md); color: var(--color-error)">
+      {{ error() }}
+      <button class="ml-3 underline" (click)="retry()">ลองใหม่</button>
+    </div>
+  }
+
+  @if (!loading() && summary()) {
+
+    <!-- Row 1: KPI Stat Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <app-stat-card label="ยอดขายรวม" [value]="totalSalesAmount()" prefix="฿"
+                     icon="currency-dollar" variant="default"
+                     [description]="totalActiveLabel()" />
+      <app-stat-card label="ส่วนลดรวม" [value]="totalDiscount()" prefix="฿"
+                     icon="tag" variant="discount" />
+      <app-stat-card label="กำไรรวม" [value]="totalProfit()" prefix="฿"
+                     icon="chart-bar" [variant]="totalProfit() > 0 ? 'profit' : 'loss'" />
+      <app-stat-card label="ต้นทุนจากของแถม" [value]="promoBurden()" prefix="฿"
+                     icon="receipt-percent" variant="loss" />
+      <app-stat-card label="งบประมาณคงเหลือ" [value]="budgetRemaining()" prefix="฿"
+                     icon="banknotes" variant="budget"
+                     [description]="'ใช้ไป ' + budgetUsedPercent() + '%'" />
+    </div>
+
+    <!-- Row 2: 3 columns (stack on mobile) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Column 1: ยอดขายล่าสุด (span 2) -->
+      <div class="lg:col-span-2">
+        <app-section-card title="ยอดขายล่าสุด" icon="clock" [noPadding]="true">
+          @if (recentSales() && recentSales().length > 0) {
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--color-border)">
+                    <th class="text-left py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">เลขที่</th>
+                    <th class="text-left py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">ยูนิต</th>
+                    <th class="text-right py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">ราคาขาย</th>
+                    <th class="text-right py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">ราคาสุทธิ</th>
+                    <th class="text-right py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">กำไร</th>
+                    <th class="text-left py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">วันที่</th>
+                    <th class="text-center py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (sale of recentSales(); track sale.sale_no) {
+                    <tr
+                      class="cursor-pointer transition-colors"
+                      style="border-bottom: 1px solid var(--color-gray-100)"
+                      [class.opacity-60]="sale.status === 'cancelled'"
+                      (click)="goToSaleDetail(sale)">
+                      <td class="py-2.5 px-4">
+                        @if (sale.status === 'cancelled') {
+                          <span class="line-through">{{ sale.sale_no }}</span>
+                        } @else {
+                          {{ sale.sale_no }}
+                        }
+                      </td>
+                      <td class="py-2.5 px-4">{{ sale.unit_code }}</td>
+                      <td class="py-2.5 px-4 text-right tabular-nums">
+                        @if (sale.status === 'cancelled') {
+                          <span class="line-through">{{ formatCurrency(sale.base_price) }}</span>
+                        } @else {
+                          {{ formatCurrency(sale.base_price) }}
+                        }
+                      </td>
+                      <td class="py-2.5 px-4 text-right tabular-nums">
+                        @if (sale.status === 'cancelled') {
+                          <span class="line-through">{{ formatCurrency(sale.net_price) }}</span>
+                        } @else {
+                          {{ formatCurrency(sale.net_price) }}
+                        }
+                      </td>
+                      <td class="py-2.5 px-4 text-right tabular-nums font-medium" [style.color]="getProfitColor(sale.profit)">
+                        {{ formatCurrency(sale.profit) }}
+                      </td>
+                      <td class="py-2.5 px-4">{{ sale.sale_date | thaiDate }}</td>
+                      <td class="py-2.5 px-4 text-center">
+                        <app-status-chip type="transaction_status" [value]="sale.status" />
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <app-empty-state title="ยังไม่มีรายการขาย" icon="shopping-cart"
+                            description="เริ่มบันทึกรายการขายแรกของโครงการ" />
+          }
+        </app-section-card>
+      </div>
+
+      <!-- Column 2: สรุปสถานะยูนิต + สรุปงบประมาณ -->
+      <div class="space-y-6">
+
+        <!-- สถานะยูนิต -->
+        <app-section-card title="สถานะยูนิต" icon="squares-2x2">
+          @if (charts()?.unit_status_chart) {
+            <div class="space-y-3">
+              @for (item of charts()!.unit_status_chart; track item.status) {
+                <div class="flex items-center gap-3">
+                  <span class="w-16 text-sm text-right" style="color: var(--color-gray-700)">{{ item.label }}</span>
+                  <div class="flex-1 h-2.5 rounded-full overflow-hidden" style="background-color: var(--color-gray-100)">
+                    <div class="h-full rounded-full transition-all duration-500"
+                         [style.width.%]="item.count > 0 ? (item.count / totalUnits()) * 100 : 0"
+                         [style.background-color]="getUnitStatusColor(item.status)"></div>
+                  </div>
+                  <span class="w-8 text-sm font-medium" [style.color]="getUnitStatusColor(item.status)">{{ item.count }}</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="text-sm" style="color: var(--color-gray-500)">กำลังโหลด...</p>
+          }
+        </app-section-card>
+
+        <!-- สรุปงบประมาณตาม Source -->
+        <app-section-card title="งบประมาณตามแหล่ง" icon="banknotes">
+          @if (charts()?.budget_usage_by_source) {
+            <div class="space-y-4">
+              @for (item of charts()!.budget_usage_by_source; track item.source) {
+                <div>
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-medium" style="color: var(--color-gray-700)">{{ item.label }}</span>
+                    <span class="text-xs" style="color: var(--color-gray-500)">{{ formatCurrency(item.used) }} / {{ formatCurrency(item.allocated) }}</span>
+                  </div>
+                  <div class="h-2 rounded-full overflow-hidden" style="background-color: var(--color-gray-100)">
+                    <div class="h-full rounded-full transition-all duration-500"
+                         [style.width.%]="item.allocated > 0 ? (item.used / item.allocated) * 100 : 0"
+                         [style.background-color]="getBudgetBarColor(item)"></div>
+                  </div>
+                  @if (item.returned > 0) {
+                    <p class="text-xs mt-1" style="color: var(--color-profit)">คืนแล้ว: {{ formatCurrency(item.returned) }}</p>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="text-sm" style="color: var(--color-gray-500)">กำลังโหลด...</p>
+          }
+        </app-section-card>
+
+      </div>
+
+    </div>
+
+  }
+
+</div>

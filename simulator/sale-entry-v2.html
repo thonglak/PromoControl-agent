@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PromoControl — Sale Entry (Mobile)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --primary-light: #EFF6FF;
+            --secondary: #64748B;
+            --bg: #F1F5F9;
+            --card-bg: #FFFFFF;
+            --border: #E2E8F0;
+            --text: #1E293B;
+            --text-muted: #64748B;
+            --profit: #16A34A;
+            --cost: #DC2626;
+            --discount: #F59E0B;
+            --budget-remaining: #0284C7;
+            --budget-exceeded: #B91C1C;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.5;
+            padding-bottom: calc(64px + var(--safe-bottom));
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== TOP BAR ===== */
+        .topbar {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        .topbar-logo {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sim-badge {
+            background: #FEF3C7;
+            color: #92400E;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        /* ===== PAGE CONTENT ===== */
+        .page {
+            padding: 12px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .page-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* ===== ACCORDION CARD ===== */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            min-height: 48px;
+        }
+
+        .card-head:active {
+            background: #F8FAFC;
+        }
+
+        .card-head-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .card-label {
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .card-arrow {
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            transition: transform .2s;
+            margin-left: 8px;
+        }
+
+        .card.open .card-arrow {
+            transform: rotate(180deg);
+        }
+
+        .card-body {
+            display: none;
+            padding: 0 16px 16px;
+        }
+
+        .card.open .card-body {
+            display: block;
+        }
+
+        /* ===== FORM ===== */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .form-row.full {
+            grid-template-columns: 1fr;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .form-input, .form-select {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--text);
+            background: var(--card-bg);
+            min-height: 44px;
+            transition: border-color .15s;
+            width: 100%;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+        }
+
+        .form-input.readonly {
+            background: #F1F5F9;
+            color: var(--text-muted);
+        }
+
+        .form-input.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ===== BUDGET SOURCE LIST ===== */
+        .budget-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .budget-item:last-child {
+            border-bottom: none;
+        }
+
+        .budget-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .budget-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .budget-detail {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .budget-amount {
+            text-align: right;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+
+        .budget-amount .amt {
+            font-size: 14px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .budget-amount .sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .remaining-positive { color: var(--budget-remaining); }
+        .remaining-negative { color: var(--budget-exceeded); font-weight: 700; }
+        .remaining-zero { color: var(--text-muted); }
+
+        .alloc-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--primary);
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            min-height: 36px;
+        }
+
+        .alloc-btn.allocated {
+            border-color: var(--profit);
+            background: #F0FDF4;
+            color: var(--profit);
+        }
+
+        .budget-locked-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 8px;
+            background: #F1F5F9;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .budget-total-bar {
+            margin-top: 12px;
+            padding: 10px 12px;
+            background: var(--primary-light);
+            border-radius: 10px;
+        }
+
+        .budget-total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .budget-total-row .lbl {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .budget-total-row .val {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ===== PROMO ITEM CARDS ===== */
+        .panel-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .panel-tag.a {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            color: #1D40AE;
+        }
+
+        .panel-tag.b {
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
+            color: #15803D;
+        }
+
+        .promo-card {
+            background: #F8FAFC;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+
+        .promo-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .promo-card-name {
+            font-size: 14px;
+            font-weight: 600;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .promo-card-num {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-left: 6px;
+        }
+
+        .chip.discount { background: #FEF3C7; color: #92400E; }
+        .chip.premium { background: #DBEAFE; color: #1E40AF; }
+        .chip.expense_support { background: #FEE2E2; color: #991B1B; }
+
+        .promo-card-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .promo-card-fields.three {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .promo-field {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .promo-field-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .promo-field-value {
+            font-size: 13px;
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .promo-input {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            background: white;
+            min-height: 40px;
+            width: 100%;
+        }
+
+        .promo-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+        }
+
+        .promo-input.num-input {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .promo-input.input-error {
+            border-color: var(--cost);
+            background: #FEF2F2;
+        }
+
+        .promo-select {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            background: white;
+            min-height: 40px;
+            width: 100%;
+        }
+
+        .promo-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+        }
+
+        .promo-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        .convert-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .toggle {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            appearance: none;
+            -webkit-appearance: none;
+            background: #CBD5E1;
+            border-radius: 11px;
+            cursor: pointer;
+            transition: background .2s;
+            flex-shrink: 0;
+        }
+
+        .toggle:checked { background: var(--primary); }
+
+        .toggle::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: transform .2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .toggle:checked::before { transform: translateX(18px); }
+        .toggle:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .remove-btn {
+            background: none;
+            border: 1px solid #FCA5A5;
+            color: var(--cost);
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            min-height: 36px;
+        }
+
+        .remove-btn:active { background: #FEE2E2; }
+
+        .add-row-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            background: none;
+            border: 1.5px dashed var(--border);
+            border-radius: 10px;
+            color: var(--primary);
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            min-height: 48px;
+        }
+
+        .add-row-btn:active { background: var(--primary-light); border-color: var(--primary); }
+
+        /* Panel subtotal */
+        .panel-subtotal {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            margin-top: 8px;
+            background: #F8FAFC;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .panel-subtotal .sub-label { color: var(--text-muted); font-weight: 500; }
+        .panel-subtotal .sub-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+        .panel-warn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: var(--cost);
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+
+        .panel-warn.hidden { display: none; }
+
+        .empty-state {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* ===== STICKY BOTTOM BAR ===== */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+            z-index: 300;
+            padding: 8px 12px calc(8px + var(--safe-bottom));
+        }
+
+        .bottom-bar-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            min-height: 44px;
+        }
+
+        .bottom-profit {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bottom-profit-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .bottom-profit-value {
+            font-size: 20px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.2;
+        }
+
+        .bottom-margin {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 8px;
+        }
+
+        .bottom-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-secondary { background: #F1F5F9; color: var(--text); }
+        .btn-secondary:active { background: #E2E8F0; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:active { background: var(--primary-hover); }
+        .btn-success { background: var(--profit); color: white; flex: 2; }
+        .btn-success:active { background: #15803D; }
+
+        /* ===== BOTTOM SHEET (Summary) ===== */
+        .sheet-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 400;
+        }
+
+        .sheet-overlay.show { display: block; }
+
+        .sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-radius: 20px 20px 0 0;
+            z-index: 500;
+            max-height: 85vh;
+            overflow-y: auto;
+            transform: translateY(100%);
+            transition: transform .3s cubic-bezier(.32,.72,0,1);
+            padding-bottom: var(--safe-bottom);
+        }
+
+        .sheet.show { transform: translateY(0); }
+
+        .sheet-handle {
+            width: 36px;
+            height: 4px;
+            background: #CBD5E1;
+            border-radius: 2px;
+            margin: 10px auto 6px;
+        }
+
+        .sheet-content { padding: 0 16px 20px; }
+
+        .sheet-title {
+            font-size: 16px;
+            font-weight: 700;
+            padding: 8px 0 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-badge {
+            background: #DCFCE7;
+            color: var(--profit);
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 8px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .summary-row:last-child { border-bottom: none; }
+        .summary-row .lbl { font-size: 13px; color: var(--text-muted); }
+        .summary-row .val { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+        .summary-divider { border-top: 2px solid var(--border); margin: 4px 0; }
+
+        .summary-big {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+        }
+
+        .summary-big .lbl { font-size: 15px; font-weight: 700; }
+        .summary-big .val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+        .text-profit { color: var(--profit); }
+        .text-cost { color: var(--cost); }
+        .text-discount { color: var(--discount); }
+        .text-budget { color: var(--budget-remaining); }
+        .text-exceeded { color: var(--budget-exceeded); }
+
+        .bar-wrapper { margin-top: 8px; }
+        .bar-labels { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+        .bar-track { height: 7px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 4px; transition: width .3s, background .3s; }
+
+        .summary-section {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .summary-section-title {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--text);
+        }
+
+        /* ===== DIALOG (Inline Budget Allocation) ===== */
+        .dialog-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            border-radius: 20px 20px 0 0;
+            z-index: 600;
+            transform: translateY(100%);
+            transition: transform .3s cubic-bezier(.32,.72,0,1);
+            padding: 0 16px calc(20px + var(--safe-bottom));
+        }
+
+        .dialog-sheet.show { transform: translateY(0); }
+
+        .dialog-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 550;
+        }
+
+        .dialog-overlay.show { display: block; }
+
+        .dialog-form-group { margin-bottom: 14px; }
+
+        .dialog-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .dialog-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--text);
+            min-height: 44px;
+        }
+
+        .dialog-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+        }
+
+        .dialog-input.readonly { background: #F1F5F9; color: var(--text-muted); }
+
+        .dialog-error { color: var(--cost); font-size: 12px; margin-top: 4px; display: none; }
+
+        .dialog-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: calc(76px + var(--safe-bottom));
+            left: 12px;
+            right: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-weight: 500;
+            font-size: 13px;
+            color: white;
+            z-index: 9999;
+            font-family: inherit;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            text-align: center;
+            transition: opacity .3s;
+        }
+
+        /* ===== FORMULA ===== */
+        .formula-card {
+            background: #F8FAFC;
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .formula-card .ftitle {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .formula-card code {
+            font-size: 11px;
+            color: var(--secondary);
+            line-height: 1.8;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+    <div class="topbar-logo">PromoControl</div>
+    <div class="topbar-right">
+        <span class="sim-badge">SIMULATOR v2</span>
+        <div class="user-avatar">&#3626;</div>
+    </div>
+</div>
+
+<!-- DIALOG OVERLAY -->
+<div class="dialog-overlay" id="dialogOverlay" onclick="closeDialog()"></div>
+<div class="dialog-sheet" id="dialogSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" style="padding:0 0 12px">&#3605;&#3633;&#3657;&#3591;&#3591;&#3610;&#3612;&#3641;&#3585;&#3618;&#3641;&#3609;&#3636;&#3605;</div>
+    <div class="dialog-form-group">
+        <label class="dialog-label">&#3649;&#3627;&#3621;&#3656;&#3591;&#3591;&#3610;</label>
+        <input class="dialog-input readonly" id="dialogSourceName" readonly>
+    </div>
+    <div class="dialog-form-group">
+        <label class="dialog-label">&#3592;&#3635;&#3609;&#3623;&#3609;&#3648;&#3591;&#3636;&#3609;&#3607;&#3637;&#3656;&#3605;&#3657;&#3629;&#3591;&#3585;&#3634;&#3619;&#3605;&#3633;&#3657;&#3591; (&#3610;&#3634;&#3607;)</label>
+        <input class="dialog-input" id="dialogAmount" type="text" inputmode="numeric" placeholder="&#3648;&#3594;&#3656;&#3609; 200,000"
+               oninput="formatDialogAmount(this)" style="text-align:right;font-variant-numeric:tabular-nums">
+        <div class="dialog-error" id="dialogAmountError">&#3585;&#3619;&#3640;&#3603;&#3634;&#3585;&#3619;&#3629;&#3585;&#3592;&#3635;&#3609;&#3623;&#3609;&#3648;&#3591;&#3636;&#3609;&#3651;&#3627;&#3657;&#3606;&#3641;&#3585;&#3605;&#3657;&#3629;&#3591;</div>
+    </div>
+    <div class="dialog-form-group">
+        <label class="dialog-label">&#3627;&#3617;&#3634;&#3618;&#3648;&#3627;&#3605;&#3640;</label>
+        <input class="dialog-input" id="dialogNote" placeholder="&#3648;&#3594;&#3656;&#3609; &#3629;&#3609;&#3640;&#3617;&#3633;&#3605;&#3636;&#3650;&#3604;&#3618;&#3612;&#3641;&#3657;&#3592;&#3633;&#3604;&#3585;&#3634;&#3619;">
+    </div>
+    <div class="dialog-actions">
+        <button class="btn btn-secondary" onclick="closeDialog()">&#3618;&#3585;&#3648;&#3621;&#3636;&#3585;</button>
+        <button class="btn btn-primary" onclick="confirmAlloc()">&#3618;&#3639;&#3609;&#3618;&#3633;&#3609;&#3605;&#3633;&#3657;&#3591;&#3591;&#3610;</button>
+    </div>
+</div>
+
+<!-- SUMMARY SHEET -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
+<div class="sheet" id="summarySheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+        <div class="sheet-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            &#3626;&#3619;&#3640;&#3611;&#3585;&#3634;&#3619;&#3588;&#3635;&#3609;&#3623;&#3603; <span class="live-badge">LIVE</span>
+        </div>
+
+        <div class="summary-row">
+            <span class="lbl">&#3619;&#3634;&#3588;&#3634;&#3586;&#3634;&#3618; (Base Price)</span>
+            <span class="val" id="sumBasePrice">&mdash;</span>
+        </div>
+        <div class="summary-row">
+            <span class="lbl">&#3619;&#3623;&#3617;&#3626;&#3656;&#3623;&#3609;&#3621;&#3604; (Discount)</span>
+            <span class="val text-discount" id="sumDiscount">0.00</span>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-row" style="padding:10px 0">
+            <span class="lbl" style="font-weight:700;color:var(--text);font-size:14px">&#3619;&#3634;&#3588;&#3634;&#3626;&#3640;&#3607;&#3608;&#3636; (Net Price)</span>
+            <span class="val" id="sumNetPrice" style="font-size:17px">&mdash;</span>
+        </div>
+
+        <div class="summary-row" style="margin-top:4px">
+            <span class="lbl">&#3619;&#3634;&#3588;&#3634;&#3605;&#3657;&#3609;&#3607;&#3640;&#3609; (Unit Cost)</span>
+            <span class="val" id="sumUnitCost">&mdash;</span>
+        </div>
+        <div class="summary-row">
+            <span class="lbl">&#3605;&#3657;&#3609;&#3607;&#3640;&#3609;&#3586;&#3629;&#3591;&#3649;&#3606;&#3617; (Promo)</span>
+            <span class="val text-cost" id="sumPromoCost">0.00</span>
+        </div>
+        <div class="summary-row">
+            <span class="lbl">&#3588;&#3656;&#3634;&#3651;&#3594;&#3657;&#3592;&#3656;&#3634;&#3618;&#3629;&#3640;&#3604;&#3627;&#3609;&#3640;&#3609; (Expense)</span>
+            <span class="val text-cost" id="sumExpense">0.00</span>
+        </div>
+        <div class="summary-row" style="padding:6px 0;border-top:1px dashed var(--border)">
+            <span class="lbl" style="font-weight:600;color:var(--text)">&#3605;&#3657;&#3609;&#3607;&#3640;&#3609;&#3592;&#3634;&#3585;&#3586;&#3629;&#3591;&#3649;&#3606;&#3617; (Burden)</span>
+            <span class="val text-cost" id="sumPromoBurden">0.00</span>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-row" style="padding:10px 0">
+            <span class="lbl" style="font-weight:700;color:var(--text);font-size:14px">&#3605;&#3657;&#3609;&#3607;&#3640;&#3609;&#3619;&#3623;&#3617; (Total Cost)</span>
+            <span class="val text-cost" id="sumTotalCost" style="font-size:17px">&mdash;</span>
+        </div>
+        <div class="summary-big">
+            <span class="lbl">&#3585;&#3635;&#3652;&#3619; (Profit)</span>
+            <span class="val" id="sumProfit">&mdash;</span>
+        </div>
+        <div class="bar-wrapper">
+            <div class="bar-labels">
+                <span style="color:var(--text-muted)">&#3629;&#3633;&#3605;&#3619;&#3634;&#3585;&#3635;&#3652;&#3619; (Margin)</span>
+                <span style="font-weight:600" id="marginPct">&mdash;</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill" id="marginBar" style="width:0;background:var(--profit)"></div></div>
+        </div>
+
+        <!-- Budget summary section -->
+        <div class="summary-section">
+            <div class="summary-section-title">&#3626;&#3619;&#3640;&#3611;&#3585;&#3634;&#3619;&#3651;&#3594;&#3657;&#3591;&#3610;&#3611;&#3619;&#3632;&#3617;&#3634;&#3603;</div>
+            <div class="summary-row">
+                <span class="lbl">&#3591;&#3610;&#3618;&#3641;&#3609;&#3636;&#3605; (Unit Standard)</span>
+                <span class="val" id="sumBudgetUnit">&mdash;</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">&#3591;&#3610;&#3629;&#3639;&#3656;&#3609;&#3607;&#3637;&#3656;&#3605;&#3633;&#3657;&#3591;&#3652;&#3623;&#3657;</span>
+                <span class="val" id="sumBudgetOther">&mdash;</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">&#3619;&#3623;&#3617;&#3591;&#3610;&#3607;&#3633;&#3657;&#3591;&#3627;&#3617;&#3604;</span>
+                <span class="val" id="sumBudgetTotal">&mdash;</span>
+            </div>
+            <div class="summary-row">
+                <span class="lbl">&#3591;&#3610;&#3607;&#3637;&#3656;&#3651;&#3594;&#3657;&#3619;&#3634;&#3618;&#3585;&#3634;&#3619;&#3609;&#3637;&#3657;</span>
+                <span class="val text-cost" id="sumBudgetUsed">0.00</span>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-row" style="padding:10px 0;border-bottom:none">
+                <span class="lbl" style="font-weight:700;color:var(--text)">&#3591;&#3610;&#3588;&#3591;&#3648;&#3627;&#3621;&#3639;&#3629;</span>
+                <span class="val text-budget" id="sumBudgetRemaining">&mdash;</span>
+            </div>
+            <div class="bar-wrapper">
+                <div class="bar-labels">
+                    <span style="color:var(--text-muted)">&#3585;&#3634;&#3619;&#3651;&#3594;&#3657;&#3591;&#3610;</span>
+                    <span style="font-weight:600" id="budgetUsagePct">&mdash;</span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" id="budgetUsageBar" style="width:0;background:var(--budget-remaining)"></div></div>
+            </div>
+        </div>
+
+        <!-- Formula -->
+        <div class="formula-card" style="margin-top:16px">
+            <div class="ftitle">&#3626;&#3641;&#3605;&#3619;&#3588;&#3635;&#3609;&#3623;&#3603;</div>
+            <code>
+                net_price = base_price &minus; &Sigma;discount<br>
+                promo_burden = &Sigma;premium + &Sigma;expense<br>
+                total_cost = unit_cost + promo_burden<br>
+                profit = net_price &minus; total_cost<br>
+                <span style="font-family:inherit;font-size:10px;color:#94A3B8">* &#3651;&#3594;&#3657; effective_category &#3648;&#3626;&#3617;&#3629; (3A+3B &#3619;&#3623;&#3617;&#3585;&#3633;&#3609;)</span>
+            </code>
+        </div>
+    </div>
+</div>
+
+<!-- PAGE CONTENT -->
+<div class="page">
+    <div class="page-title">&#3610;&#3633;&#3609;&#3607;&#3638;&#3585;&#3585;&#3634;&#3619;&#3586;&#3634;&#3618;</div>
+    <div class="page-sub">Sales Entry &mdash; &#3610;&#3633;&#3609;&#3607;&#3638;&#3585;&#3650;&#3611;&#3619;&#3650;&#3617;&#3594;&#3633;&#3656;&#3609;&#3649;&#3621;&#3632;&#3588;&#3635;&#3609;&#3623;&#3603;&#3585;&#3635;&#3652;&#3619;&#3649;&#3610;&#3610; Real-time</div>
+
+    <!-- SECTION 1: ข้อมูลยูนิต -->
+    <div class="card open" id="sec1">
+        <div class="card-head" onclick="toggleCard('sec1')">
+            <div class="card-head-left">
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span class="card-label">&#3586;&#3657;&#3629;&#3617;&#3641;&#3621;&#3618;&#3641;&#3609;&#3636;&#3605;</span>
+            </div>
+            <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">&#3650;&#3588;&#3619;&#3591;&#3585;&#3634;&#3619;</label>
+                    <input class="form-input readonly" value="The Garden Ville" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">&#3619;&#3627;&#3633;&#3626;&#3618;&#3641;&#3609;&#3636;&#3605;</label>
+                    <select class="form-select" id="unitSelect" onchange="onUnitChange()">
+                        <option value="">&mdash; &#3648;&#3621;&#3639;&#3629;&#3585;&#3618;&#3641;&#3609;&#3636;&#3605; &mdash;</option>
+                        <option value="0">A-101 (&#3610;&#3657;&#3634;&#3609;&#3648;&#3604;&#3637;&#3656;&#3618;&#3623; Grand)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">&#3619;&#3634;&#3588;&#3634;&#3586;&#3634;&#3618;</label>
+                    <input class="form-input num readonly" id="basePrice" readonly placeholder="&mdash;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">&#3619;&#3634;&#3588;&#3634;&#3605;&#3657;&#3609;&#3607;&#3640;&#3609;</label>
+                    <input class="form-input num readonly" id="unitCost" readonly placeholder="&mdash;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">&#3619;&#3634;&#3588;&#3634;&#3611;&#3619;&#3632;&#3648;&#3617;&#3636;&#3609;</label>
+                    <input class="form-input num readonly" id="appraisalPrice" readonly placeholder="&mdash;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">&#3623;&#3633;&#3609;&#3607;&#3637;&#3656;&#3586;&#3634;&#3618;</label>
+                    <input class="form-input" type="date" id="saleDate" value="2026-03-13">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">&#3594;&#3639;&#3656;&#3629;&#3621;&#3641;&#3585;&#3588;&#3657;&#3634;</label>
+                    <input class="form-input" id="customerName" placeholder="&#3594;&#3639;&#3656;&#3629;-&#3609;&#3634;&#3617;&#3626;&#3585;&#3640;&#3621;&#3621;&#3641;&#3585;&#3588;&#3657;&#3634;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">&#3614;&#3609;&#3633;&#3585;&#3591;&#3634;&#3609;&#3586;&#3634;&#3618;</label>
+                    <select class="form-select" id="salesperson">
+                        <option value="">&mdash; &#3648;&#3621;&#3639;&#3629;&#3585; &mdash;</option>
+                        <option value="1">&#3626;&#3617;&#3594;&#3634;&#3618; &#3651;&#3592;&#3604;&#3637;</option>
+                        <option value="2">&#3626;&#3617;&#3627;&#3597;&#3636;&#3591; &#3619;&#3633;&#3585;&#3604;&#3637;</option>
+                        <option value="3">&#3611;&#3619;&#3632;&#3648;&#3626;&#3619;&#3636;&#3600; &#3617;&#3633;&#3656;&#3609;&#3588;&#3591;</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row full">
+                <div class="form-group">
+                    <label class="form-label">&#3627;&#3617;&#3634;&#3618;&#3648;&#3627;&#3605;&#3640;</label>
+                    <input class="form-input" id="saleRemark" placeholder="&#3627;&#3617;&#3634;&#3618;&#3648;&#3627;&#3605;&#3640;&#3648;&#3614;&#3636;&#3656;&#3617;&#3648;&#3605;&#3636;&#3617; (&#3606;&#3657;&#3634;&#3617;&#3637;)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 2: งบประมาณ -->
+    <div class="card open" id="sec2">
+        <div class="card-head" onclick="toggleCard('sec2')">
+            <div class="card-head-left">
+                <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M2 15h20"/></svg>
+                <span class="card-label">&#3591;&#3610;&#3611;&#3619;&#3632;&#3617;&#3634;&#3603;</span>
+            </div>
+            <span class="card-badge" id="budgetBadge" style="background:#EFF6FF;color:var(--primary)">&#3618;&#3633;&#3591;&#3652;&#3617;&#3656;&#3648;&#3621;&#3639;&#3629;&#3585;&#3618;&#3641;&#3609;&#3636;&#3605;</span>
+            <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="card-body" id="budgetBody">
+            <div id="budgetList">
+                <div class="empty-state">&#3648;&#3621;&#3639;&#3629;&#3585;&#3618;&#3641;&#3609;&#3636;&#3605;&#3585;&#3656;&#3629;&#3609;&#3648;&#3614;&#3639;&#3656;&#3629;&#3604;&#3641;&#3591;&#3610;&#3611;&#3619;&#3632;&#3617;&#3634;&#3603;</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 3A: งบยูนิต -->
+    <div class="card open" id="sec3a">
+        <div class="card-head" onclick="toggleCard('sec3a')">
+            <div class="card-head-left">
+                <svg class="card-icon" style="color:#1D40AE" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                <span class="card-label">3A &#3591;&#3610;&#3618;&#3641;&#3609;&#3636;&#3605;</span>
+            </div>
+            <span class="card-badge" id="panelABadge" style="background:#EFF6FF;color:#1D40AE">&mdash;</span>
+            <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="card-body">
+            <div class="panel-tag a">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                &#3650;&#3627;&#3621;&#3604;&#3629;&#3633;&#3605;&#3650;&#3609;&#3617;&#3633;&#3605;&#3636;&#3592;&#3634;&#3585; Master &mdash; &#3649;&#3627;&#3621;&#3656;&#3591;&#3591;&#3610;&#3621;&#3655;&#3629;&#3588;&#3648;&#3611;&#3655;&#3609; "&#3591;&#3610;&#3618;&#3641;&#3609;&#3636;&#3605;"
+            </div>
+            <div id="panelACards"></div>
+            <div class="panel-subtotal" id="panelASubtotal">
+                <span class="sub-label">&#3619;&#3623;&#3617; Panel 3A</span>
+                <span class="sub-value" id="panelATotal">&#3647;0.00</span>
+            </div>
+            <div class="panel-warn hidden" id="panelAWarn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+                <span id="panelAWarnText"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 3B: งบอื่น -->
+    <div class="card open" id="sec3b">
+        <div class="card-head" onclick="toggleCard('sec3b')">
+            <div class="card-head-left">
+                <svg class="card-icon" style="color:#15803D" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                <span class="card-label">3B &#3591;&#3610;&#3629;&#3639;&#3656;&#3609;</span>
+            </div>
+            <span class="card-badge" id="panelBBadge" style="background:#F0FDF4;color:#15803D">0 &#3619;&#3634;&#3618;&#3585;&#3634;&#3619;</span>
+            <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="card-body">
+            <div class="panel-tag b">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                &#3605;&#3657;&#3629;&#3591;&#3605;&#3633;&#3657;&#3591;&#3591;&#3610;&#3585;&#3656;&#3629;&#3609;&#3592;&#3638;&#3591;&#3592;&#3632;&#3648;&#3621;&#3639;&#3629;&#3585;&#3649;&#3627;&#3621;&#3656;&#3591;&#3591;&#3610;&#3609;&#3633;&#3657;&#3609;&#3652;&#3604;&#3657;
+            </div>
+            <div id="panelBCards"></div>
+            <button class="add-row-btn" onclick="addRow('B')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                &#3648;&#3614;&#3636;&#3656;&#3617;&#3619;&#3634;&#3618;&#3585;&#3634;&#3619; (&#3591;&#3610;&#3629;&#3639;&#3656;&#3609;)
+            </button>
+            <div class="panel-subtotal" id="panelBSubtotal" style="margin-top:10px">
+                <span class="sub-label">&#3618;&#3633;&#3591;&#3652;&#3617;&#3656;&#3617;&#3637;&#3619;&#3634;&#3618;&#3585;&#3634;&#3619;</span>
+                <span class="sub-value">&#3647;0.00</span>
+            </div>
+            <div class="panel-warn hidden" id="panelBWarn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+                <span id="panelBWarnText"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- spacer for bottom bar -->
+    <div style="height:20px"></div>
+</div>
+
+<!-- STICKY BOTTOM BAR -->
+<div class="bottom-bar">
+    <div class="bottom-bar-summary" onclick="openSheet()">
+        <div class="bottom-profit">
+            <span class="bottom-profit-label">&#3585;&#3635;&#3652;&#3619; (Profit)</span>
+            <span class="bottom-profit-value" id="bottomProfit">&mdash;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+            <span class="bottom-margin" id="bottomMargin" style="background:#F1F5F9;color:var(--text-muted)">&mdash;</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+        </div>
+    </div>
+    <div class="bottom-actions">
+        <button class="btn btn-secondary" onclick="resetForm()">&#3621;&#3657;&#3634;&#3591;</button>
+        <button class="btn btn-primary" onclick="saveDraft()">&#3593;&#3610;&#3633;&#3610;&#3619;&#3656;&#3634;&#3591;</button>
+        <button class="btn btn-success" onclick="confirmSale()">&#3618;&#3639;&#3609;&#3618;&#3633;&#3609;&#3585;&#3634;&#3619;&#3586;&#3634;&#3618;</button>
+    </div>
+</div>
+
+<script>
+    // ==================== MOCK DATA ====================
+    const MOCK_UNITS = [
+        {code: 'A-101', model: 'บ้านเดี่ยว Grand', base_price: 3200000, unit_cost: 3000000, appraisal_price: 3000000, standard_budget: 200000},
+    ];
+
+    const PROMO_MASTER = [
+        {id: 1, name: 'ฟรีวันโอน', category: 'expense_support', value_mode: 'actual', max_value: 60000, default_used_value: null, convertible: false, is_unit_standard: true},
+        {id: 2, name: 'แอร์', category: 'premium', value_mode: 'fixed', max_value: 50000, default_used_value: null, convertible: true, is_unit_standard: true},
+        {id: 3, name: 'กันขโมย', category: 'premium', value_mode: 'fixed', max_value: 40000, default_used_value: null, convertible: true, is_unit_standard: true},
+        {id: 4, name: 'ส่วนลด ', category: 'discount', value_mode: 'manual', max_value: 50000, default_used_value: null, convertible: false, is_unit_standard: true},
+        {id: 5, name: 'Gift Voucher', category: 'premium', value_mode: 'manual', max_value: 50000, default_used_value: null, convertible: true, is_unit_standard: false},
+        {id: 6, name: 'ส่วนลดเงินสด (Cash Discount)', category: 'discount', value_mode: 'manual', max_value: 5000000, default_used_value: 100000, convertible: false, is_unit_standard: false},
+        {id: 7, name: 'ค่าใช้จ่ายบวกราคา', category: 'expense_support', value_mode: 'actual', max_value: 30000, default_used_value: null, convertible: false, is_unit_standard: false},
+    ];
+
+    const STANDARD_ITEMS = PROMO_MASTER.filter(i => i.is_unit_standard);
+    const NON_STANDARD_ITEMS = PROMO_MASTER.filter(i => !i.is_unit_standard);
+
+    const BUDGET_SOURCES_B = [
+        {type: 'MANAGEMENT_SPECIAL', label: 'งบผู้บริหาร', movement_type: 'SPECIAL_BUDGET_ALLOCATE'},
+        {type: 'PROJECT_POOL', label: 'งบส่วนกลาง', movement_type: 'ALLOCATE'},
+    ];
+
+    // ==================== STATE ====================
+    let selectedUnit = null;
+    let allocations = {};
+    let panelA = [];
+    let panelB = [];
+    let rowId = 0;
+    let dialogSource = null;
+
+    // ==================== HELPERS ====================
+    const fmt = n => (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const fmtInt = n => (!n && n !== 0) ? '' : Number(n).toLocaleString('th-TH', {maximumFractionDigits: 0});
+    const parseNum = s => parseFloat(String(s).replace(/,/g, '')) || 0;
+
+    function getDefaultUsedValue(item) {
+        return item.default_used_value != null ? item.default_used_value : (item.max_value || 0);
+    }
+
+    function getSelectedPanelBIds() {
+        return new Set(panelB.filter(r => r.item_id).map(r => r.item_id));
+    }
+
+    function getEffectiveCat(row) {
+        if (!row.item_id) return '';
+        const item = PROMO_MASTER.find(i => i.id === row.item_id);
+        if (!item) return '';
+        return (item.category === 'premium' && row.convert) ? 'discount' : item.category;
+    }
+
+    function getBudgetUsedBySource() {
+        const used = {UNIT_STANDARD: 0, PROJECT_POOL: 0, MANAGEMENT_SPECIAL: 0};
+        for (const r of panelA) used.UNIT_STANDARD += (r.used_value || 0);
+        for (const r of panelB) used[r.source || 'MANAGEMENT_SPECIAL'] += (r.used_value || 0);
+        return used;
+    }
+
+    function getAllocatedBySource() {
+        return {
+            UNIT_STANDARD: selectedUnit ? selectedUnit.standard_budget : 0,
+            PROJECT_POOL: allocations.PROJECT_POOL ? allocations.PROJECT_POOL.amount : 0,
+            MANAGEMENT_SPECIAL: allocations.MANAGEMENT_SPECIAL ? allocations.MANAGEMENT_SPECIAL.amount : 0,
+        };
+    }
+
+    // ==================== ACCORDION ====================
+    function toggleCard(id) {
+        document.getElementById(id).classList.toggle('open');
+    }
+
+    // ==================== UNIT CHANGE ====================
+    function onUnitChange() {
+        const idx = document.getElementById('unitSelect').value;
+        if (idx === '') {
+            selectedUnit = null;
+            allocations = {};
+            panelA = [];
+            panelB = [];
+            document.getElementById('basePrice').value = '';
+            document.getElementById('unitCost').value = '';
+            document.getElementById('appraisalPrice').value = '';
+        } else {
+            selectedUnit = MOCK_UNITS[parseInt(idx)];
+            allocations = {};
+            panelB = [];
+            panelA = STANDARD_ITEMS.map(item => ({
+                id: rowId++,
+                item_id: item.id,
+                used_value: getDefaultUsedValue(item),
+                convert: false,
+                source: 'UNIT_STANDARD',
+                remark: ''
+            }));
+            document.getElementById('basePrice').value = fmt(selectedUnit.base_price);
+            document.getElementById('unitCost').value = fmt(selectedUnit.unit_cost);
+            document.getElementById('appraisalPrice').value = fmt(selectedUnit.appraisal_price);
+        }
+        renderAll();
+    }
+
+    // ==================== BUDGET LIST ====================
+    function renderBudgetList() {
+        const el = document.getElementById('budgetList');
+        const badge = document.getElementById('budgetBadge');
+        if (!selectedUnit) {
+            el.innerHTML = '<div class="empty-state">เลือกยูนิตก่อนเพื่อดูงบประมาณ</div>';
+            badge.textContent = 'ยังไม่เลือกยูนิต';
+            badge.style.background = '#F1F5F9';
+            badge.style.color = 'var(--text-muted)';
+            return;
+        }
+        const used = getBudgetUsedBySource();
+        let html = '';
+
+        // UNIT_STANDARD
+        const uAlloc = selectedUnit.standard_budget;
+        const uUsed = used.UNIT_STANDARD;
+        const uLeft = uAlloc - uUsed;
+        html += `<div class="budget-item">
+            <div class="budget-info">
+                <div class="budget-name">งบยูนิต</div>
+                <div class="budget-detail">UNIT_STANDARD &bull; <span class="budget-locked-badge">ล็อค</span></div>
+            </div>
+            <div class="budget-amount">
+                <div class="amt ${uLeft < 0 ? 'remaining-negative' : uLeft === 0 ? 'remaining-zero' : 'remaining-positive'}">${fmt(uLeft)}</div>
+                <div class="sub">ตั้ง ${fmt(uAlloc)} / ใช้ ${fmt(uUsed)}</div>
+            </div>
+        </div>`;
+
+        // Other sources
+        for (const src of BUDGET_SOURCES_B) {
+            const alloc = allocations[src.type] ? allocations[src.type].amount : 0;
+            const srcUsed = used[src.type] || 0;
+            const srcLeft = alloc - srcUsed;
+            const allocated = !!allocations[src.type];
+            html += `<div class="budget-item">
+                <div class="budget-info">
+                    <div class="budget-name">${src.label}</div>
+                    <div class="budget-detail">${src.type}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    ${alloc > 0 ? `<div class="budget-amount">
+                        <div class="amt ${srcLeft < 0 ? 'remaining-negative' : 'remaining-positive'}">${fmt(srcLeft)}</div>
+                        <div class="sub">ตั้ง ${fmt(alloc)} / ใช้ ${fmt(srcUsed)}</div>
+                    </div>` : ''}
+                    <button class="alloc-btn ${allocated ? 'allocated' : ''}" onclick="openDialog('${src.type}')">
+                        ${allocated ? '✓ แก้ไข' : '+ ตั้งงบ'}
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        // Total
+        const totalAlloc = uAlloc + (allocations.PROJECT_POOL?.amount || 0) + (allocations.MANAGEMENT_SPECIAL?.amount || 0);
+        const totalUsed = Object.values(used).reduce((a, b) => a + b, 0);
+        const totalLeft = totalAlloc - totalUsed;
+        html += `<div class="budget-total-bar">
+            <div class="budget-total-row">
+                <span class="lbl">รวมงบ ${fmt(totalAlloc)}</span>
+                <span class="val">${totalLeft < 0 ? '<span class="remaining-negative">' : ''}เหลือ ${fmt(totalLeft)}${totalLeft < 0 ? '</span>' : ''}</span>
+            </div>
+        </div>`;
+
+        el.innerHTML = html;
+
+        badge.textContent = `เหลือ ${fmt(totalLeft)}`;
+        badge.style.background = totalLeft < 0 ? '#FEF2F2' : '#EFF6FF';
+        badge.style.color = totalLeft < 0 ? 'var(--budget-exceeded)' : 'var(--primary)';
+    }
+
+    // ==================== DIALOG ====================
+    function openDialog(sourceType) {
+        if (!selectedUnit) { showToast('กรุณาเลือกยูนิตก่อน', 'warn'); return; }
+        dialogSource = sourceType;
+        const src = BUDGET_SOURCES_B.find(s => s.type === sourceType);
+        document.getElementById('dialogSourceName').value = src.label + ' (' + sourceType + ')';
+        const existing = allocations[sourceType];
+        document.getElementById('dialogAmount').value = existing ? fmtInt(existing.amount) : '';
+        document.getElementById('dialogNote').value = existing ? existing.note : '';
+        document.getElementById('dialogAmountError').style.display = 'none';
+        document.getElementById('dialogOverlay').classList.add('show');
+        document.getElementById('dialogSheet').classList.add('show');
+        setTimeout(() => document.getElementById('dialogAmount').focus(), 300);
+    }
+
+    function closeDialog() {
+        document.getElementById('dialogOverlay').classList.remove('show');
+        document.getElementById('dialogSheet').classList.remove('show');
+        dialogSource = null;
+    }
+
+    function formatDialogAmount(el) {
+        const raw = String(el.value).replace(/,/g, '');
+        const num = parseFloat(raw) || 0;
+        const formatted = raw === '' ? '' : fmtInt(num);
+        if (formatted !== el.value) {
+            const cursorPos = el.selectionStart;
+            const lenDiff = formatted.length - el.value.length;
+            el.value = formatted;
+            el.setSelectionRange(cursorPos + lenDiff, cursorPos + lenDiff);
+        }
+        validateDialogAmount();
+    }
+
+    function validateDialogAmount() {
+        const v = parseNum(document.getElementById('dialogAmount').value);
+        const err = document.getElementById('dialogAmountError');
+        if (!v || v <= 0) { err.style.display = 'block'; return false; }
+        err.style.display = 'none';
+        return true;
+    }
+
+    function confirmAlloc() {
+        if (!validateDialogAmount()) return;
+        const amount = parseNum(document.getElementById('dialogAmount').value);
+        const note = document.getElementById('dialogNote').value;
+        const src = BUDGET_SOURCES_B.find(s => s.type === dialogSource);
+        allocations[dialogSource] = {amount, note};
+        closeDialog();
+        showToast(`ตั้งงบ${src.label} ${fmt(amount)} บาท เรียบร้อย`, 'success');
+        renderAll();
+    }
+
+    // ==================== SUMMARY SHEET ====================
+    function openSheet() {
+        document.getElementById('sheetOverlay').classList.add('show');
+        document.getElementById('summarySheet').classList.add('show');
+    }
+
+    function closeSheet() {
+        document.getElementById('sheetOverlay').classList.remove('show');
+        document.getElementById('summarySheet').classList.remove('show');
+    }
+
+    // ==================== PROMO ROWS ====================
+    function addRow(panel) {
+        if (!selectedUnit) { showToast('กรุณาเลือกยูนิตก่อน', 'warn'); return; }
+        if (panel === 'A') return;
+        panelB.push({id: rowId++, item_id: null, used_value: 0, convert: false, source: 'MANAGEMENT_SPECIAL', remark: ''});
+        renderPanel(panel);
+        recalculate();
+    }
+
+    function removeRow(panel, id) {
+        if (panel === 'A') return;
+        panelB = panelB.filter(r => r.id !== id);
+        renderAll();
+    }
+
+    function onItemChange(panel, id, val) {
+        if (panel === 'A') return;
+        const row = panelB.find(r => r.id === id);
+        if (!row) return;
+        row.item_id = val ? parseInt(val) : null;
+        row.convert = false;
+        if (row.item_id) {
+            const item = PROMO_MASTER.find(i => i.id === row.item_id);
+            row.used_value = getDefaultUsedValue(item);
+        } else {
+            row.used_value = 0;
+        }
+        renderAll();
+    }
+
+    function onValueChange(panel, id, el) {
+        const rows = panel === 'A' ? panelA : panelB;
+        const row = rows.find(r => r.id === id);
+        if (!row) return;
+        const raw = String(el.value).replace(/,/g, '');
+        row.used_value = parseFloat(raw) || 0;
+        const formatted = raw === '' ? '' : fmtInt(row.used_value);
+        if (formatted !== el.value) {
+            const cursorPos = el.selectionStart;
+            const lenDiff = formatted.length - el.value.length;
+            el.value = formatted;
+            el.setSelectionRange(cursorPos + lenDiff, cursorPos + lenDiff);
+        }
+        const item = row.item_id ? PROMO_MASTER.find(i => i.id === row.item_id) : null;
+        const maxVal = item?.max_value || 0;
+        el.classList.toggle('input-error', maxVal > 0 && row.used_value > maxVal);
+        recalcSummaryOnly();
+    }
+
+    function onConvertChange(panel, id, checked) {
+        if (panel !== 'A') return;
+        const row = panelA.find(r => r.id === id);
+        if (row) { row.convert = checked; recalcSummaryOnly(); }
+    }
+
+    function onSourceChange(id, val) {
+        const row = panelB.find(r => r.id === id);
+        if (row) { row.source = val; recalcSummaryOnly(); }
+    }
+
+    function onRemarkChange(panel, id, val) {
+        const rows = panel === 'A' ? panelA : panelB;
+        const row = rows.find(r => r.id === id);
+        if (row) row.remark = val;
+    }
+
+    function recalcSummaryOnly() {
+        renderBudgetList();
+        renderPanelSubtotals();
+        recalculate();
+    }
+
+    // ==================== RENDER PANELS (Card-based) ====================
+    function renderPanel(panel) {
+        const rows = panel === 'A' ? panelA : panelB;
+        const containerId = panel === 'A' ? 'panelACards' : 'panelBCards';
+        const container = document.getElementById(containerId);
+
+        if (rows.length === 0) {
+            const msg = panel === 'A'
+                ? 'เลือกยูนิตเพื่อโหลดรายการ Standard อัตโนมัติ'
+                : 'ยังไม่มีรายการ — กด "เพิ่มรายการ" ด้านล่าง';
+            container.innerHTML = `<div class="empty-state">${msg}</div>`;
+            return;
+        }
+
+        const alloc = getAllocatedBySource();
+        const selectedBIds = getSelectedPanelBIds();
+
+        container.innerHTML = rows.map((row, idx) => {
+            const item = row.item_id ? PROMO_MASTER.find(i => i.id === row.item_id) : null;
+            const effCat = getEffectiveCat(row);
+            const catLabel = {discount: 'ส่วนลด', premium: 'ของแถม', expense_support: 'อุดหนุน'}[effCat] || '';
+            const canConvert = item?.category === 'premium';
+            const maxVal = item?.max_value || 0;
+            const valError = item && maxVal > 0 && row.used_value > maxVal;
+
+            if (panel === 'A') {
+                return `<div class="promo-card">
+                    <div class="promo-card-head">
+                        <span class="promo-card-num">#${idx + 1}</span>
+                        <span class="promo-card-name">${item ? item.name : '—'}</span>
+                        ${effCat ? `<span class="chip ${effCat}">${catLabel}</span>` : ''}
+                    </div>
+                    <div class="promo-card-fields">
+                        <div class="promo-field">
+                            <span class="promo-field-label">มูลค่าสูงสุด</span>
+                            <span class="promo-field-value">${maxVal > 0 ? fmt(maxVal) : '—'}</span>
+                        </div>
+                        <div class="promo-field">
+                            <span class="promo-field-label">มูลค่าที่ใช้</span>
+                            <input type="text" inputmode="numeric" value="${row.used_value ? fmtInt(row.used_value) : ''}" placeholder="0"
+                                class="promo-input num-input${valError ? ' input-error' : ''}"
+                                oninput="onValueChange('A',${row.id},this)">
+                        </div>
+                    </div>
+                    <div class="promo-card-footer">
+                        <div class="convert-toggle">
+                            <input type="checkbox" class="toggle" ${canConvert ? '' : 'disabled'} ${row.convert ? 'checked' : ''} onchange="onConvertChange('A',${row.id},this.checked)">
+                            <span>แปลงเป็นส่วนลด</span>
+                        </div>
+                        <span class="budget-locked-badge">งบยูนิต</span>
+                    </div>
+                </div>`;
+            } else {
+                const itemOptions = NON_STANDARD_ITEMS.map(m => {
+                    const inUse = selectedBIds.has(m.id) && m.id !== row.item_id;
+                    return `<option value="${m.id}" ${m.id === row.item_id ? 'selected' : ''} ${inUse ? 'disabled' : ''}>${inUse ? '✗ ' : ''}${m.name}</option>`;
+                }).join('');
+
+                const srcOptions = BUDGET_SOURCES_B.map(s => {
+                    const hasAlloc = !!allocations[s.type];
+                    let label = s.label;
+                    if (!hasAlloc) label += ' (ยังไม่ตั้งงบ)';
+                    return `<option value="${s.type}" ${s.type === row.source ? 'selected' : ''} ${!hasAlloc ? 'disabled' : ''}>${label}</option>`;
+                }).join('');
+
+                return `<div class="promo-card">
+                    <div class="promo-card-head">
+                        <span class="promo-card-num">#${idx + 1}</span>
+                        <div style="flex:1;min-width:0">
+                            <select class="promo-select" onchange="onItemChange('B',${row.id},this.value)">
+                                <option value="">— เลือกรายการ —</option>
+                                ${itemOptions}
+                            </select>
+                        </div>
+                        ${effCat ? `<span class="chip ${effCat}">${catLabel}</span>` : ''}
+                    </div>
+                    <div class="promo-card-fields">
+                        <div class="promo-field">
+                            <span class="promo-field-label">มูลค่าสูงสุด</span>
+                            <span class="promo-field-value">${maxVal > 0 ? fmt(maxVal) : '—'}</span>
+                        </div>
+                        <div class="promo-field">
+                            <span class="promo-field-label">มูลค่าที่ใช้</span>
+                            <input type="text" inputmode="numeric" value="${row.used_value ? fmtInt(row.used_value) : ''}" placeholder="0"
+                                class="promo-input num-input${valError ? ' input-error' : ''}"
+                                oninput="onValueChange('B',${row.id},this)">
+                        </div>
+                    </div>
+                    <div class="promo-card-footer">
+                        <div class="promo-field" style="flex:1">
+                            <span class="promo-field-label">แหล่งงบ</span>
+                            <select class="promo-select" onchange="onSourceChange(${row.id},this.value)" style="margin-top:2px">${srcOptions}</select>
+                        </div>
+                        <button class="remove-btn" onclick="removeRow('B',${row.id})">ลบ</button>
+                    </div>
+                </div>`;
+            }
+        }).join('');
+    }
+
+    function renderPanelSubtotals() {
+        // Panel A
+        const totalA = panelA.reduce((s, r) => s + (r.used_value || 0), 0);
+        const unitLeft = selectedUnit ? (selectedUnit.standard_budget - totalA) : 0;
+        document.getElementById('panelATotal').textContent = '฿' + fmt(totalA);
+        document.getElementById('panelABadge').textContent = selectedUnit ? `฿${fmt(totalA)}` : '—';
+
+        const warnA = document.getElementById('panelAWarn');
+        if (selectedUnit && unitLeft < 0) {
+            warnA.classList.remove('hidden');
+            document.getElementById('panelAWarnText').textContent = `เกินงบยูนิต ${fmt(Math.abs(unitLeft))} บาท!`;
+        } else {
+            warnA.classList.add('hidden');
+        }
+
+        // Panel B
+        const alloc = getAllocatedBySource();
+        const usedB = {};
+        for (const r of panelB) {
+            const src = r.source || 'MANAGEMENT_SPECIAL';
+            usedB[src] = (usedB[src] || 0) + (r.used_value || 0);
+        }
+        const totalB = panelB.reduce((s, r) => s + (r.used_value || 0), 0);
+        document.getElementById('panelBBadge').textContent = `${panelB.length} รายการ`;
+
+        let bHtml = '';
+        let bWarnMsg = '';
+        for (const src of BUDGET_SOURCES_B) {
+            const a = alloc[src.type] || 0;
+            const u = usedB[src.type] || 0;
+            if (u > 0 || a > 0) {
+                const left = a - u;
+                bHtml += `<span class="sub-label">${src.label}:</span> <span class="sub-value">${fmt(u)} / ${fmt(a)}</span> `;
+                if (left < 0) bWarnMsg += `${src.label} เกิน ${fmt(Math.abs(left))} บาท `;
+            }
+        }
+        document.getElementById('panelBSubtotal').innerHTML = bHtml || '<span class="sub-label">ยังไม่มีรายการ</span><span class="sub-value">฿0.00</span>';
+
+        const warnB = document.getElementById('panelBWarn');
+        if (bWarnMsg) {
+            warnB.classList.remove('hidden');
+            document.getElementById('panelBWarnText').textContent = bWarnMsg;
+        } else {
+            warnB.classList.add('hidden');
+        }
+    }
+
+    // ==================== RECALCULATE ====================
+    function recalculate() {
+        const base = selectedUnit ? selectedUnit.base_price : null;
+        const cost = selectedUnit ? selectedUnit.unit_cost : null;
+
+        let totalDiscount = 0, totalPremium = 0, totalExpense = 0;
+        for (const r of [...panelA, ...panelB]) {
+            if (!r.item_id) continue;
+            const eff = getEffectiveCat(r);
+            const v = r.used_value || 0;
+            if (eff === 'discount') totalDiscount += v;
+            else if (eff === 'premium') totalPremium += v;
+            else if (eff === 'expense_support') totalExpense += v;
+        }
+
+        const netPrice = base != null ? base - totalDiscount : null;
+        const totalPromoBurden = totalPremium + totalExpense;
+        const totalCost = cost != null ? cost + totalPromoBurden : null;
+        const profit = netPrice != null && totalCost != null ? netPrice - totalCost : null;
+        const margin = base && profit != null ? (profit / base * 100) : null;
+
+        // Sheet summary
+        document.getElementById('sumBasePrice').textContent = base != null ? fmt(base) : '—';
+        document.getElementById('sumDiscount').textContent = totalDiscount > 0 ? `−${fmt(totalDiscount)}` : fmt(0);
+        document.getElementById('sumNetPrice').textContent = netPrice != null ? fmt(netPrice) : '—';
+        document.getElementById('sumUnitCost').textContent = cost != null ? fmt(cost) : '—';
+        document.getElementById('sumPromoCost').textContent = fmt(totalPremium);
+        document.getElementById('sumExpense').textContent = fmt(totalExpense);
+        document.getElementById('sumPromoBurden').textContent = fmt(totalPromoBurden);
+        document.getElementById('sumTotalCost').textContent = totalCost != null ? fmt(totalCost) : '—';
+
+        const profEl = document.getElementById('sumProfit');
+        profEl.textContent = profit != null ? fmt(profit) : '—';
+        profEl.className = 'val ' + (profit == null ? '' : profit >= 0 ? 'text-profit' : 'text-cost');
+
+        const mEl = document.getElementById('marginPct');
+        if (margin != null) {
+            mEl.textContent = margin.toFixed(1) + '%';
+            mEl.style.color = margin >= 0 ? 'var(--profit)' : 'var(--cost)';
+            const bar = document.getElementById('marginBar');
+            bar.style.width = Math.min(Math.abs(margin), 100) + '%';
+            bar.style.background = margin >= 0 ? 'var(--profit)' : 'var(--cost)';
+        } else {
+            mEl.textContent = '—';
+            document.getElementById('marginBar').style.width = '0';
+        }
+
+        // Bottom bar
+        const bottomProfit = document.getElementById('bottomProfit');
+        bottomProfit.textContent = profit != null ? fmt(profit) : '—';
+        bottomProfit.style.color = profit == null ? 'var(--text-muted)' : profit >= 0 ? 'var(--profit)' : 'var(--cost)';
+
+        const bottomMargin = document.getElementById('bottomMargin');
+        if (margin != null) {
+            bottomMargin.textContent = margin.toFixed(1) + '%';
+            bottomMargin.style.background = margin >= 0 ? '#DCFCE7' : '#FEE2E2';
+            bottomMargin.style.color = margin >= 0 ? 'var(--profit)' : 'var(--cost)';
+        } else {
+            bottomMargin.textContent = '—';
+            bottomMargin.style.background = '#F1F5F9';
+            bottomMargin.style.color = 'var(--text-muted)';
+        }
+
+        // Budget summary
+        const alloc = getAllocatedBySource();
+        const budgetUnit = alloc.UNIT_STANDARD;
+        const budgetOther = (alloc.PROJECT_POOL || 0) + (alloc.MANAGEMENT_SPECIAL || 0);
+        const budgetTotal = budgetUnit + budgetOther;
+        const totalUsed = [...panelA, ...panelB].reduce((s, r) => s + (r.used_value || 0), 0);
+        const remaining = budgetTotal - totalUsed;
+
+        document.getElementById('sumBudgetUnit').textContent = selectedUnit ? fmt(budgetUnit) : '—';
+        document.getElementById('sumBudgetOther').textContent = selectedUnit ? fmt(budgetOther) : '—';
+        document.getElementById('sumBudgetTotal').textContent = selectedUnit ? fmt(budgetTotal) : '—';
+        document.getElementById('sumBudgetUsed').textContent = fmt(totalUsed);
+        const remEl = document.getElementById('sumBudgetRemaining');
+        remEl.textContent = selectedUnit ? fmt(remaining) : '—';
+        remEl.className = 'val ' + (remaining < 0 ? 'text-exceeded' : 'text-budget');
+
+        const usagePct = budgetTotal > 0 ? (totalUsed / budgetTotal * 100) : 0;
+        document.getElementById('budgetUsagePct').textContent = selectedUnit ? usagePct.toFixed(1) + '%' : '—';
+        const bBar = document.getElementById('budgetUsageBar');
+        bBar.style.width = selectedUnit ? Math.min(usagePct, 100) + '%' : '0';
+        bBar.style.background = usagePct <= 80 ? 'var(--budget-remaining)' : usagePct <= 100 ? 'var(--discount)' : 'var(--budget-exceeded)';
+    }
+
+    // ==================== RENDER ALL ====================
+    function renderAll() {
+        renderBudgetList();
+        renderPanel('A');
+        renderPanel('B');
+        renderPanelSubtotals();
+        recalculate();
+    }
+
+    // ==================== ACTIONS ====================
+    function resetForm() {
+        if (!confirm('ต้องการล้างข้อมูลทั้งหมดหรือไม่?')) return;
+        document.getElementById('unitSelect').value = '';
+        document.getElementById('customerName').value = '';
+        document.getElementById('salesperson').value = '';
+        document.getElementById('saleRemark').value = '';
+        selectedUnit = null;
+        allocations = {};
+        panelA = [];
+        panelB = [];
+        rowId = 0;
+        document.getElementById('basePrice').value = '';
+        document.getElementById('unitCost').value = '';
+        document.getElementById('appraisalPrice').value = '';
+        renderAll();
+    }
+
+    function saveDraft() {
+        if (!selectedUnit) { showToast('กรุณาเลือกยูนิตก่อน', 'warn'); return; }
+        showToast('บันทึกฉบับร่างเรียบร้อย (Simulator)', 'success');
+    }
+
+    function confirmSale() {
+        if (!selectedUnit) { showToast('กรุณาเลือกยูนิตก่อน', 'warn'); return; }
+        if (!document.getElementById('customerName').value.trim()) { showToast('กรุณากรอกชื่อลูกค้า', 'warn'); return; }
+        if (!document.getElementById('salesperson').value) { showToast('กรุณาเลือกพนักงานขาย', 'warn'); return; }
+        const alloc = getAllocatedBySource();
+        const totalBudget = Object.values(alloc).reduce((a, b) => a + b, 0);
+        const totalUsed = [...panelA, ...panelB].reduce((s, r) => s + (r.used_value || 0), 0);
+        if (totalUsed > totalBudget) {
+            if (!confirm('งบที่ใช้เกินกว่างบที่ตั้งไว้ ต้องการดำเนินการต่อหรือไม่?')) return;
+        }
+        showToast('ยืนยันการขายเรียบร้อย! (Simulator)', 'success');
+    }
+
+    // ==================== TOAST ====================
+    function showToast(msg, type) {
+        const d = document.createElement('div');
+        d.className = 'toast';
+        d.textContent = msg;
+        d.style.background = {success: 'var(--profit)', warn: 'var(--discount)', error: 'var(--cost)'}[type] || '#333';
+        document.body.appendChild(d);
+        setTimeout(() => { d.style.opacity = '0'; }, 2500);
+        setTimeout(() => d.remove(), 3000);
+    }
+
+    // ==================== INIT ====================
+    renderAll();
+</script>
+</body>
+</html>

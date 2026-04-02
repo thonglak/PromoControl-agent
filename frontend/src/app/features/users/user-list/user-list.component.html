@@ -1,0 +1,207 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="page-title m-0">จัดการผู้ใช้งาน</h1>
+      <p class="text-caption mt-1" style="color: var(--color-gray-500)">จัดการข้อมูลผู้ใช้และสิทธิ์การเข้าถึง</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()"
+              class="!text-slate-500 hover:!text-slate-700">
+        <app-icon name="adjustments-horizontal" class="w-5 h-5" />
+      </button>
+      <button mat-flat-button color="primary" (click)="openCreateDialog()" class="flex items-center gap-2">
+        <app-icon name="plus" class="w-4 h-4" />
+        เพิ่มผู้ใช้
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
+    <form [formGroup]="filterForm" class="flex flex-wrap gap-3 items-end">
+      <mat-form-field appearance="outline" class="flex-1 min-w-[220px]">
+        <mat-label>ค้นหา</mat-label>
+        <input matInput formControlName="search" placeholder="ชื่อ / อีเมล" (input)="onFilterChange()" />
+        <app-icon matSuffix name="magnifying-glass" class="w-4 h-4 text-slate-400 mr-2" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="w-48">
+        <mat-label>บทบาท</mat-label>
+        <mat-select formControlName="role" (selectionChange)="onFilterChange()">
+          <mat-option value="">ทั้งหมด</mat-option>
+          @for (r of roles; track r.value) {
+            <mat-option [value]="r.value">{{ r.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </form>
+  </div>
+
+  <!-- Active filter indicator -->
+  @if (hasActiveFilters()) {
+    <div class="flex items-center flex-wrap gap-2 mb-4 ml-1">
+      <span class="text-xs text-slate-400">ตัวกรองที่ใช้:</span>
+      @if (filterForm.get('search')?.value) {
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+          ค้นหา: {{ filterForm.get('search')?.value }}
+        </span>
+      }
+      @if (filterForm.get('role')?.value) {
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+          บทบาท: {{ roleLabel(filterForm.get('role')!.value!) }}
+        </span>
+      }
+      @if (sortRef.active) {
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+          <app-icon name="arrows-up-down" class="w-3 h-3" />
+          เรียงตาม {{ sortRef.active }}
+        </span>
+      }
+      <button type="button" (click)="resetAll()"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                     bg-red-50 text-red-600 text-xs font-medium
+                     hover:bg-red-100 transition-colors cursor-pointer">
+        <app-icon name="x-mark" class="w-3 h-3" />
+        ล้างทั้งหมด
+      </button>
+    </div>
+  }
+
+  <!-- Table card -->
+  <app-section-card [noPadding]="true">
+    <div class="relative">
+
+    <!-- Loading overlay -->
+    @if (loading()) {
+      <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+        <mat-spinner diameter="36" />
+      </div>
+    }
+
+    <div class="overflow-x-auto">
+      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" class="w-full min-w-[900px]">
+
+        <!-- Name -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header
+              class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">ชื่อ</th>
+          <td mat-cell *matCellDef="let user" class="!text-sm !font-medium !text-slate-800">{{ user.name }}</td>
+        </ng-container>
+
+        <!-- Email -->
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header
+              class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">อีเมล</th>
+          <td mat-cell *matCellDef="let user" class="!text-sm !text-slate-600">{{ user.email }}</td>
+        </ng-container>
+
+        <!-- Role -->
+        <ng-container matColumnDef="role">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header
+              class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">บทบาท</th>
+          <td mat-cell *matCellDef="let user">
+            <app-status-chip type="user_role" [value]="user.role" />
+          </td>
+        </ng-container>
+
+        <!-- Projects -->
+        <ng-container matColumnDef="projects">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header
+              class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">โครงการ</th>
+          <td mat-cell *matCellDef="let user" class="py-2">
+            <div class="flex flex-wrap gap-1 max-w-[260px]">
+              @if (user.projects.length === 0) {
+                <span class="text-slate-300 text-xs">—</span>
+              }
+              @for (p of user.projects.slice(0, 3); track p.id) {
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700"
+                      [matTooltip]="p.name">
+                  {{ p.code }}
+                  <span class="font-semibold" [class]="p.access_level === 'edit' ? 'text-green-600' : 'text-amber-500'">
+                    {{ p.access_level === 'edit' ? 'E' : 'V' }}
+                  </span>
+                </span>
+              }
+              @if (user.projects.length > 3) {
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
+                  +{{ user.projects.length - 3 }}
+                </span>
+              }
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Status -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header
+              class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">สถานะ</th>
+          <td mat-cell *matCellDef="let user">
+            @if (user.is_active) {
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700">ใช้งาน</span>
+            } @else {
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-red-50 text-red-700">ปิดใช้งาน</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Last Login -->
+        <ng-container matColumnDef="last_login_at">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header
+              class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">เข้าระบบล่าสุด</th>
+          <td mat-cell *matCellDef="let user" class="!text-sm !text-slate-500 whitespace-nowrap">
+            @if (user.last_login_at) {
+              {{ user.last_login_at | date:'d MMM y, HH:mm' }}
+            } @else {
+              <span class="text-slate-300">ยังไม่เคยเข้า</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Actions -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef
+              class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">จัดการ</th>
+          <td mat-cell *matCellDef="let user" class="!text-center">
+            <div class="flex justify-center gap-1">
+              <button mat-icon-button matTooltip="แก้ไขข้อมูล" class="!text-slate-500 hover:!text-blue-600"
+                      (click)="openEditDialog(user)">
+                <app-icon name="pencil-square" class="w-4 h-4" />
+              </button>
+              <button mat-icon-button matTooltip="กำหนดโครงการ" class="!text-slate-500 hover:!text-blue-600"
+                      (click)="openAssignDialog(user)">
+                <app-icon name="building-office" class="w-4 h-4" />
+              </button>
+              <button mat-icon-button matTooltip="รีเซ็ตรหัสผ่าน" class="!text-slate-500 hover:!text-amber-600"
+                      (click)="openResetPasswordDialog(user)">
+                <app-icon name="lock-closed" class="w-4 h-4" />
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns(); sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns();"
+            class="hover:bg-primary-100 transition-colors even:bg-slate-50/40"></tr>
+
+        <!-- No data -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell text-center py-12 text-slate-400" [attr.colspan]="displayedColumns().length">
+            <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p>ไม่พบผู้ใช้งาน</p>
+          </td>
+        </tr>
+
+      </table>
+    </div>
+
+    <mat-paginator
+      [pageSizeOptions]="[10, 25, 50]"
+      showFirstLastButtons
+      class="border-t border-slate-200">
+    </mat-paginator>
+
+    </div>
+  </app-section-card>
+</div>

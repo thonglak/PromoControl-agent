@@ -1,0 +1,73 @@
+<div class="min-h-screen flex items-center justify-center px-4 py-12"
+     style="background-color: var(--color-bg)">
+  <div class="w-full max-w-[420px]"
+       style="background: var(--color-surface);
+              border-radius: var(--radius-xl);
+              box-shadow: var(--shadow-lg);
+              padding: var(--space-10)">
+
+    <!-- Logo / ชื่อระบบ -->
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold" style="color: var(--color-primary-900)">PromoControl</h1>
+      <p class="text-sm mt-1" style="color: var(--color-gray-500)">ระบบจัดการโปรโมชั่นและงบประมาณ</p>
+    </div>
+
+    <!-- Login Form -->
+    <form [formGroup]="form" (ngSubmit)="onLogin()" class="flex flex-col gap-4">
+
+      <!-- Email -->
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>อีเมล</mat-label>
+        <input matInput type="email" formControlName="email"
+               placeholder="admin@example.com" autocomplete="email" />
+        @if (form.get('email')?.hasError('required') && form.get('email')?.touched) {
+          <mat-error>กรุณากรอกอีเมล</mat-error>
+        } @else if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+          <mat-error>รูปแบบอีเมลไม่ถูกต้อง</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Password -->
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>รหัสผ่าน</mat-label>
+        <input matInput [type]="showPassword() ? 'text' : 'password'"
+               formControlName="password" autocomplete="current-password" />
+        <button mat-icon-button matSuffix type="button"
+                (click)="showPassword.set(!showPassword())"
+                [attr.aria-label]="showPassword() ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'">
+          <app-icon [name]="showPassword() ? 'eye-slash' : 'eye'" />
+        </button>
+        @if (form.get('password')?.hasError('required') && form.get('password')?.touched) {
+          <mat-error>กรุณากรอกรหัสผ่าน</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Login Button -->
+      <button mat-flat-button color="primary" type="submit"
+              class="w-full !font-semibold !text-base"
+              style="height: 48px; border-radius: var(--radius-md)"
+              [disabled]="form.invalid || loading()">
+        @if (loading()) {
+          <mat-spinner diameter="22" />
+        } @else {
+          เข้าสู่ระบบ
+        }
+      </button>
+
+    </form>
+
+    <!-- Setup Admin Button — แสดงเมื่อยังไม่มี user ในระบบ -->
+    @if (needsSetup()) {
+      <div class="mt-6 pt-5 text-center"
+           style="border-top: 1px solid var(--color-border)">
+        <p class="text-sm mb-3" style="color: var(--color-gray-500)">ยังไม่มีผู้ใช้งานในระบบ</p>
+        <button mat-stroked-button class="w-full"
+                style="border-color: var(--color-accent); color: var(--color-accent-warm)"
+                (click)="openSetupDialog()">
+          สร้างผู้ดูแลระบบ
+        </button>
+      </div>
+    }
+
+  </div>
+</div>

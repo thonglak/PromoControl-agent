@@ -1,0 +1,99 @@
+<h2 mat-dialog-title class="!text-lg !font-semibold !text-slate-800">
+  {{ data.mode === 'create' ? 'สร้างมาตรการ/นโยบาย' : 'แก้ไขมาตรการ/นโยบาย' }}
+</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="pt-2">
+
+    <!-- ══ Section 1: ข้อมูลพื้นฐาน ══ -->
+    <h3 class="text-sm font-semibold text-slate-700 mb-3">ข้อมูลพื้นฐาน</h3>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>ชื่อมาตรการ</mat-label>
+      <input matInput formControlName="policy_name" />
+      @if (form.get('policy_name')?.hasError('required')) { <mat-error>กรุณากรอกชื่อ</mat-error> }
+    </mat-form-field>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0">
+      <mat-form-field appearance="outline">
+        <mat-label>อัตรา override</mat-label>
+        <input matInput currencyMask [options]="{ precision: 2, align: 'left' }" formControlName="override_rate_pct" />
+        <span matSuffix class="text-slate-400 mr-2">%</span>
+        @if (form.get('override_rate_pct')?.hasError('required')) { <mat-error>กรุณากรอกอัตรา</mat-error> }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>สัดส่วนผู้ซื้อ (ว่าง = ใช้ค่าเดิม)</mat-label>
+        <input matInput currencyMask [options]="{ precision: 2, align: 'left' }" formControlName="override_buyer_share_pct" placeholder="ว่าง = ใช้ค่าเดิม" />
+        <span matSuffix class="text-slate-400 mr-2">%</span>
+      </mat-form-field>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-0">
+      <mat-form-field appearance="outline">
+        <mat-label>ลำดับความสำคัญ</mat-label>
+        <input matInput type="number" formControlName="priority" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>วันเริ่มต้น</mat-label>
+        <input matInput [matDatepicker]="fromPicker" formControlName="effective_from" />
+        <mat-datepicker-toggle matSuffix [for]="fromPicker" />
+        <mat-datepicker #fromPicker />
+        @if (form.get('effective_from')?.hasError('required')) { <mat-error>กรุณาเลือกวันที่</mat-error> }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>วันสิ้นสุด</mat-label>
+        <input matInput [matDatepicker]="toPicker" formControlName="effective_to" />
+        <mat-datepicker-toggle matSuffix [for]="toPicker" />
+        <mat-datepicker #toPicker />
+        @if (form.get('effective_to')?.hasError('required')) { <mat-error>กรุณาเลือกวันที่</mat-error> }
+      </mat-form-field>
+    </div>
+
+    <div class="mb-4">
+      <mat-slide-toggle formControlName="is_active" color="primary">เปิดใช้งาน</mat-slide-toggle>
+    </div>
+
+    <!-- ══ Section 2: เงื่อนไข ══ -->
+    <h3 class="text-sm font-semibold text-slate-700 mb-3 border-t border-slate-100 pt-4">เงื่อนไข</h3>
+
+    <div class="mb-4">
+      <mat-checkbox formControlName="has_max_price" color="primary">จำกัดราคาขายสูงสุด</mat-checkbox>
+      @if (form.get('has_max_price')?.value) {
+        <mat-form-field appearance="outline" class="w-full mt-2">
+          <mat-label>ราคาสูงสุด</mat-label>
+          <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+          <input matInput currencyMask formControlName="max_base_price" />
+        </mat-form-field>
+      }
+    </div>
+
+    <div class="mb-4">
+      <mat-checkbox formControlName="has_project_types" color="primary">จำกัดประเภทโครงการ</mat-checkbox>
+      @if (form.get('has_project_types')?.value) {
+        <mat-form-field appearance="outline" class="w-full mt-2">
+          <mat-label>ประเภทโครงการ</mat-label>
+          <mat-select formControlName="project_types" multiple>
+            @for (pt of projectTypeOptions; track pt.value) {
+              <mat-option [value]="pt.value">{{ pt.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+    </div>
+
+    @if (serverError()) {
+      <div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ serverError() }}</div>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="!px-6 !pb-4 !pt-2 gap-2">
+  <button mat-stroked-button (click)="dialogRef.close()">ยกเลิก</button>
+  <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
+    @if (saving()) { <mat-spinner diameter="18" class="!inline-block mr-1" /> }
+    บันทึก
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,91 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+  @if (loading()) {
+    <div class="flex justify-center py-16"><mat-spinner diameter="40" /></div>
+  } @else if (record()) {
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+      <button mat-icon-button (click)="goBack()" class="!w-9 !h-9">
+        <app-icon name="arrow-left" class="w-5 h-5 text-slate-500" />
+      </button>
+      <div class="flex-1">
+        <div class="flex items-center gap-3">
+          <h1 class="page-title m-0 font-mono">{{ record()!.import_key }}</h1>
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold" [ngClass]="recordStatusClass(record()!.status)">
+            {{ recordStatusLabel(record()!.status) }}
+          </span>
+        </div>
+        <p class="text-caption mt-1" style="color: var(--color-gray-500)">{{ record()!.file_name }} — {{ record()!.imported_at | thaiDate:'datetime' }}</p>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-slate-50 rounded-lg p-4 text-center">
+        <p class="text-2xl font-bold text-slate-700">{{ record()!.total_rows }}</p>
+        <p class="text-xs text-slate-500 mt-1">แถวทั้งหมด</p>
+      </div>
+      <div class="bg-green-50 rounded-lg p-4 text-center">
+        <p class="text-2xl font-bold text-green-700">{{ record()!.matched_rows }}</p>
+        <p class="text-xs text-green-600 mt-1">Match ได้</p>
+      </div>
+      <div class="bg-red-50 rounded-lg p-4 text-center">
+        <p class="text-2xl font-bold text-red-700">{{ record()!.unmatched_rows }}</p>
+        <p class="text-xs text-red-600 mt-1">Match ไม่ได้</p>
+      </div>
+      <div class="bg-blue-50 rounded-lg p-4 text-center">
+        <p class="text-2xl font-bold text-blue-700">{{ record()!.updated_rows }}</p>
+        <p class="text-xs text-blue-600 mt-1">อัปเดตแล้ว</p>
+      </div>
+    </div>
+
+    <!-- Rows table -->
+    @if (record()!.rows && record()!.rows!.length > 0) {
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-auto">
+          <table mat-table [dataSource]="record()!.rows!" class="w-full">
+            <ng-container matColumnDef="row_number">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs">แถว</th>
+              <td mat-cell *matCellDef="let r" class="!text-sm">{{ r.row_number }}</td>
+            </ng-container>
+            <ng-container matColumnDef="unit_code">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs">เลขที่ยูนิต</th>
+              <td mat-cell *matCellDef="let r" class="!text-sm font-medium">{{ r.unit_code }}</td>
+            </ng-container>
+            <ng-container matColumnDef="bottom_line_price">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs">ราคา BL (ใหม่)</th>
+              <td mat-cell *matCellDef="let r" class="!text-sm">{{ formatCurrency(r.bottom_line_price) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="appraisal_price">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs">ราคาประเมิน (ใหม่)</th>
+              <td mat-cell *matCellDef="let r" class="!text-sm">{{ formatCurrency(r.appraisal_price) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="old_unit_cost">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs">Unit Cost (เดิม)</th>
+              <td mat-cell *matCellDef="let r" class="!text-sm text-slate-400">{{ r.old_unit_cost != null ? formatCurrency(r.old_unit_cost) : '—' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="old_appraisal">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs">Appraisal (เดิม)</th>
+              <td mat-cell *matCellDef="let r" class="!text-sm text-slate-400">{{ r.old_appraisal != null ? formatCurrency(r.old_appraisal) : '—' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs">สถานะ</th>
+              <td mat-cell *matCellDef="let r">
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold" [ngClass]="statusClass(r.status)">{{ statusLabel(r.status) }}</span>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="rowColumns" class="bg-slate-50"></tr>
+            <tr mat-row *matRowDef="let row; columns: rowColumns;" [class.bg-red-50]="row.status === 'unmatched'" class="hover:bg-slate-50"></tr>
+          </table>
+        </div>
+      </div>
+    }
+
+    @if (record()!.note) {
+      <div class="mt-4 p-3 bg-slate-50 rounded-lg text-sm text-slate-600">
+        <span class="font-medium">หมายเหตุ:</span> {{ record()!.note }}
+      </div>
+    }
+  } @else {
+    <div class="text-center py-16 text-slate-400">ไม่พบข้อมูล</div>
+  }
+</div>

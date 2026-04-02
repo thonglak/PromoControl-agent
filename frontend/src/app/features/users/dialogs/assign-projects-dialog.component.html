@@ -1,0 +1,52 @@
+<h2 mat-dialog-title class="!text-lg !font-semibold !text-slate-800">
+  กำหนดโครงการ — {{ data.user.name }}
+</h2>
+
+<mat-dialog-content class="!pt-4 !pb-2 ">
+
+  @if (data.allProjects.length === 0) {
+    <p class="text-slate-400 text-sm text-center py-8">ไม่มีโครงการในระบบ</p>
+  } @else {
+    <form [formGroup]="form">
+      <div formArrayName="assignments" class="flex flex-col divide-y divide-slate-100">
+        @for (ctrl of assignments.controls; track $index) {
+          <div [formGroupName]="$index"
+               class="flex items-center gap-4 py-3 hover:bg-slate-50 px-2 rounded">
+            <!-- Checkbox -->
+            <mat-checkbox formControlName="checked" color="primary"></mat-checkbox>
+
+            <!-- Project info -->
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-slate-800 truncate">
+                {{ ctrl.get('project_name')!.value }}
+              </p>
+              <p class="text-xs text-slate-400 font-mono">{{ ctrl.get('project_code')!.value }}</p>
+            </div>
+
+            <!-- Access level select (เปิดใช้เมื่อ checked) -->
+            <mat-form-field appearance="outline" class="w-40 !text-sm"
+                            subscriptSizing="dynamic">
+              <mat-label>สิทธิ์</mat-label>
+              <mat-select formControlName="access_level"
+                          [disabled]="!ctrl.get('checked')!.value">
+                <mat-option value="view">ดูอย่างเดียว</mat-option>
+                <mat-option value="edit">แก้ไขได้</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        }
+      </div>
+    </form>
+  }
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="!px-6 !pb-4 !pt-2 gap-2">
+  <button mat-stroked-button (click)="cancel()" [disabled]="saving()">ยกเลิก</button>
+  <button mat-flat-button color="primary" (click)="save()" [disabled]="saving()">
+    @if (saving()) {
+      <mat-spinner diameter="18" class="!inline-block mr-1" />
+    }
+    บันทึก
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,67 @@
+# ─── Dependencies ───
+node_modules/
+vendor/
+frontend/node_modules/
+backend/vendor/
+
+# ─── Build output ───
+frontend/dist/
+frontend/.angular/
+backend/writable/logs/*
+backend/writable/cache/*
+backend/writable/session/*
+backend/writable/uploads/*
+!backend/writable/logs/.gitkeep
+!backend/writable/cache/.gitkeep
+!backend/writable/session/.gitkeep
+!backend/writable/uploads/.gitkeep
+
+# ─── Environment / Secrets ───
+.env
+backend/.env
+frontend/.env
+*.env.local
+*.env.production
+
+# ─── Docker volumes ───
+mysql_data/
+docker/mysql/data/
+
+# ─── IDE / Editor ───
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── OS ───
+.DS_Store
+desktop.ini
+
+# ─── Logs ───
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Test / Coverage ───
+coverage/
+frontend/coverage/
+backend/phpunit.result.cache
+.phpunit.result.cache
+
+# ─── Temp files ───
+*.tmp
+*.bak
+*.orig
+
+# ─── Development Plan generation scripts ───
+create-dev-plan.js
+create-claude-code-plan.js
+
+# ─── Compiled output ───
+*.js.map
+*.d.ts
+!frontend/src/**/*.d.ts

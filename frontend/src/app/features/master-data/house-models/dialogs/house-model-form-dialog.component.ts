@@ -1,0 +1,158 @@
+import { Component, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatButtonModule } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+
+import { CurrencyMaskDirective } from '../../../../shared/directives/currency-mask.directive';
+import { HouseModelApiService, HouseModel } from '../house-model-api.service';
+
+export interface HouseModelFormDialogData {
+  mode: 'create' | 'edit';
+  projectId: number;
+  model?: HouseModel;
+}
+
+@Component({
+  selector: 'app-house-model-form-dialog',
+  standalone: true,
+  imports: [
+    CommonModule, ReactiveFormsModule, MatDialogModule,
+    MatFormFieldModule, MatInputModule, MatButtonModule, MatProgressSpinnerModule, CurrencyMaskDirective,
+  ],
+  template: `
+    <h2 mat-dialog-title class="!text-lg !font-semibold !text-slate-800">
+      {{ data.mode === 'create' ? 'สร้างแบบบ้านใหม่' : 'แก้ไขแบบบ้าน' }}
+    </h2>
+
+    <mat-dialog-content>
+      <form [formGroup]="form" class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0 pt-2">
+
+        <!-- รหัส -->
+        <mat-form-field appearance="outline">
+          <mat-label>รหัสแบบบ้าน</mat-label>
+          <input matInput formControlName="code" [readonly]="data.mode === 'edit'">
+          @if (form.get('code')?.hasError('required')) {
+            <mat-error>กรุณากรอกรหัสแบบบ้าน</mat-error>
+          }
+        </mat-form-field>
+
+        <!-- ชื่อ -->
+        <mat-form-field appearance="outline">
+          <mat-label>ชื่อแบบบ้าน</mat-label>
+          <input matInput formControlName="name">
+          @if (form.get('name')?.hasError('required')) {
+            <mat-error>กรุณากรอกชื่อแบบบ้าน</mat-error>
+          }
+        </mat-form-field>
+
+        <!-- ห้องนอน / ห้องน้ำ / ชั้น -->
+        <mat-form-field appearance="outline">
+          <mat-label>จำนวนห้องนอน</mat-label>
+          <input matInput type="number" formControlName="bedrooms" min="0" max="10">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>จำนวนห้องน้ำ</mat-label>
+          <input matInput type="number" formControlName="bathrooms" min="0" max="10">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>จำนวนชั้น</mat-label>
+          <input matInput type="number" formControlName="floors" min="1" max="5">
+        </mat-form-field>
+
+        <!-- พื้นที่ -->
+        <mat-form-field appearance="outline">
+          <mat-label>พื้นที่ใช้สอย (ตร.ม.)</mat-label>
+          <input matInput currencyMask [options]="{ precision: 2, align: 'left' }" formControlName="area_sqm">
+          <span matSuffix class="text-slate-400 text-sm mr-2">ตร.ม.</span>
+          @if (form.get('area_sqm')?.hasError('required')) {
+            <mat-error>กรุณากรอกพื้นที่ใช้สอย</mat-error>
+          }
+          @if (form.get('area_sqm')?.hasError('min')) {
+            <mat-error>พื้นที่ต้องมากกว่า 0</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>พื้นที่ดิน (ตร.ว.)</mat-label>
+          <input matInput currencyMask [options]="{ precision: 2, align: 'left' }" formControlName="land_area_sqw">
+          <span matSuffix class="text-slate-400 text-sm mr-2">ตร.ว.</span>
+        </mat-form-field>
+
+
+        <!-- Server error -->
+        @if (serverError()) {
+          <div class="sm:col-span-2 text-red-600 text-sm bg-red-50 p-3 rounded">{{ serverError() }}</div>
+        }
+
+      </form>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end" class="!px-6 !pb-4 !pt-2 gap-2">
+      <button mat-stroked-button (click)="dialogRef.close()">ยกเลิก</button>
+      <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
+        @if (saving()) { <mat-spinner diameter="18" class="!inline-block mr-1" /> }
+        {{ data.mode === 'create' ? 'สร้างแบบบ้าน' : 'บันทึก' }}
+      </button>
+    </mat-dialog-actions>
+  `,
+})
+export class HouseModelFormDialogComponent {
+  data      = inject<HouseModelFormDialogData>(MAT_DIALOG_DATA);
+  dialogRef = inject(MatDialogRef<HouseModelFormDialogComponent>);
+  private api = inject(HouseModelApiService);
+  private fb  = inject(FormBuilder);
+
+  saving      = signal(false);
+  serverError = signal<string | null>(null);
+
+  form = this.fb.group({
+    code:               [this.data.model?.code ?? '', Validators.required],
+    name:               [this.data.model?.name ?? '', Validators.required],
+    bedrooms:           [this.data.model?.bedrooms ?? 0, [Validators.min(0), Validators.max(10)]],
+    bathrooms:          [this.data.model?.bathrooms ?? 0, [Validators.min(0), Validators.max(10)]],
+    floors:             [this.data.model?.floors ?? 1, [Validators.min(1), Validators.max(5)]],
+    area_sqm:           [this.data.model?.area_sqm ?? null, [Validators.required, Validators.min(0.01)]],
+    land_area_sqw:      [this.data.model?.land_area_sqw ?? null],
+  });
+
+  save(): void {
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    this.saving.set(true);
+    this.serverError.set(null);
+
+    const v = this.form.value;
+    const payload = {
+      project_id:         this.data.projectId,
+      code:               v.code!,
+      name:               v.name!,
+      bedrooms:           v.bedrooms ?? 0,
+      bathrooms:          v.bathrooms ?? 0,
+      floors:             v.floors ?? 1,
+      area_sqm:           v.area_sqm!,
+      land_area_sqw:      v.land_area_sqw ?? null,
+    };
+
+    const obs = this.data.mode === 'create'
+      ? this.api.create(payload)
+      : this.api.update(this.data.model!.id, payload);
+
+    obs.subscribe({
+      next: result => this.dialogRef.close(result),
+      error: err => {
+        const body = err.error;
+        if (body?.errors) {
+          this.serverError.set(Object.values(body.errors as Record<string, string>).join(', '));
+        } else {
+          this.serverError.set(body?.error ?? 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+        }
+        this.saving.set(false);
+      },
+    });
+  }
+}

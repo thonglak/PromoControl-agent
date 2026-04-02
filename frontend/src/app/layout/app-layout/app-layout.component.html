@@ -1,0 +1,28 @@
+<mat-sidenav-container class="!fixed !inset-0" autosize>
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <mat-sidenav
+    #sidenav
+    [mode]="isMobile() ? 'over' : 'side'"
+    [opened]="!isMobile()"
+    [style.width]="isMobile() ? '240px' : (sidebarCollapsed() ? '56px' : '240px')"
+    class="border-r border-slate-200 !overflow-hidden"
+  >
+    <app-sidebar-menu
+      [collapsed]="!isMobile() && sidebarCollapsed()"
+      (collapseToggle)="onCollapseToggle()"
+    />
+  </mat-sidenav>
+
+  <!-- ── Main area ────────────────────────────────────────────────────────── -->
+  <mat-sidenav-content>
+    <app-top-navigation
+      [isMobile]="isMobile()"
+      (menuToggle)="onMenuToggle()"
+    />
+    <main cdkScrollable class="flex-1 overflow-auto bg-[#F8FAFC]">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+
+</mat-sidenav-container>

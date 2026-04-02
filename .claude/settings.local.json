@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /home/janya/PromoControl-agent -type f \\\\\\( -name \"*.php\" -o -name \"*.ts\" -o -name \"*.js\" -o -name \"*.html\" -o -name \"docker-compose.yml\" -o -name \"composer.json\" -o -name \"package.json\" \\\\\\) 2>/dev/null | head -30)",
+      "Bash(python3 simulator/server.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8555/)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker run:*)",
+      "Bash(sudo chown:*)",
+      "Bash(# ไฟล์ owned by root - ลอง write ผ่าน cp\ncp /home/janya/PromoControl-agent/backend/app/Services/ProjectService.php /tmp/ProjectService.php.bak\nls -la /home/janya/PromoControl-agent/backend/app/Controllers/)",
+      "Bash(sudo -n chown -R janya:janya /home/janya/PromoControl-agent/backend/app/ 2>&1)",
+      "Bash(docker ps:*)",
+      "Bash(find:*)",
+      "Bash(git clone:*)",
+      "Bash(docker cp:*)"
+    ]
+  }
+}

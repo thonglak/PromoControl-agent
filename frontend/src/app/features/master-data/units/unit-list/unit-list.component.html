@@ -1,0 +1,292 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <!-- Header -->
+  <app-page-header title="ยูนิต" subtitle="จัดการยูนิตในโครงการ">
+    <div actions class="flex items-center gap-2">
+      <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700"><app-icon name="adjustments-horizontal" class="w-5 h-5" /></button>
+      @if (canWrite()) {
+        <button mat-stroked-button (click)="toggleImport()">
+          <app-icon name="arrow-up-tray" class="w-4 h-4 mr-1"></app-icon>
+          นำเข้า CSV
+        </button>
+        <button mat-flat-button color="primary" (click)="openCreate()">
+          <app-icon name="plus" class="w-4 h-4 mr-1"></app-icon>
+          สร้างยูนิต
+        </button>
+      }
+    </div>
+  </app-page-header>
+
+  <!-- CSV Import Panel -->
+  @if (showImport()) {
+    <div class="mb-5 border border-slate-200 rounded-lg bg-white p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-medium text-slate-700">นำเข้ายูนิตจาก CSV</h2>
+        <button mat-icon-button (click)="toggleImport()" matTooltip="ปิด">
+          <app-icon name="x-mark" class="w-5 h-5"></app-icon>
+        </button>
+      </div>
+
+      <p class="text-sm text-slate-500 mb-3">
+        คอลัมน์ที่รองรับ:
+        <code class="bg-slate-100 px-1 rounded">unit_code</code> (บังคับ),
+        <code class="bg-slate-100 px-1 rounded">unit_number</code>,
+        <code class="bg-slate-100 px-1 rounded">building</code>,
+        <code class="bg-slate-100 px-1 rounded">floor</code>,
+        <code class="bg-slate-100 px-1 rounded">base_price</code>,
+        <code class="bg-slate-100 px-1 rounded">unit_cost</code>,
+        <code class="bg-slate-100 px-1 rounded">standard_budget</code>,
+        <code class="bg-slate-100 px-1 rounded">house_model_id</code>
+      </p>
+
+      @if (!importResult()) {
+        <label class="flex items-center gap-3 cursor-pointer">
+          <button mat-stroked-button type="button" onclick="this.parentElement.querySelector('input[type=file]').click()">
+            <app-icon name="document-arrow-up" class="w-4 h-4 mr-1"></app-icon>
+            เลือกไฟล์ CSV
+          </button>
+          <input type="file" accept=".csv" class="hidden" (change)="onFileSelected($event)">
+        </label>
+      }
+
+      @if (csvError()) {
+        <div class="mt-3 text-sm text-red-600 bg-red-50 p-3 rounded">{{ csvError() }}</div>
+      }
+
+      @if (csvPreview().length) {
+        <div class="mt-4">
+          <p class="text-sm font-medium text-slate-600 mb-2">
+            ตัวอย่าง {{ csvPreview().length }} แถวแรก (ทั้งหมด {{ csvRows().length }} แถว)
+          </p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="border border-slate-200 px-3 py-2 text-left font-medium text-slate-600">รหัสยูนิต</th>
+                  <th class="border border-slate-200 px-3 py-2 text-left font-medium text-slate-600">เลขที่ยูนิต</th>
+                  <th class="border border-slate-200 px-3 py-2 text-left font-medium text-slate-600">อาคาร</th>
+                  <th class="border border-slate-200 px-3 py-2 text-left font-medium text-slate-600">ชั้น</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right font-medium text-slate-600">ราคาขาย</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right font-medium text-slate-600">ต้นทุน</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right font-medium text-slate-600">งบมาตรฐาน</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of csvPreview(); track row.unit_code) {
+                  <tr class="hover:bg-primary-100 transition-colors even:bg-slate-50/40">
+                    <td class="border border-slate-200 px-3 py-1.5">{{ row.unit_code }}</td>
+                    <td class="border border-slate-200 px-3 py-1.5">{{ row.unit_number ?? '—' }}</td>
+                    <td class="border border-slate-200 px-3 py-1.5">{{ row.building ?? '—' }}</td>
+                    <td class="border border-slate-200 px-3 py-1.5">{{ row.floor ?? '—' }}</td>
+                    <td class="border border-slate-200 px-3 py-1.5 text-right">{{ formatCurrency(row.base_price) }}</td>
+                    <td class="border border-slate-200 px-3 py-1.5 text-right">{{ formatCurrency(row.unit_cost) }}</td>
+                    <td class="border border-slate-200 px-3 py-1.5 text-right">{{ formatCurrency(row.standard_budget) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 flex justify-end gap-2">
+            <button mat-stroked-button (click)="resetImport()">ล้างข้อมูล</button>
+            <button mat-flat-button color="primary" [disabled]="importing()" (click)="confirmImport()">
+              @if (importing()) { <mat-spinner diameter="20" class="inline-block mr-1"></mat-spinner> }
+              นำเข้า {{ csvRows().length }} ยูนิต
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (importResult()) {
+        <div class="mt-4 p-4 rounded-lg border"
+             [class]="importResult()!.errors.length ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'">
+          <p class="font-medium mb-2"
+             [class]="importResult()!.errors.length ? 'text-amber-800' : 'text-green-800'">
+            นำเข้าสำเร็จ {{ importResult()!.created }} ยูนิต
+            @if (importResult()!.errors.length) { / ผิดพลาด {{ importResult()!.errors.length }} แถว }
+          </p>
+          @if (importResult()!.errors.length) {
+            <ul class="text-sm text-amber-700 space-y-1">
+              @for (e of importResult()!.errors; track e.row) {
+                <li>แถว {{ e.row }} ({{ e.unit_code }}): {{ e.error }}</li>
+              }
+            </ul>
+          }
+          <div class="mt-3">
+            <button mat-stroked-button (click)="resetImport(); toggleImport()">ปิด</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Filters -->
+  <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
+    <form [formGroup]="filterForm" class="flex flex-wrap gap-3 items-end">
+
+      <mat-form-field appearance="outline" class="flex-1 min-w-[180px]">
+        <mat-label>ค้นหา</mat-label>
+        <input matInput formControlName="search" placeholder="รหัส, เลขที่, ลูกค้า..." (input)="onFilterChange()">
+        <app-icon matSuffix name="magnifying-glass" class="w-4 h-4 text-slate-400 mr-2"></app-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="min-w-[200px]">
+        <mat-label>แบบบ้าน</mat-label>
+        <mat-select formControlName="house_model_id" (selectionChange)="onFilterChange()">
+          <mat-option [value]="null">ทั้งหมด</mat-option>
+          @for (m of houseModels(); track m.id) {
+            <mat-option [value]="m.id">{{ m.code }} — {{ m.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="min-w-[160px]">
+        <mat-label>สถานะ</mat-label>
+        <mat-select formControlName="status" (selectionChange)="onFilterChange()">
+          <mat-option value="">ทั้งหมด</mat-option>
+          <mat-option value="available">ว่าง</mat-option>
+          <mat-option value="reserved">จอง</mat-option>
+          <mat-option value="sold">ขายแล้ว</mat-option>
+          <mat-option value="transferred">โอนแล้ว</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+
+    </form>
+  </div>
+
+  <!-- Active filter indicator -->
+  @if (hasActiveFilters()) {
+    <div class="flex items-center gap-2 mb-4 ml-1">
+      <span class="text-xs text-slate-400">ตัวกรองที่ใช้:</span>
+      @if (filterForm.get("search")?.value) {
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-medium">
+          ค้นหา: {{ filterForm.get("search")?.value }}
+        </span>
+      }
+      @if (filterForm.get("house_model_id")?.value) {
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-medium">
+          แบบบ้าน
+        </span>
+      }
+      @if (filterForm.get("status")?.value) {
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-medium">
+          สถานะ: {{ statusLabel(filterForm.get("status")!.value!) }}
+        </span>
+      }
+      @if (sortRef.active) {
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+          <app-icon name="arrows-up-down" class="w-3 h-3" />
+          เรียงตาม {{ sortRef.active }}
+        </span>
+      }
+      <button type="button" (click)="resetAll()"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                     bg-red-50 text-red-600 text-xs font-medium
+                     hover:bg-red-100 transition-colors cursor-pointer">
+        <app-icon name="x-mark" class="w-3 h-3" />
+        ล้างทั้งหมด
+      </button>
+    </div>
+  }
+
+  <!-- Table -->
+  <app-section-card [noPadding]="true">
+    <div class="relative">
+
+    <!-- Loading overlay -->
+    @if (loading()) {
+      <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10"><mat-spinner diameter="36" /></div>
+    }
+    <div class="overflow-x-auto">
+        <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" class="w-full">
+
+          <ng-container matColumnDef="unit_code">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">รหัสยูนิต</th>
+            <td mat-cell *matCellDef="let u" class="!font-mono !font-medium text-slate-800">{{ u.unit_code }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="unit_number">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">เลขที่ยูนิต</th>
+            <td mat-cell *matCellDef="let u">{{ u.unit_number ?? '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="house_model">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">แบบบ้าน</th>
+            <td mat-cell *matCellDef="let u">
+              @if (u.house_model_code) {
+                <span class="text-slate-700">{{ u.house_model_code }}</span>
+                <span class="text-slate-400 text-xs ml-1">{{ u.house_model_name }}</span>
+              } @else {
+                <span class="text-slate-400">—</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="base_price">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !text-right !bg-slate-50">ราคาขาย</th>
+            <td mat-cell *matCellDef="let u" class="!text-right !font-medium text-slate-800">{{ formatCurrency(u.base_price) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="unit_cost">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !text-right !bg-slate-50">ต้นทุน</th>
+            <td mat-cell *matCellDef="let u" class="!text-right font-medium" style="color:#DC2626">{{ formatCurrency(u.unit_cost) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="appraisal_price">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !text-right !bg-slate-50">ราคาประเมิน</th>
+            <td mat-cell *matCellDef="let u" class="!text-right text-slate-600">{{ formatCurrency(u.appraisal_price) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="standard_budget">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !text-right !bg-slate-50">งบมาตรฐาน</th>
+            <td mat-cell *matCellDef="let u" class="!text-right font-medium" style="color:#0284C7">{{ formatCurrency(u.standard_budget) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">สถานะ</th>
+            <td mat-cell *matCellDef="let u">
+              <app-status-chip type="unit_status" [value]="u.status" />
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="customer_name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">ลูกค้า</th>
+            <td mat-cell *matCellDef="let u" class="text-slate-600">{{ u.customer_name ?? '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">จัดการ</th>
+            <td mat-cell *matCellDef="let u">
+              <div class="flex gap-1">
+                @if (canWrite()) {
+                  <button mat-icon-button (click)="openEdit(u)" matTooltip="แก้ไข" class="!text-slate-500 hover:!text-blue-600">
+                    <app-icon name="pencil-square" class="w-4 h-4"></app-icon>
+                  </button>
+                  @if (isAdmin()) {
+                    <button mat-icon-button (click)="confirmDelete(u)" matTooltip="ลบ" class="!text-slate-400 hover:!text-red-600">
+                      <app-icon name="trash" class="w-4 h-4"></app-icon>
+                    </button>
+                  }
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns(); sticky: true" class="bg-slate-50"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns();"
+              class="hover:bg-slate-50 border-b border-slate-100 even:bg-slate-50/40"></tr>
+
+          <tr class="mat-row" *matNoDataRow>
+            <td [attr.colspan]="displayedColumns().length" class="text-center py-12 text-slate-400">
+              <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p>ไม่พบข้อมูลยูนิต</p>
+            </td>
+          </tr>
+
+        </table>
+      </div>
+
+    <mat-paginator [pageSizeOptions]="[25, 50, 100]" pageSize="25" showFirstLastButtons></mat-paginator>
+    </div>
+  </app-section-card>
+</div>

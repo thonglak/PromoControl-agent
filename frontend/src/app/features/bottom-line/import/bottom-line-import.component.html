@@ -1,0 +1,330 @@
+<div class="p-6 max-w-5xl mx-auto" style="max-width: 1440px; margin: 0 auto;">
+  <app-page-header title="Import ราคาต้นทุน" subtitle="นำเข้าราคาต้นทุนและราคาประเมินจากไฟล์ Excel" />
+
+  <mat-stepper #stepper class="bg-white rounded-xl shadow-sm border border-slate-200">
+
+    <!-- Custom stepper icons (แทน mat-icon ที่ต้องใช้ Material Icons font) -->
+    <ng-template matStepperIcon="edit">
+      <app-icon name="pencil-square" class="w-4 h-4 text-white" />
+    </ng-template>
+    <ng-template matStepperIcon="done">
+      <app-icon name="check" class="w-4 h-4 text-white" />
+    </ng-template>
+    <ng-template matStepperIcon="number" let-index="index">
+      <span class="text-xs font-bold">{{ index + 1 }}</span>
+    </ng-template>
+
+    <!-- ══════ Step 1: อัปโหลดไฟล์ ══════ -->
+    <mat-step label="อัปโหลดไฟล์">
+      <div class="py-6 px-2">
+        <div class="mb-6 p-3 bg-slate-50 rounded-lg flex items-center gap-2">
+          <app-icon name="building-office" class="w-4 h-4 text-slate-400" />
+          <span class="text-sm text-slate-600"><span class="font-medium">โครงการ:</span> {{ projectName() }}</span>
+        </div>
+
+        @if (presets().length > 0) {
+          <div class="mb-6" [formGroup]="uploadForm">
+            <mat-form-field appearance="outline" class="w-full sm:w-80">
+              <mat-label>Mapping Preset (ไม่บังคับ)</mat-label>
+              <mat-select formControlName="selectedPresetId">
+                <mat-option [value]="null">— ตั้งค่าใหม่ —</mat-option>
+                @for (p of presets(); track p.id) {
+                  <mat-option [value]="p.id">
+                    {{ p.preset_name }}
+                    @if (p.is_default) { <span class="text-xs text-blue-600 ml-1">(default)</span> }
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        }
+
+        <!-- Drag & Drop -->
+        <div
+          (drop)="onDrop($event)" (dragover)="onDragOver($event)" (dragleave)="onDragLeave()"
+          [class.border-blue-400]="dragOver()" [class.bg-blue-50]="dragOver()"
+          class="border-dashed border-2 border-slate-300 rounded-xl p-8 text-center
+                 transition-colors cursor-pointer hover:border-slate-400"
+          (click)="fileInput.click()">
+          <input #fileInput type="file" accept=".xlsx,.xls" class="hidden" (change)="onFileSelected($event)" />
+          @if (!selectedFile()) {
+            <app-icon name="arrow-up-tray" class="w-10 h-10 text-slate-400 mx-auto mb-3" />
+            <p class="text-sm text-slate-600 font-medium">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือก</p>
+            <p class="text-xs text-slate-400 mt-1">รองรับ .xlsx, .xls (สูงสุด 50MB)</p>
+          } @else {
+            <div class="flex items-center justify-center gap-3">
+              <app-icon name="document-text" class="w-8 h-8 text-green-600" />
+              <div class="text-left">
+                <p class="text-sm font-medium text-slate-800">{{ selectedFile()!.name }}</p>
+                <p class="text-xs text-slate-400">{{ formatFileSize(selectedFile()!.size) }}</p>
+              </div>
+              <button type="button" (click)="clearFile($event)"
+                      class="ml-4 p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                <app-icon name="x-mark" class="w-5 h-5" />
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="mt-3 text-center">
+          <button type="button" (click)="downloadSample()"
+                  class="text-sm text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1">
+            <app-icon name="arrow-down-tray" class="w-4 h-4" />
+            ดาวน์โหลดไฟล์ตัวอย่าง
+          </button>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button mat-flat-button color="primary" [disabled]="!selectedFile() || uploading()" (click)="upload()">
+            @if (uploading()) { <mat-spinner diameter="18" class="!inline-block mr-2" /> }
+            อัปโหลดและอ่านไฟล์
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- ══════ Step 2: ตั้งค่า Mapping ══════ -->
+    <mat-step label="ตั้งค่า Mapping">
+      <div class="py-6 px-2" [formGroup]="mappingForm">
+        @if (uploadResult()) {
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <mat-form-field appearance="outline">
+              <mat-label>Sheet</mat-label>
+              <mat-select formControlName="sheet_name">
+                @for (s of uploadResult()!.sheets; track s) {
+                  <mat-option [value]="s">{{ s }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>แถว Header</mat-label>
+              <input matInput type="number" formControlName="header_row" min="1" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>แถวเริ่มต้นข้อมูล</mat-label>
+              <input matInput type="number" formControlName="data_start_row" min="2" />
+            </mat-form-field>
+          </div>
+
+          <h3 class="text-sm font-semibold text-slate-700 mb-3">Column Mapping</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <mat-form-field appearance="outline">
+              <mat-label>เลขที่ยูนิต</mat-label>
+              <mat-select formControlName="unit_code_column">
+                @for (c of columns(); track c) {
+                  <mat-option [value]="c">{{ c }} — {{ columnSamples()[c] | slice:0:30 }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>ราคา Bottom Line</mat-label>
+              <mat-select formControlName="bottom_line_price_column">
+                @for (c of columns(); track c) {
+                  <mat-option [value]="c">{{ c }} — {{ columnSamples()[c] | slice:0:30 }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>ราคาประเมินกรมที่ดิน</mat-label>
+              <mat-select formControlName="appraisal_price_column">
+                @for (c of columns(); track c) {
+                  <mat-option [value]="c">{{ c }} — {{ columnSamples()[c] | slice:0:30 }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+
+          <!-- ปุ่มอ่านใหม่ -->
+          <div class="mb-6 flex items-center gap-3">
+            <button mat-stroked-button color="primary" [disabled]="previewing()" (click)="refreshPreview()">
+              @if (previewing()) { <mat-spinner diameter="16" class="!inline-block mr-1" /> }
+              <app-icon name="arrow-path" class="w-4 h-4 mr-1" />
+              อ่านข้อมูลใหม่
+            </button>
+            <span class="text-xs text-slate-400">กดเมื่อเปลี่ยนแถวเริ่มต้น, Sheet หรือ Column</span>
+          </div>
+
+          <!-- Preview table -->
+          @if (previewRows().length) {
+            <h3 class="text-sm font-semibold text-slate-700 mb-2">
+              ตัวอย่างข้อมูล ({{ previewRows().length }} แถวแรก จากทั้งหมด {{ totalRows() }} แถว)
+            </h3>
+            <div class="overflow-auto border border-slate-200 rounded-lg mb-6">
+              <table mat-table [dataSource]="previewRows()" class="w-full">
+                <ng-container matColumnDef="row">
+                  <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">แถว</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm text-slate-500">{{ r.row }}</td>
+                </ng-container>
+                <ng-container matColumnDef="unit_code">
+                  <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">เลขที่ยูนิต</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm font-medium text-slate-800">{{ r.unit_code }}</td>
+                </ng-container>
+                <ng-container matColumnDef="bottom_line_price">
+                  <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคา Bottom Line</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #DC2626">{{ formatCurrency(r.bottom_line_price) }}</td>
+                </ng-container>
+                <ng-container matColumnDef="appraisal_price">
+                  <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคาประเมิน</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #0284C7">{{ formatCurrency(r.appraisal_price) }}</td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="previewColumns" class="!bg-slate-50"></tr>
+                <tr mat-row *matRowDef="let row; columns: previewColumns;" class="hover:bg-slate-50"></tr>
+              </table>
+            </div>
+          }
+
+          <!-- Save preset -->
+          <div class="flex flex-col gap-2 p-4 bg-slate-50 rounded-lg mb-6">
+            <mat-checkbox formControlName="save_preset" color="primary">บันทึก mapping นี้เป็น preset</mat-checkbox>
+            @if (mappingForm.get('save_preset')?.value) {
+              <mat-form-field appearance="outline" class="ml-8 max-w-xs !mt-1">
+                <mat-label>ชื่อ Preset</mat-label>
+                <input matInput formControlName="preset_name" placeholder="เช่น Default SRP" />
+              </mat-form-field>
+              <mat-checkbox formControlName="set_as_default" color="primary" class="ml-8">
+                ตั้งเป็น default สำหรับโครงการนี้
+              </mat-checkbox>
+            }
+          </div>
+
+          <div class="flex justify-between">
+            <button mat-stroked-button matStepperPrevious>ย้อนกลับ</button>
+            <button mat-flat-button color="primary" matStepperNext [disabled]="mappingForm.invalid">ถัดไป</button>
+          </div>
+        }
+      </div>
+    </mat-step>
+
+    <!-- ══════ Step 3: ตรวจสอบและยืนยัน ══════ -->
+    <mat-step label="ตรวจสอบและยืนยัน">
+      <div class="py-6 px-2">
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div class="bg-slate-50 rounded-lg p-4">
+            <p class="text-xs text-slate-500 mb-1">ไฟล์</p>
+            <p class="text-sm font-medium text-slate-800 truncate">{{ uploadResult()?.file_name }}</p>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4">
+            <p class="text-xs text-slate-500 mb-1">จำนวนแถวทั้งหมด</p>
+            <p class="text-2xl font-bold text-slate-700">{{ totalRows() }}</p>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4">
+            <p class="text-xs text-slate-500 mb-1">Mapping</p>
+            <p class="text-sm font-mono text-slate-700">
+              Unit={{ mappingForm.get('unit_code_column')?.value }},
+              BL={{ mappingForm.get('bottom_line_price_column')?.value }},
+              App={{ mappingForm.get('appraisal_price_column')?.value }}
+              (แถว {{ mappingForm.get('data_start_row')?.value }}–{{ totalRows() + (mappingForm.get('data_start_row')?.value ?? 2) - 1 }})
+            </p>
+          </div>
+        </div>
+
+        @if (previewRows().length) {
+          <h3 class="text-sm font-semibold text-slate-700 mb-2">ตัวอย่างข้อมูลที่จะ import</h3>
+          <div class="overflow-auto border border-slate-200 rounded-lg mb-4">
+            <table mat-table [dataSource]="previewRows()" class="w-full">
+              <ng-container matColumnDef="row">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">แถว</th>
+                <td mat-cell *matCellDef="let r" class="!text-sm text-slate-500">{{ r.row }}</td>
+              </ng-container>
+              <ng-container matColumnDef="unit_code">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">เลขที่ยูนิต</th>
+                <td mat-cell *matCellDef="let r" class="!text-sm font-medium text-slate-800">{{ r.unit_code }}</td>
+              </ng-container>
+              <ng-container matColumnDef="bottom_line_price">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคา BL (ใหม่)</th>
+                <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #DC2626">{{ formatCurrency(r.bottom_line_price) }}</td>
+              </ng-container>
+              <ng-container matColumnDef="appraisal_price">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคาประเมิน (ใหม่)</th>
+                <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #0284C7">{{ formatCurrency(r.appraisal_price) }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="reviewColumns" class="!bg-slate-50"></tr>
+              <tr mat-row *matRowDef="let row; columns: reviewColumns;" class="hover:bg-slate-50"></tr>
+            </table>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            แสดง {{ previewRows().length }} แถวแรกจากทั้งหมด {{ totalRows() }} แถว —
+            ผลลัพธ์ Match/Unmatched จะแสดงหลัง import
+          </p>
+        }
+
+        <mat-form-field appearance="outline" class="w-full mb-4">
+          <mat-label>หมายเหตุ (ไม่บังคับ)</mat-label>
+          <textarea matInput [formControl]="noteControl" rows="2"></textarea>
+        </mat-form-field>
+
+        <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-6">
+          <app-icon name="exclamation-triangle" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <span class="text-sm text-amber-800">ระบบจะ backup ข้อมูลยูนิตอัตโนมัติก่อนทำการ import</span>
+        </div>
+
+        @if (importError()) {
+          <div class="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+            <app-icon name="x-circle" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <span class="text-sm text-red-700">{{ importError() }}</span>
+          </div>
+        }
+
+        <div class="flex justify-between">
+          <button mat-stroked-button matStepperPrevious>ย้อนกลับ</button>
+          <button mat-flat-button color="primary" [disabled]="importing()" (click)="confirmImport()">
+            @if (importing()) { <mat-spinner diameter="18" class="!inline-block mr-2" /> }
+            ยืนยัน Import
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- ══════ Step 4: ผลลัพธ์ ══════ -->
+    <mat-step label="ผลลัพธ์">
+      <div class="py-10 px-2 text-center">
+        @if (importResult()) {
+          @if (importResult()!.status === 'completed') {
+            <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <app-icon name="check-circle" class="w-10 h-10 text-green-500" />
+            </div>
+            <h2 class="text-lg font-semibold text-green-700 mb-2">Import สำเร็จ</h2>
+          } @else {
+            <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <app-icon name="x-circle" class="w-10 h-10 text-red-500" />
+            </div>
+            <h2 class="text-lg font-semibold text-red-700 mb-2">Import ไม่สำเร็จ</h2>
+          }
+
+          <p class="text-sm text-slate-500 mb-6">
+            Import Key: <span class="font-mono font-semibold text-slate-700">{{ importResult()!.import_key }}</span>
+          </p>
+
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-2xl mx-auto mb-8">
+            <div class="bg-slate-50 rounded-lg p-4 text-center">
+              <p class="text-2xl font-bold text-slate-700">{{ importResult()!.total_rows }}</p>
+              <p class="text-xs text-slate-500 mt-1">แถวทั้งหมด</p>
+            </div>
+            <div class="bg-green-50 rounded-lg p-4 text-center">
+              <p class="text-2xl font-bold text-green-700">{{ importResult()!.matched_rows }}</p>
+              <p class="text-xs text-green-600 mt-1">Match ได้</p>
+            </div>
+            <div class="bg-red-50 rounded-lg p-4 text-center">
+              <p class="text-2xl font-bold text-red-700">{{ importResult()!.unmatched_rows }}</p>
+              <p class="text-xs text-red-600 mt-1">Match ไม่ได้</p>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4 text-center">
+              <p class="text-2xl font-bold text-blue-700">{{ importResult()!.updated_rows }}</p>
+              <p class="text-xs text-blue-600 mt-1">อัปเดตแล้ว</p>
+            </div>
+          </div>
+
+          <div class="flex justify-center gap-3">
+            <button mat-stroked-button (click)="goToHistory()">
+              <app-icon name="clock" class="w-4 h-4 mr-1" /> ดูประวัติ Import
+            </button>
+            <button mat-flat-button color="primary" (click)="resetStepper()">
+              <app-icon name="arrow-path" class="w-4 h-4 mr-1" /> Import ใหม่
+            </button>
+          </div>
+        }
+      </div>
+    </mat-step>
+
+  </mat-stepper>
+</div>

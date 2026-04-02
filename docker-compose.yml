@@ -1,0 +1,115 @@
+services:
+
+  # ฐานข้อมูล MySQL 8
+  promo_mysql:
+    image: mysql:8
+    ports:
+      - "3309:3306"
+    container_name: promo_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: promo_db
+      MYSQL_USER: promo_user
+      MYSQL_PASSWORD: promo_pass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - promo_network
+
+  # PHP-FPM Backend (CodeIgniter 4)
+  promo_php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+
+    container_name: promo_php
+    volumes:
+      - ./backend:/var/www/backend
+    working_dir: /var/www/backend
+    depends_on:
+      promo_mysql:
+        condition: service_healthy
+    networks:
+      - promo_network
+
+  # Angular 21 Frontend (dev server ผ่าน container เท่านั้น — host มี Node 15)
+  promo_frontend:
+    container_name: promo_frontend
+    image: node:22-alpine
+    command: sh -c "npm install && npx ng serve --host 0.0.0.0 --poll 2000"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    working_dir: /app
+    depends_on:
+      - promo_php
+    networks:
+      - promo_network
+
+  # Nginx Reverse Proxy — รับ traffic ทั้งหมด แจกไปยัง PHP-FPM และ Angular
+  promo_nginx:
+    container_name: promo_nginx
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - promo_php
+      - promo_frontend
+    networks:
+      - promo_network
+
+  # phpMyAdmin — GUI สำหรับจัดการ MySQL
+  promo_phpmyadmin:
+    container_name: promo_phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: promo_mysql
+      PMA_USER: promo_user
+      PMA_PASSWORD: promo_pass
+    networks:
+      - promo_network
+
+  # Angular 21 Frontend V2 (Sakai-NG + PrimeNG)
+  #promo_frontend_v2:
+  #  container_name: promo_frontend_v2
+  #  image: node:22-alpine
+  #  command: sh -c "npm install && npx ng serve --host 0.0.0.0 --port 4201 --poll 2000"
+  #  volumes:
+  #    - ./frontend-v2:/app
+  #    - frontend_v2_node_modules:/app/node_modules
+  #  working_dir: /app
+  #  ports:
+  #    - "4201:4201"
+  #  depends_on:
+  #    - promo_php
+  #  networks:
+  #    - promo_network
+
+  # Simulator — สำหรับทดสอบ (ของเดิม)
+  simulator:
+    container_name: simulator
+    build: ./simulator
+    ports:
+      - "8555:8555"
+    restart: unless-stopped
+    networks:
+      - promo_network
+
+networks:
+  promo_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  frontend_node_modules:
+  #frontend_v2_node_modules:

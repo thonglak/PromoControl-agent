@@ -1,0 +1,516 @@
+// ── Angular Material M3 Theme ───────────────────────────────────────────────
+// @use ต้องมาก่อน @tailwind และ @import ทั้งหมด
+@use "@angular/material" as mat;
+
+// ── Corporate Navy M3 tonal palette ─────────────────────────────────────────
+$corporate-navy-palette: (
+  0: #000000,
+  10: #0A1A2C,
+  20: #16324F,
+  25: #1B3D5F,
+  30: #1F4B73,
+  35: #255882,
+  40: #2F6EA3,
+  50: #3D85BD,
+  60: #5A9BD0,
+  70: #6FA3D4,
+  80: #9DC3E5,
+  90: #CDDEF0,
+  95: #DCEAF6,
+  98: #EEF4FA,
+  99: #F6F9FD,
+  100: #FFFFFF,
+);
+
+// ── Gold Accent M3 tonal palette ────────────────────────────────────────────
+$gold-accent-palette: (
+  0: #000000,
+  10: #2D2010,
+  20: #583E1C,
+  25: #644820,
+  30: #705024,
+  35: #7C5A29,
+  40: #88632E,
+  50: #A07638,
+  60: #B88A44,
+  70: #C8A96B,
+  80: #D4B67F,
+  90: #E0C99F,
+  95: #F4E9D7,
+  98: #FAF4EB,
+  99: #FDF9F3,
+  100: #FFFFFF,
+);
+
+// ── Apply M3 theme ──────────────────────────────────────────────────────────
+html {
+  @include mat.theme((
+    color: (
+      primary: $corporate-navy-palette,
+      tertiary: $gold-accent-palette,
+      theme-type: light,
+    ),
+    density: 0,
+  ));
+}
+
+// ── Design Tokens ───────────────────────────────────────────────────────────
+@import 'styles/design-tokens';
+
+// ── Tailwind CSS ────────────────────────────────────────────────────────────
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// ── Global font ─────────────────────────────────────────────────────────────
+* {
+  font-family: var(--font-family);
+}
+
+// ── Body ────────────────────────────────────────────────────────────────────
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+// ── Custom elements ─────────────────────────────────────────────────────────
+app-root,
+app-layout,
+app-sidebar-menu,
+app-top-navigation {
+  display: block;
+}
+
+app-root,
+app-sidebar-menu {
+  height: 100%;
+}
+
+// ── Angular Material Sidenav overrides ──────────────────────────────────────
+.mat-sidenav-container,
+.mat-drawer-container {
+  background: transparent !important;
+}
+
+.mat-sidenav-content {
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden !important;
+  transition: margin-left 200ms ease-in-out !important;
+}
+
+.mat-drawer-inner-container {
+  overflow: hidden !important;
+}
+
+.mat-sidenav,
+.mat-drawer {
+  overflow: hidden !important;
+}
+
+// ── SvgIconComponent ────────────────────────────────────────────────────────
+app-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Global Component Overrides (Design Token-based)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Card override ───────────────────────────────────────────────────────────
+.mat-mdc-card {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+.mat-mdc-card:hover {
+  box-shadow: var(--shadow-md) !important;
+}
+
+// ── Dialog override ─────────────────────────────────────────────────────────
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  background-color: var(--color-surface, #FFFFFF) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+// ── Dialog backdrop (สีดำจางๆ ด้านหลัง) ────────────────────────────────────
+.cdk-overlay-dark-backdrop {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+// ── CDK Overlay container ──────────────────────────────────────────────────
+.cdk-overlay-container {
+  z-index: 1000;
+}
+
+// ── Button override ─────────────────────────────────────────────────────────
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-flat-button,
+.mat-mdc-outlined-button,
+.mat-mdc-unelevated-button {
+  border-radius: var(--radius-md) !important;
+}
+
+// ── Input override ──────────────────────────────────────────────────────────
+.mat-mdc-form-field .mdc-text-field {
+  border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
+}
+
+// ── Chip override (full round) ──────────────────────────────────────────────
+.mat-mdc-chip {
+  border-radius: var(--radius-full) !important;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CDK Overlay fix — ป้องกัน popup/panel โปร่งใส
+// สาเหตุ: .mat-sidenav-container { background: transparent } ทำให้
+// overlay ที่ render ภายในมี background หายไป
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Catch-all: ทุก panel ใน overlay ต้องมี background ขาว
+.cdk-overlay-pane > .mat-mdc-dialog-panel,
+.cdk-overlay-pane > div,
+.cdk-overlay-pane > .mat-mdc-select-panel,
+.cdk-overlay-pane > .mat-mdc-autocomplete-panel {
+  // handled by specific rules below
+}
+
+// ── Dialog ──
+.mat-mdc-dialog-container .mdc-dialog__surface,
+.mat-mdc-dialog-surface {
+  background-color: var(--color-surface, #FFFFFF) !important;
+}
+
+// ── Datepicker ──
+.mat-datepicker-content,
+.mat-mdc-datepicker-content {
+  background-color: var(--color-surface, #FFFFFF) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+// ── Select dropdown ──
+.mat-mdc-select-panel {
+  background-color: var(--color-surface, #FFFFFF) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+// ── Autocomplete ──
+.mat-mdc-autocomplete-panel {
+  background-color: var(--color-surface, #FFFFFF) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+// ── Menu ──
+.mat-mdc-menu-panel {
+  background-color: var(--color-surface, #FFFFFF) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+// ── Snackbar ──
+.mat-mdc-snack-bar-container .mdc-snackbar__surface {
+  background-color: var(--color-gray-900, #1F2937) !important;
+  color: #FFFFFF !important;
+}
+.mat-mdc-snack-bar-container .mdc-snackbar__label {
+  color: #FFFFFF !important;
+}
+.mat-mdc-snack-bar-container .mat-mdc-button.mat-mdc-snack-bar-action {
+  color: var(--color-accent, #C8A96B) !important;
+}
+
+// ── Bottom sheet ──
+.mat-bottom-sheet-container {
+  background-color: var(--color-surface, #FFFFFF) !important;
+}
+
+// ── Tooltip ──
+.mat-mdc-tooltip .mdc-tooltip__surface {
+  background-color: var(--color-gray-900, #1F2937) !important;
+  color: #FFFFFF !important;
+  font-size: 12px;
+  border-radius: var(--radius-sm) !important;
+  max-width: 300px;
+}
+
+// ── Option list (ใน select/autocomplete) ──
+.mat-mdc-option {
+  background-color: var(--color-surface, #FFFFFF);
+}
+.mat-mdc-option:hover:not(.mdc-list-item--disabled) {
+  background-color: var(--color-primary-100, #DCEAF6) !important;
+}
+
+.mat-calendar-body-cell-content.mat-calendar-body-selected {
+  background-color: var(--color-primary) !important;
+  color: var(--color-text-on-primary) !important;
+}
+
+.mat-calendar-body-today:not(.mat-calendar-body-selected) {
+  border-color: var(--color-primary-500) !important;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Financial utility classes
+// ═══════════════════════════════════════════════════════════════════════════
+
+.text-profit { color: var(--color-profit) !important; }
+.text-loss { color: var(--color-loss) !important; }
+.text-discount { color: var(--color-discount) !important; }
+.text-budget { color: var(--color-budget) !important; }
+.text-accent { color: var(--color-accent) !important; }
+
+.bg-profit-subtle { background-color: #E8F5E9 !important; }
+.bg-loss-subtle { background-color: #FFEBEE !important; }
+.bg-discount-subtle { background-color: #FFF3E0 !important; }
+.bg-accent-subtle { background-color: var(--color-accent-light) !important; }
+
+.financial-positive { color: var(--color-profit); font-weight: 600; }
+.financial-negative { color: var(--color-loss); font-weight: 600; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Reusable layout classes
+// ═══════════════════════════════════════════════════════════════════════════
+
+.kpi-number {
+  font-size: var(--font-size-kpi);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.section-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-6);
+}
+
+.page-title {
+  font-size: var(--font-size-page-title);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.section-title {
+  font-size: var(--font-size-section-title);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Table overrides
+// ═══════════════════════════════════════════════════════════════════════════
+
+.mat-mdc-table {
+  font-size: var(--font-size-table);
+}
+
+.mat-mdc-header-cell {
+  background-color: var(--color-gray-50) !important;
+  font-weight: 600;
+  color: var(--color-gray-700);
+}
+
+.mat-mdc-row:hover {
+  background-color: var(--color-primary-100) !important;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Sidebar — Corporate Navy theme
+// ═══════════════════════════════════════════════════════════════════════════
+
+.sidebar {
+  background: linear-gradient(180deg, var(--color-primary-900) 0%, var(--color-primary-700) 100%);
+}
+
+.sidebar-menu-item {
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+
+  .menu-icon {
+    color: rgba(255, 255, 255, 0.5);
+    transition: color 0.2s ease;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #FFFFFF;
+
+    .menu-icon {
+      color: rgba(255, 255, 255, 0.8);
+    }
+  }
+
+  &.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: #FFFFFF;
+    font-weight: 600;
+    border-left-color: var(--color-accent);
+
+    .menu-icon {
+      color: var(--color-accent);
+    }
+  }
+}
+
+.sidebar-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.4);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.sidebar-submenu-item {
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #FFFFFF;
+  }
+
+  &.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: #FFFFFF;
+    font-weight: 500;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Topbar
+// ═══════════════════════════════════════════════════════════════════════════
+
+.topbar {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-6);
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+// User dropdown menu — override mat-menu panel
+.user-dropdown-menu .mat-mdc-menu-panel {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Project selection card
+// ═══════════════════════════════════════════════════════════════════════════
+
+.project-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-6);
+  transition: all 0.2s ease;
+
+  &:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-color: var(--color-primary-300);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Readonly form fields — พื้นหลังเทาอ่อน แยกจาก field ที่แก้ไขได้
+// ═══════════════════════════════════════════════════════════════════════════
+
+.mat-mdc-form-field.readonly-field {
+  .mdc-text-field {
+    background-color: var(--color-gray-50) !important;
+  }
+  .mdc-text-field--outlined .mdc-notched-outline__leading,
+  .mdc-text-field--outlined .mdc-notched-outline__notch,
+  .mdc-text-field--outlined .mdc-notched-outline__trailing {
+    border-color: var(--color-gray-200) !important;
+  }
+  input {
+    color: var(--color-gray-700) !important;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Form validation — ข้อความ error ชัดเจน
+// ═══════════════════════════════════════════════════════════════════════════
+
+// mat-error text สีแดงชัด
+.mat-mdc-form-field-error {
+  color: var(--color-error, #D32F2F) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+mat-error, .mat-mdc-form-field-error-wrapper {
+  color: var(--color-error, #D32F2F) !important;
+}
+
+
+
+// Snackbar สำหรับ validation error
+.snack-error {
+  --mdc-snackbar-container-color: var(--color-error, #D32F2F) !important;
+  --mdc-snackbar-supporting-text-color: #FFFFFF !important;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Monospace number font — ตัวเลขใช้ font monospace ทุกที่
+// ═══════════════════════════════════════════════════════════════════════════
+
+.font-mono,
+.tabular-nums {
+  font-family: var(--font-family-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+// ทุก element ที่มี class tabular-nums ภายใน mat-table
+.mat-mdc-table .mat-mdc-cell {
+  &.text-right {
+    font-family: var(--font-family-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// Currency display ทั่วไป
+.currency-value {
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

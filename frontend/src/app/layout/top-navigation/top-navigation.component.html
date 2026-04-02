@@ -1,0 +1,104 @@
+<!-- Fixed top bar: h-16, bg-white, border-bottom, shadow -->
+<header class="topbar flex-shrink-0">
+
+  <!-- ── Left: Hamburger (mobile only) ────────────────────────────────── -->
+  @if (isMobile) {
+    <button
+      type="button"
+      (click)="menuToggle.emit()"
+      class="mr-3 w-9 h-9 flex items-center justify-center flex-shrink-0 transition-colors"
+      style="border-radius: var(--radius-md); color: var(--color-gray-700)"
+      onmouseover="this.style.backgroundColor='var(--color-gray-100)'"
+      onmouseout="this.style.backgroundColor='transparent'">
+      <app-icon name="bars-3" class="w-5 h-5" />
+    </button>
+  }
+
+  <!-- ── Center: Breadcrumb ───────────────────────────────────────────── -->
+  <div class="flex-1 min-w-0">
+    @if (breadcrumb()) {
+      <h1 class="text-base font-semibold truncate m-0"
+          style="color: var(--color-primary)">{{ breadcrumb() }}</h1>
+    }
+  </div>
+
+  <!-- ── Right: User menu trigger ─────────────────────────────────────── -->
+  <button
+    type="button"
+    [matMenuTriggerFor]="userMenu"
+    class="flex items-center gap-2 px-2 py-1.5 flex-shrink-0
+           transition-colors cursor-pointer border-0 bg-transparent outline-none"
+    style="border-radius: var(--radius-md)">
+
+    <!-- Avatar circle -->
+    <div class="user-avatar flex-shrink-0">
+      @if (currentUser()?.avatar_url) {
+        <img [src]="currentUser()!.avatar_url" alt="avatar"
+             class="w-full h-full object-cover rounded-full" />
+      } @else {
+        <span class="select-none leading-none">{{ initials() }}</span>
+      }
+    </div>
+
+    <!-- Display name + role (hidden on mobile) -->
+    <div class="hidden sm:flex flex-col items-start">
+      <span class="text-sm font-medium max-w-[140px] truncate"
+            style="color: var(--color-gray-700)">
+        {{ currentUser()?.name }}
+      </span>
+      <span class="text-caption" style="color: var(--color-gray-500)">
+        {{ currentUser()?.role }}
+      </span>
+    </div>
+    <app-icon name="chevron-down" class="w-3.5 h-3.5 hidden sm:inline-block"
+              style="color: var(--color-gray-500)" />
+  </button>
+
+  <!-- ── User dropdown menu ───────────────────────────────────────────── -->
+  <mat-menu #userMenu="matMenu" xPosition="before" class="user-dropdown-menu">
+
+    <!-- User info header (non-interactive) -->
+    <div class="px-4 py-3" style="border-bottom: 1px solid var(--color-border)"
+         (click)="$event.stopPropagation()">
+      <p class="text-sm font-semibold m-0" style="color: var(--color-text-primary)">
+        {{ currentUser()?.name }}
+      </p>
+      <p class="text-xs mt-0.5 m-0" style="color: var(--color-gray-500)">
+        {{ currentUser()?.email }}
+      </p>
+      <span class="inline-block mt-1.5 px-1.5 py-0.5 text-[10px] uppercase font-medium tracking-wide"
+            style="background-color: var(--color-primary-100); color: var(--color-primary-700);
+                   border-radius: var(--radius-sm)">
+        {{ currentUser()?.role }}
+      </span>
+    </div>
+
+    <!-- Profile -->
+    <button mat-menu-item (click)="openProfile()">
+      <div class="flex items-center gap-3">
+        <app-icon name="user-circle" class="w-[18px] h-[18px]" style="color: var(--color-gray-500)" />
+        <span class="text-sm">โปรไฟล์</span>
+      </div>
+    </button>
+
+    <!-- Change Password -->
+    <button mat-menu-item (click)="openChangePassword()">
+      <div class="flex items-center gap-3">
+        <app-icon name="key" class="w-[18px] h-[18px]" style="color: var(--color-gray-500)" />
+        <span class="text-sm">เปลี่ยนรหัสผ่าน</span>
+      </div>
+    </button>
+
+    <mat-divider />
+
+    <!-- Logout -->
+    <button mat-menu-item (click)="logout()">
+      <div class="flex items-center gap-3">
+        <app-icon name="arrow-right-on-rectangle" class="w-[18px] h-[18px]" style="color: var(--color-error)" />
+        <span class="text-sm" style="color: var(--color-error)">ออกจากระบบ</span>
+      </div>
+    </button>
+
+  </mat-menu>
+
+</header>

@@ -1,0 +1,83 @@
+<h2 mat-dialog-title class="!text-lg !font-semibold !text-slate-800">{{ title }}</h2>
+
+<mat-dialog-content class="!pt-4 !pb-2">
+  <form [formGroup]="form" class="flex flex-col gap-4">
+
+    <!-- ชื่อ -->
+    <mat-form-field appearance="outline">
+      <mat-label>ชื่อ-นามสกุล</mat-label>
+      <input matInput formControlName="name" placeholder="สมชาย ใจดี" />
+      @if (form.get('name')!.touched && form.get('name')!.errors?.['required']) {
+        <mat-error>กรุณากรอกชื่อ</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- อีเมล -->
+    <mat-form-field appearance="outline">
+      <mat-label>อีเมล</mat-label>
+      <input matInput formControlName="email" type="email" placeholder="user@example.com" />
+      @if (form.get('email')!.touched && form.get('email')!.errors?.['required']) {
+        <mat-error>กรุณากรอกอีเมล</mat-error>
+      }
+      @if (form.get('email')!.touched && form.get('email')!.errors?.['email']) {
+        <mat-error>รูปแบบอีเมลไม่ถูกต้อง</mat-error>
+      }
+      @if (isEdit) {
+        <mat-hint>ไม่สามารถเปลี่ยนอีเมลได้</mat-hint>
+      }
+    </mat-form-field>
+
+    <!-- รหัสผ่าน (required เมื่อ create, optional เมื่อ edit) -->
+    <mat-form-field appearance="outline">
+      <mat-label>{{ isEdit ? 'รหัสผ่านใหม่ (เว้นว่างถ้าไม่เปลี่ยน)' : 'รหัสผ่าน' }}</mat-label>
+      <input matInput formControlName="password"
+             [type]="showPassword ? 'text' : 'password'"
+             placeholder="{{ isEdit ? 'ไม่บังคับ' : 'อย่างน้อย 8 ตัว' }}" />
+      <button type="button" mat-icon-button matSuffix (click)="showPassword = !showPassword">
+        <span class="text-xs text-slate-400">{{ showPassword ? 'ซ่อน' : 'แสดง' }}</span>
+      </button>
+      @if (passwordErrors) {
+        <mat-error>{{ passwordErrors }}</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- บทบาท -->
+    <mat-form-field appearance="outline">
+      <mat-label>บทบาท</mat-label>
+      <mat-select formControlName="role">
+        @for (role of roles; track role.value) {
+          <mat-option [value]="role.value">{{ role.label }}</mat-option>
+        }
+      </mat-select>
+      @if (form.get('role')!.touched && form.get('role')!.errors?.['required']) {
+        <mat-error>กรุณาเลือกบทบาท</mat-error>
+      }
+    </mat-form-field>
+
+    <!-- เบอร์โทร -->
+    <mat-form-field appearance="outline">
+      <mat-label>เบอร์โทร (ไม่บังคับ)</mat-label>
+      <input matInput formControlName="phone" placeholder="08X-XXX-XXXX" />
+    </mat-form-field>
+
+    <!-- สถานะ (เฉพาะ edit) -->
+    @if (isEdit) {
+      <div class="flex items-center gap-3 py-1">
+        <mat-slide-toggle formControlName="is_active" color="primary">
+          {{ form.get('is_active')!.value ? 'ใช้งาน' : 'ปิดใช้งาน' }}
+        </mat-slide-toggle>
+      </div>
+    }
+
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="!px-6 !pb-4 !pt-2 gap-2">
+  <button mat-stroked-button (click)="cancel()" [disabled]="saving">ยกเลิก</button>
+  <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || saving">
+    @if (saving) {
+      <mat-spinner diameter="18" class="!inline-block mr-1" />
+    }
+    บันทึก
+  </button>
+</mat-dialog-actions>

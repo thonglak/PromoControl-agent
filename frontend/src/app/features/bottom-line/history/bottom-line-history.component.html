@@ -1,0 +1,172 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="page-title m-0">ประวัติ Import ราคาต้นทุน</h1>
+      <p class="text-caption mt-1" style="color: var(--color-gray-500)">ดูประวัติและจัดการการ import ราคาต้นทุน</p>
+    </div>
+    <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700"><app-icon name="adjustments-horizontal" class="w-5 h-5" /></button>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
+    <form [formGroup]="filterForm" class="flex flex-wrap gap-3 items-end">
+      <mat-form-field appearance="outline" class="w-48">
+        <mat-label>สถานะ</mat-label>
+        <mat-select formControlName="status" (selectionChange)="onFilterChange()">
+          <mat-option value="">ทั้งหมด</mat-option>
+          <mat-option value="completed">สำเร็จ</mat-option>
+          <mat-option value="failed">ล้มเหลว</mat-option>
+          <mat-option value="rolled_back">ย้อนกลับแล้ว</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </form>
+  </div>
+
+  <!-- Table card -->
+  <app-section-card [noPadding]="true">
+    <div class="relative">
+
+    <!-- Loading overlay -->
+    @if (loading()) {
+      <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10"><mat-spinner diameter="36" /></div>
+    }
+
+      <div class="overflow-auto">
+        <table mat-table [dataSource]="dataSource" matSort (matSortChange)="loadData()" class="w-full min-w-[1000px]">
+
+          <ng-container matColumnDef="import_key">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              Import Key
+            </th>
+            <td mat-cell *matCellDef="let r"
+                class="!font-mono !text-sm !text-blue-700 !font-medium cursor-pointer hover:!text-blue-900"
+                (click)="viewDetail(r)">
+              {{ r.import_key }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="file_name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              ชื่อไฟล์
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-sm !text-slate-700 max-w-[150px] truncate">
+              {{ r.file_name }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="total_rows">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">
+              ทั้งหมด
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-sm !text-slate-700 !text-center">{{ r.total_rows }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="matched_rows">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">
+              Match
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-sm !text-green-700 !font-medium !text-center">{{ r.matched_rows }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="unmatched_rows">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">
+              ไม่ Match
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-sm !text-center"
+                [class.!text-red-600]="r.unmatched_rows > 0"
+                [class.!font-medium]="r.unmatched_rows > 0"
+                [class.!text-slate-400]="r.unmatched_rows === 0">
+              {{ r.unmatched_rows }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="updated_rows">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">
+              อัปเดต
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-sm !text-blue-700 !font-medium !text-center">{{ r.updated_rows }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="imported_by_name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              ผู้ Import
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-sm !text-slate-600">{{ r.imported_by_name }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="imported_at">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              วันที่
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-sm !text-slate-500">{{ r.imported_at | thaiDate:'datetime' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              สถานะ
+            </th>
+            <td mat-cell *matCellDef="let r">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium" [ngClass]="statusClass(r.status)">
+                {{ statusLabel(r.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">
+              จัดการ
+            </th>
+            <td mat-cell *matCellDef="let r" class="!text-center">
+              <div class="flex justify-center gap-1">
+                <button mat-icon-button matTooltip="ดูรายละเอียด"
+                        class="!text-slate-500 hover:!text-blue-600"
+                        (click)="viewDetail(r)">
+                  <app-icon name="eye" class="w-4 h-4" />
+                </button>
+                @if (isAdmin() && r.status === 'completed') {
+                  <button mat-icon-button matTooltip="Rollback"
+                          class="!text-slate-500 hover:!text-amber-600"
+                          (click)="confirmRollback(r)">
+                    <app-icon name="arrow-uturn-left" class="w-4 h-4" />
+                  </button>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns(); sticky: true"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns();"
+              class="hover:bg-primary-100 transition-colors even:bg-slate-50/40"></tr>
+
+          <!-- No data -->
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell text-center py-12 text-slate-400" [attr.colspan]="displayedColumns().length">
+              <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p>ไม่พบประวัติ import</p>
+            </td>
+          </tr>
+
+        </table>
+      </div>
+
+      <mat-paginator
+        [pageSizeOptions]="[10, 25, 50]"
+        showFirstLastButtons
+        class="border-t border-slate-200">
+      </mat-paginator>
+
+    </div>
+  </app-section-card>
+</div>

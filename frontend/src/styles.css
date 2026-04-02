@@ -1,0 +1,91 @@
+/* Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Angular Material M2 Theme */
+@use "@angular/material" as mat;
+
+@include mat.core();
+
+$primary-palette: mat.define-palette(mat.$blue-palette, 600, 400, 800);
+$accent-palette: mat.define-palette(mat.$blue-grey-palette, 600, 400, 800);
+$warn-palette: mat.define-palette(mat.$red-palette, 700, 500, 900);
+
+$theme: mat.define-light-theme((
+  color: (
+    primary: $primary-palette,
+    accent: $accent-palette,
+    warn: $warn-palette,
+  ),
+  typography: mat.define-typography-config(
+    $font-family: 'Inter, "Noto Sans Thai", system-ui, sans-serif',
+  ),
+  density: 0,
+));
+
+@include mat.all-component-themes($theme);
+
+/* ── Global font ─────────────────────────────────────────────────────────── */
+* {
+  font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif;
+}
+
+/* ── Full-viewport foundation ────────────────────────────────────────────── */
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background-color: #F8FAFC;
+}
+
+/* Custom elements ต้อง display:block และ height:100% ให้ child ทำงานได้ */
+app-root,
+app-layout,
+app-sidebar-menu,
+app-top-navigation {
+  display: block;
+}
+
+app-root,
+app-sidebar-menu {
+  height: 100%;
+}
+
+/* ── Angular Material Sidenav overrides ──────────────────────────────────── */
+
+/* ไม่ให้ container มี background ของตัวเอง */
+.mat-sidenav-container,
+.mat-drawer-container {
+  background: transparent !important;
+}
+
+/* mat-sidenav-content: flex column + ห้าม scroll ที่นี่ ให้ <main> scroll แทน */
+.mat-sidenav-content {
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+/* inner container ของ mat-sidenav ต้องไม่มี overflow */
+.mat-drawer-inner-container {
+  overflow: hidden !important;
+}
+
+/* ── Sidenav transition: smooth margin-left เมื่อ sidebar collapse ────────── */
+.mat-sidenav-content {
+  transition: margin-left 200ms ease-in-out !important;
+}
+
+/* ── SvgIconComponent — SVG ขยายตาม Tailwind class บน <app-icon> ────────── */
+app-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── ป้องกัน scrollbar ใน mat-sidenav และ inner container ────────────────── */
+.mat-sidenav,
+.mat-drawer {
+  overflow: hidden !important;
+}
