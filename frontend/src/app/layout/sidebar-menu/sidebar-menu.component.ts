@@ -34,6 +34,7 @@ const MENU: MenuItem[] = [
       { label: 'แบบบ้าน',       path: '/house-models',     roles: ['admin', 'manager'] },
       { label: 'ยูนิต',         path: '/units',            roles: ['admin', 'manager'] },
       { label: 'รายการโปรโมชั่น', path: '/promotion-items', roles: ['admin', 'manager'] },
+      { label: 'Phase',           path: '/phases',          roles: ['admin', 'manager'] },
     ],
   },
   {
@@ -54,13 +55,23 @@ const MENU: MenuItem[] = [
     ],
   },
   {
+    label: 'ข้อมูลจาก API', icon: 'cloud-arrow-down',
+    roles: ['admin', 'manager'],
+    children: [
+      { label: 'ประวัติการดึง', path: '/sync-from-api',          roles: ['admin', 'manager'], exact: true },
+      { label: 'ตั้งค่า API',   path: '/sync-from-api/configs',  roles: ['admin', 'manager'] },
+      { label: 'ทดสอบ API',    path: '/sync-from-api/debug',    roles: ['admin', 'manager'] },
+      { label: 'จับคู่ Field',  path: '/sync-from-api/mappings', roles: ['admin', 'manager'] },
+      { label: 'Target Tables', path: '/sync-from-api/targets', roles: ['admin'] },
+    ],
+  },
+  {
     label: 'การขาย', icon: 'document-text',
     children: [
       { label: 'บันทึกขาย',  path: '/sales',      roles: ['admin', 'manager', 'sales'], exact: true },
       { label: 'รายการขาย',  path: '/sales/list' },
     ],
   },
-  { label: 'Unit Promotion Setup', icon: 'shopping-cart', path: '/unit-promotions', roles: ['admin', 'manager'] },
   {
     label: 'งบประมาณ', icon: 'banknotes',
     roles: ['admin', 'manager'],

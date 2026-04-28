@@ -7,6 +7,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 import { AuthService } from '../../core/services/auth.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
 import { ChangePasswordDialogComponent } from './change-password-dialog.component';
 
@@ -18,7 +19,6 @@ const ROUTE_LABELS: Record<string, string> = {
   'house-models':     'แบบบ้าน',
   units:              'ยูนิต',
   'promotion-items':  'รายการโปรโมชั่น',
-  'unit-promotions':  'Unit Promotion Setup',
   sales:              'บันทึกการขาย',
   'sales-entry':      'บันทึกการขาย',
   budget:             'งบประมาณ',
@@ -51,6 +51,7 @@ export class TopNavigationComponent {
   private readonly auth   = inject(AuthService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
+  readonly theme          = inject(ThemeService);
 
   readonly currentUser = this.auth.currentUser;
 

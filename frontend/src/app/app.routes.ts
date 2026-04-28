@@ -9,11 +9,11 @@ import { ProjectListComponent } from './features/master-data/projects/project-li
 import { HouseModelListComponent } from './features/master-data/house-models/house-model-list/house-model-list.component';
 import { UnitListComponent } from './features/master-data/units/unit-list/unit-list.component';
 import { PromotionItemListComponent } from './features/master-data/promotion-items/promotion-item-list/promotion-item-list.component';
+import { PhaseListComponent } from './features/master-data/phases/phase-list/phase-list.component';
 import { BottomLineImportComponent } from './features/bottom-line/import/bottom-line-import.component';
 import { BottomLineHistoryComponent } from './features/bottom-line/history/bottom-line-history.component';
 import { BottomLineDetailComponent } from './features/bottom-line/detail/bottom-line-detail.component';
 import { BottomLineMappingComponent } from './features/bottom-line/mappings/bottom-line-mapping.component';
-import { ComingSoonComponent } from './shared/components/coming-soon/coming-soon.component';
 
 import { FeeFormulaListComponent } from './features/fee-formula/formula-list/fee-formula-list.component';
 import { FeeRatePolicyListComponent } from './features/fee-formula/policy-list/fee-rate-policy-list.component';
@@ -27,6 +27,10 @@ import { roleGuard } from './core/guards/role.guard';
 export const routes: Routes = [
 
   { path: 'login', component: LoginPageComponent },
+  {
+    path: 'sso-callback',
+    loadComponent: () => import('./features/auth/sso-callback/sso-callback.component').then(m => m.SsoCallbackComponent),
+  },
 
   {
     path: '',
@@ -48,6 +52,7 @@ export const routes: Routes = [
           { path: 'house-models',     component: HouseModelListComponent, canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
           { path: 'units',            component: UnitListComponent,       canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
           { path: 'promotion-items',  component: PromotionItemListComponent,     canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
+          { path: 'phases',           component: PhaseListComponent,             canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
 
           // ── Bottom Line (ราคาต้นทุน) ────────────────────────────
           { path: 'bottom-line/import',  component: BottomLineImportComponent,  canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
@@ -60,9 +65,6 @@ export const routes: Routes = [
             path: 'sales',
             loadChildren: () => import('./features/sales-entry/sales-entry.routes').then(m => m.SALES_ENTRY_ROUTES),
           },
-
-          // ── Sales & Promotions ───────────────────────────────────
-          { path: 'unit-promotions',  component: ComingSoonComponent, canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
 
           // ── Fee Formulas (สูตรคำนวณ) ────────────────────────────
           { path: 'fee-formulas',                      component: FeeFormulaListComponent,    canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
@@ -86,6 +88,14 @@ export const routes: Routes = [
           {
             path: 'settings',
             loadChildren: () => import('./features/settings/settings.routes').then(m => m.SETTINGS_ROUTES),
+            canActivate: [roleGuard],
+            data: { roles: ['admin', 'manager'] },
+          },
+
+          // ── Sync From API (Narai Connect) ────────────────────────────────────
+          {
+            path: 'sync-from-api',
+            loadChildren: () => import('./features/sync-from-api/sync-from-api.routes').then(m => m.SYNC_FROM_API_ROUTES),
             canActivate: [roleGuard],
             data: { roles: ['admin', 'manager'] },
           },
