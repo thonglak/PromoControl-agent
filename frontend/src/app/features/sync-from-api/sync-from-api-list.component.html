@@ -1,0 +1,191 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <!-- Page header -->
+  <app-page-header title="ประวัติการดึงข้อมูลจาก API" subtitle="ดึงและดูข้อมูลยูนิตจาก Narai Connect">
+    <div actions></div>
+  </app-page-header>
+
+  <!-- Fetch bar -->
+  <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
+    <div class="flex flex-wrap gap-3 items-end">
+
+      <!-- Config selector -->
+      <mat-form-field appearance="outline" class="w-72">
+        <mat-label>เลือก API Config</mat-label>
+        <mat-select [formControl]="filterForm.controls.config_id">
+          <mat-option [value]="null">-- เลือก Config --</mat-option>
+          @for (cfg of activeConfigs(); track cfg.id) {
+            <mat-option [value]="cfg.id">{{ cfg.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Fetch button -->
+      @if (canWrite()) {
+        <button mat-flat-button color="primary"
+                [disabled]="fetching() || !filterForm.value.config_id"
+                (click)="fetchData()"
+                class="flex items-center gap-2 mb-[1.34375em]">
+          @if (fetching()) {
+            <mat-spinner diameter="18" class="!inline-block" />
+            กำลังดึงข้อมูล...
+          } @else {
+            <app-icon name="cloud-arrow-down" class="w-4 h-4" />
+            ดึงข้อมูล
+          }
+        </button>
+      }
+
+    </div>
+    @if (activeConfigs().length === 0) {
+      <p class="text-sm text-amber-600 mt-1">
+        ไม่มี Config ที่เปิดใช้งาน กรุณาไปที่ <a routerLink="/sync-from-api/configs" class="underline">ตั้งค่า API</a> ก่อน
+      </p>
+    }
+  </div>
+
+  <!-- Table card -->
+  <app-section-card [noPadding]="true">
+    <div class="relative">
+
+      <!-- Loading overlay -->
+      @if (loading()) {
+        <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+          <mat-spinner diameter="36" />
+        </div>
+      }
+
+      <div class="overflow-auto">
+        <table mat-table [dataSource]="dataSource" class="w-full min-w-[960px]">
+
+          <!-- Code -->
+          <ng-container matColumnDef="code">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              รหัส Snapshot
+            </th>
+            <td mat-cell *matCellDef="let row"
+                class="!font-mono !text-sm !text-blue-700 !font-medium cursor-pointer hover:!text-blue-900"
+                (click)="viewDetail(row)">
+              {{ row.name || row.code }}
+            </td>
+          </ng-container>
+
+          <!-- Config Name -->
+          <ng-container matColumnDef="config_name">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              Config
+            </th>
+            <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-700">
+              {{ row.config_name }}
+            </td>
+          </ng-container>
+
+          <!-- API URL -->
+          <ng-container matColumnDef="api_url">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              URL
+            </th>
+            <td mat-cell *matCellDef="let row"
+                class="!text-sm !text-slate-500 !font-mono max-w-[220px] truncate"
+                [matTooltip]="row.api_url">
+              {{ row.api_url }}
+            </td>
+          </ng-container>
+
+          <!-- Total Rows -->
+          <ng-container matColumnDef="total_rows">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">
+              จำนวน record
+            </th>
+            <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-700 !font-medium !text-center">
+              {{ row.total_rows | number }}
+            </td>
+          </ng-container>
+
+          <!-- Status -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              สถานะ
+            </th>
+            <td mat-cell *matCellDef="let row">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium" [ngClass]="statusClass(row.status)">
+                {{ statusLabel(row.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Created At -->
+          <ng-container matColumnDef="created_at">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              วันที่ดึง
+            </th>
+            <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-500">
+              {{ row.created_at | thaiDate:'datetime' }}
+            </td>
+          </ng-container>
+
+          <!-- Fetched By -->
+          <ng-container matColumnDef="fetched_by_name">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">
+              ผู้ดึง
+            </th>
+            <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-600">
+              {{ row.fetched_by_name }}
+            </td>
+          </ng-container>
+
+          <!-- Actions -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef
+                class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-center">
+              จัดการ
+            </th>
+            <td mat-cell *matCellDef="let row" class="!text-center">
+              <div class="flex justify-center gap-1">
+                <button mat-icon-button matTooltip="ดูรายละเอียด"
+                        class="!text-slate-500 hover:!text-blue-600"
+                        (click)="viewDetail(row)">
+                  <app-icon name="eye" class="w-4 h-4" />
+                </button>
+                @if (canWrite()) {
+                  <button mat-icon-button matTooltip="แก้ไขชื่อ"
+                          class="!text-slate-500 hover:!text-amber-600"
+                          (click)="renameSnapshot(row); $event.stopPropagation()">
+                    <app-icon name="pencil" class="w-4 h-4" />
+                  </button>
+                  <button mat-icon-button matTooltip="ลบ Snapshot"
+                          class="!text-slate-500 hover:!text-red-600"
+                          (click)="confirmDelete(row); $event.stopPropagation()">
+                    <app-icon name="trash" class="w-4 h-4" />
+                  </button>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+              class="hover:bg-primary-100 transition-colors cursor-pointer even:bg-slate-50/40"
+              (click)="viewDetail(row)"></tr>
+
+          <!-- No data -->
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell text-center py-12 text-slate-400" [attr.colspan]="displayedColumns.length">
+              <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p>ยังไม่มีประวัติการดึงข้อมูล</p>
+            </td>
+          </tr>
+
+        </table>
+      </div>
+    </div>
+  </app-section-card>
+
+</div>

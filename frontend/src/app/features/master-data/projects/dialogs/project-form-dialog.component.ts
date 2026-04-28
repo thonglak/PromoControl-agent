@@ -92,16 +92,16 @@ export interface ProjectFormDialogData {
         <mat-form-field appearance="outline">
           <mat-label>งบ Pool (บาท)</mat-label>
           <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
-          <input matInput currencyMask formControlName="pool_budget" placeholder="0">
-          @if (form.get('pool_budget')?.hasError('min')) {
+          <input matInput currencyMask formControlName="pool_budget_amount" placeholder="0">
+          @if (form.get('pool_budget_amount')?.hasError('min')) {
             <mat-error>งบ Pool ต้องไม่ติดลบ</mat-error>
           }
         </mat-form-field>
 
-        <!-- Auto approve -->
+        <!-- Approval required -->
         <div class="flex items-center gap-2">
-          <mat-checkbox formControlName="auto_approve" color="primary">
-            อนุมัติการขายอัตโนมัติ
+          <mat-checkbox formControlName="approval_required" color="primary">
+            ต้องอนุมัติการขายก่อนบันทึก
           </mat-checkbox>
         </div>
 
@@ -146,9 +146,9 @@ export class ProjectFormDialogComponent {
     project_type: [this.data.project?.project_type ?? '', Validators.required],
     status:       [this.data.project?.status ?? 'active'],
     location:     [this.data.project?.location ?? ''],
-    pool_budget:      [this.data.project?.pool_budget ?? 0, Validators.min(0)],
-    auto_approve:     [!!(this.data.project?.auto_approve)],
-    allow_over_budget:[!!(this.data.project?.allow_over_budget)],
+    pool_budget_amount:  [this.data.project?.pool_budget_amount ?? 0, Validators.min(0)],
+    approval_required:   [!!Number(this.data.project?.approval_required)],
+    allow_over_budget:   [!!Number(this.data.project?.allow_over_budget)],
   });
 
   save(): void {
@@ -163,22 +163,22 @@ export class ProjectFormDialogComponent {
 
     const obs = this.data.mode === 'create'
       ? this.api.createProject({
-          code:              val.code!,
-          name:              val.name!,
-          project_type:      val.project_type!,
-          location:          val.location || undefined,
-          pool_budget:       val.pool_budget ?? 0,
-          auto_approve:      !!val.auto_approve,
-          allow_over_budget: !!val.allow_over_budget,
+          code:               val.code!,
+          name:               val.name!,
+          project_type:       val.project_type!,
+          location:           val.location || undefined,
+          pool_budget_amount: val.pool_budget_amount ?? 0,
+          approval_required:  !!val.approval_required,
+          allow_over_budget:  !!val.allow_over_budget,
         })
       : this.api.updateProject(this.data.project!.id, {
-          name:              val.name!,
-          project_type:      val.project_type!,
-          status:            val.status!,
-          location:          val.location || undefined,
-          pool_budget:       val.pool_budget ?? 0,
-          auto_approve:      !!val.auto_approve,
-          allow_over_budget: !!val.allow_over_budget,
+          name:               val.name!,
+          project_type:       val.project_type!,
+          status:             val.status!,
+          location:           val.location || undefined,
+          pool_budget_amount: val.pool_budget_amount ?? 0,
+          approval_required:  !!val.approval_required,
+          allow_over_budget:  !!val.allow_over_budget,
         });
 
     obs.subscribe({

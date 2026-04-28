@@ -12,10 +12,9 @@ class UnitModel extends Model
 
     protected $allowedFields = [
         'project_id', 'house_model_id', 'unit_code', 'unit_number',
-        'floor', 'building', 'area_sqm', 'unit_type_id',
+        'floor', 'building', 'unit_type_id',
         'base_price', 'unit_cost', 'appraisal_price', 'standard_budget',
-        'status', 'customer_name', 'salesperson',
-        'sale_date', 'transfer_date', 'remark',
+        'status', 'sale_date', 'transfer_date', 'remark',
     ];
 
     protected $useTimestamps = true;
@@ -27,7 +26,7 @@ class UnitModel extends Model
         $db = \Config\Database::connect();
 
         $builder = $db->table('project_units pu')
-            ->select('pu.*, hm.name AS house_model_name, hm.code AS house_model_code, ut.name AS unit_type_name, p.project_type')
+            ->select('pu.*, hm.name AS house_model_name, hm.code AS house_model_code, hm.area_sqm, ut.name AS unit_type_name, p.project_type')
             ->join('house_models hm', 'hm.id = pu.house_model_id', 'left')
             ->join('unit_types ut', 'ut.id = pu.unit_type_id', 'left')
             ->join('projects p', 'p.id = pu.project_id', 'left')
@@ -45,7 +44,6 @@ class UnitModel extends Model
             $builder->groupStart()
                 ->like('pu.unit_code', $s)
                 ->orLike('pu.unit_number', $s)
-                ->orLike('pu.customer_name', $s)
                 ->groupEnd();
         }
 

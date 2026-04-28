@@ -27,6 +27,10 @@ frontend/.env
 mysql_data/
 docker/mysql/data/
 
+# ─── Claude Code agent runtime state ───
+.claude/projects/
+.claude/worktrees/
+
 # ─── IDE / Editor ───
 .idea/
 .vscode/

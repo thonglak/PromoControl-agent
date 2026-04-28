@@ -12,11 +12,7 @@ class HouseModelModel extends Model
     protected $useSoftDeletes = false;
 
     protected $allowedFields = [
-        'project_id', 'code', 'name', 'description',
-        'bedrooms', 'bathrooms', 'floors',
-        'area_sqm', 'land_area_sqw',
-        'default_base_price', 'default_unit_cost', 'default_budget',
-        'image_url', 'status', 'total_units',
+        'project_id', 'code', 'name', 'area_sqm',
     ];
 
     protected $useTimestamps = true;

@@ -23,16 +23,12 @@ class SalesTransactionService
     {
         $projectId = (int) ($data['project_id'] ?? 0);
         $unitId = (int) ($data['unit_id'] ?? 0);
-        $customerName = trim($data['customer_name'] ?? '');
-        $salesperson = trim($data['salesperson'] ?? '');
         $saleDate = $data['sale_date'] ?? date('Y-m-d');
         $items = $data['items'] ?? [];
         $createdBy = (int) ($data['created_by'] ?? 0);
 
         if ($projectId <= 0) throw new RuntimeException('กรุณาระบุ project_id');
         if ($unitId <= 0) throw new RuntimeException('กรุณาระบุ unit_id');
-        if (empty($customerName)) throw new RuntimeException('กรุณาระบุชื่อลูกค้า');
-        if (empty($salesperson)) throw new RuntimeException('กรุณาระบุพนักงานขาย');
 
         $this->db->transBegin();
 
@@ -57,15 +53,13 @@ class SalesTransactionService
                 'total_promo_burden' => $calculations['total_promo_burden'],
                 'total_cost' => $calculations['total_cost'],
                 'profit' => $calculations['profit'],
-                'customer_name' => $customerName,
-                'salesperson' => $salesperson,
                 'sale_date' => $saleDate,
                 'created_by' => $createdBy,
             ]);
 
             $insertedItems = $this->insertItems($transactionId, $items, $projectId, $createdBy);
             $movements = $this->createBudgetMovements($projectId, $unitId, $items, $createdBy, $transactionId);
-            $this->updateUnitStatus($unitId, $customerName, $salesperson, $saleDate);
+            $this->updateUnitStatus($unitId, $saleDate);
 
             $this->db->transCommit();
 
@@ -95,16 +89,12 @@ class SalesTransactionService
 
         $projectId = (int) ($data['project_id'] ?? $transaction['project_id']);
         $unitId = (int) ($data['unit_id'] ?? $transaction['unit_id']);
-        $customerName = trim($data['customer_name'] ?? $transaction['customer_name']);
-        $salesperson = trim($data['salesperson'] ?? $transaction['salesperson']);
         $saleDate = $data['sale_date'] ?? $transaction['sale_date'];
         $items = $data['items'] ?? [];
         $createdBy = (int) ($data['created_by'] ?? $transaction['created_by']);
 
         if ($projectId <= 0) throw new RuntimeException('กรุณาระบุ project_id');
         if ($unitId <= 0) throw new RuntimeException('กรุณาระบุ unit_id');
-        if (empty($customerName)) throw new RuntimeException('กรุณาระบุชื่อลูกค้า');
-        if (empty($salesperson)) throw new RuntimeException('กรุณาระบุพนักงานขาย');
 
         $this->db->transBegin();
 
@@ -141,8 +131,6 @@ class SalesTransactionService
                     'total_promo_burden' => $calculations['total_promo_burden'],
                     'total_cost' => $calculations['total_cost'],
                     'profit' => $calculations['profit'],
-                    'customer_name' => $customerName,
-                    'salesperson' => $salesperson,
                     'sale_date' => $saleDate,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
@@ -153,8 +141,6 @@ class SalesTransactionService
             $this->db->table('project_units')
                 ->where('id', $unitId)
                 ->update([
-                    'customer_name' => $customerName,
-                    'salesperson' => $salesperson,
                     'sale_date' => $saleDate,
                 ]);
 
@@ -178,7 +164,7 @@ class SalesTransactionService
     private function validateUnit(int $projectId, int $unitId, bool $isUpdate = false): array
     {
         $unit = $this->db->table('project_units')
-            ->select('id, unit_code, project_id, base_price, unit_cost, standard_budget, status, customer_name, salesperson, sale_date')
+            ->select('id, unit_code, project_id, base_price, unit_cost, standard_budget, status, sale_date')
             ->where('id', $unitId)
             ->get()->getRowArray();
 
@@ -491,14 +477,12 @@ class SalesTransactionService
         );
     }
 
-    private function updateUnitStatus(int $unitId, string $customerName, string $salesperson, string $saleDate): void
+    private function updateUnitStatus(int $unitId, string $saleDate): void
     {
         $this->db->table('project_units')
             ->where('id', $unitId)
             ->update([
                 'status' => 'sold',
-                'customer_name' => $customerName,
-                'salesperson' => $salesperson,
                 'sale_date' => $saleDate,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);

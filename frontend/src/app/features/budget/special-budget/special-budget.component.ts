@@ -456,7 +456,7 @@ export class SpecialBudgetComponent implements OnInit {
         allocated,
         used,
         remaining,
-        approval_required: !!approvalRequired,
+        approval_required: !!Number(approvalRequired),
       } as ReturnSpecialBudgetDialogData,
       width: '480px',
       maxHeight: '90vh',

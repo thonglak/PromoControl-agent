@@ -30,8 +30,8 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: 'name',         label: 'ชื่อโครงการ',     visible: true },
   { key: 'project_type', label: 'ประเภท',         visible: true },
   { key: 'status',       label: 'สถานะ',          visible: true },
-  { key: 'auto_approve', label: 'อนุมัติอัตโนมัติ', visible: true },
-  { key: 'pool_budget',  label: 'งบ Pool (บาท)',  visible: true },
+  { key: 'approval_required',  label: 'อนุมัติอัตโนมัติ', visible: true },
+  { key: 'pool_budget_amount', label: 'งบ Pool (บาท)',  visible: true },
   { key: 'unit_count',   label: 'จำนวนยูนิต',     visible: true },
   { key: 'actions',      label: 'จัดการ',          visible: true, locked: true },
 ];

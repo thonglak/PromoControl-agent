@@ -1,0 +1,125 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+
+  <!-- Back button + header + Sync button -->
+  <div class="flex items-center gap-3 mb-6">
+    <button mat-icon-button (click)="goBack()" matTooltip="กลับ" class="!text-slate-500 hover:!text-slate-700">
+      <app-icon name="arrow-left" class="w-5 h-5" />
+    </button>
+    <div class="flex-1">
+      <h1 class="page-title m-0">รายละเอียด Snapshot</h1>
+      <p class="text-caption mt-1" style="color: var(--color-gray-500)">ข้อมูลยูนิตที่ดึงมาจาก API ภายนอก</p>
+    </div>
+    @if (header()?.status === 'completed') {
+      <div class="flex items-center gap-2">
+        <button mat-flat-button color="primary" (click)="openSync()" class="flex items-center gap-2">
+          <app-icon name="arrow-path" class="w-4 h-4" />
+          Sync เข้าระบบ
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (loading() && !header()) {
+    <!-- Initial loading state -->
+    <div class="flex items-center justify-center py-24">
+      <mat-spinner diameter="40" />
+    </div>
+  }
+
+  @if (header(); as h) {
+
+    <!-- Snapshot Info Card -->
+    <div class="bg-white rounded-lg border border-slate-200 p-5 mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">รหัส Snapshot</p>
+        <p class="text-sm font-mono font-semibold text-slate-800">{{ h.code }}</p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">วันที่ดึง</p>
+        <p class="text-sm text-slate-700">{{ h.created_at | thaiDate:'datetime' }}</p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">จำนวน record</p>
+        <p class="text-sm font-semibold text-slate-800">{{ h.total_rows | number }} รายการ</p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">สถานะ</p>
+        <span class="text-xs px-2 py-1 rounded-full font-medium" [ngClass]="statusClass()">
+          {{ statusLabel() }}
+        </span>
+      </div>
+
+      <div class="col-span-2">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Config</p>
+        <p class="text-sm text-slate-700">{{ h.config_name }}</p>
+      </div>
+
+      <div class="col-span-2">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">API URL</p>
+        <p class="text-sm font-mono text-slate-600 truncate" [title]="h.api_url">{{ h.api_url }}</p>
+      </div>
+
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+
+      <div class="relative">
+        @if (loading()) {
+          <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+            <mat-spinner diameter="32" />
+          </div>
+        }
+
+        <div class="overflow-auto">
+          @if (dynamicColumns().length > 0) {
+            <table mat-table [dataSource]="dataSource" class="w-full">
+
+              @for (col of dynamicColumns(); track col) {
+                <ng-container [matColumnDef]="col">
+                  <th mat-header-cell *matHeaderCellDef
+                      class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 whitespace-nowrap">
+                    {{ col }}
+                  </th>
+                  <td mat-cell *matCellDef="let row"
+                      class="!text-sm !text-slate-700 whitespace-nowrap max-w-[200px] truncate"
+                      [title]="formatCellValue(row[col])">
+                    {{ formatCellValue(row[col]) }}
+                  </td>
+                </ng-container>
+              }
+
+              <tr mat-header-row *matHeaderRowDef="dynamicColumns()"></tr>
+              <tr mat-row *matRowDef="let row; columns: dynamicColumns();"
+                  class="hover:bg-slate-50 transition-colors even:bg-slate-50/40"></tr>
+
+            </table>
+          } @else if (!loading()) {
+            <div class="text-center py-12 text-slate-400">
+              <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p>ไม่มีข้อมูลใน Snapshot นี้</p>
+            </div>
+          }
+        </div>
+
+        <!-- Server-side paginator -->
+        <mat-paginator
+          [length]="totalRecords()"
+          [pageSize]="pageSize()"
+          [pageIndex]="currentPage() - 1"
+          [pageSizeOptions]="[10, 25, 50, 100]"
+          (page)="onPageChange($event)"
+          showFirstLastButtons
+          class="border-t border-slate-200">
+        </mat-paginator>
+
+      </div>
+    </div>
+
+  }
+
+</div>

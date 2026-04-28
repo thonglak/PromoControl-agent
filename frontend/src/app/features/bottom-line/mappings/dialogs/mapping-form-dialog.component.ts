@@ -76,6 +76,22 @@ const COLUMNS = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z'.split(' ')
           </mat-select>
         </mat-form-field>
 
+        <mat-form-field appearance="outline">
+          <mat-label>Column งบมาตรฐาน (Standard Budget)</mat-label>
+          <mat-select formControlName="standard_budget_column">
+            <mat-option [value]="''">— ไม่ระบุ —</mat-option>
+            @for (c of columnOptions; track c) { <mat-option [value]="c">{{ c }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Column ราคาฐาน (Base Price)</mat-label>
+          <mat-select formControlName="base_price_column">
+            <mat-option [value]="''">— ไม่ระบุ —</mat-option>
+            @for (c of columnOptions; track c) { <mat-option [value]="c">{{ c }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+
         <mat-checkbox formControlName="is_default" color="primary">ตั้งเป็น default สำหรับโครงการนี้</mat-checkbox>
 
         @if (serverError()) {
@@ -111,7 +127,9 @@ export class MappingFormDialogComponent {
     unit_code_column:         [this.data.preset?.mapping_config?.unit_code_column ?? 'A'],
     bottom_line_price_column: [this.data.preset?.mapping_config?.bottom_line_price_column ?? 'B'],
     appraisal_price_column:   [this.data.preset?.mapping_config?.appraisal_price_column ?? 'C'],
-    is_default:               [this.data.preset?.is_default ?? false],
+    standard_budget_column:   [this.data.preset?.mapping_config?.standard_budget_column ?? ''],
+    base_price_column:        [this.data.preset?.mapping_config?.base_price_column ?? ''],
+    is_default:               [!!Number(this.data.preset?.is_default)],
   });
 
   save(): void {
@@ -124,6 +142,8 @@ export class MappingFormDialogComponent {
       unit_code_column: v.unit_code_column!,
       bottom_line_price_column: v.bottom_line_price_column!,
       appraisal_price_column: v.appraisal_price_column!,
+      standard_budget_column: v.standard_budget_column || undefined,
+      base_price_column: v.base_price_column || undefined,
       header_row: v.header_row!,
       data_start_row: v.data_start_row!,
       sheet_name: v.sheet_name!,

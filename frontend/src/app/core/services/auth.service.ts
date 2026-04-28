@@ -77,6 +77,30 @@ export class AuthService {
       );
   }
 
+  /**
+   * handleSsoToken — เรียกหลังจาก SSO callback redirect กลับมา
+   *
+   * Backend ส่ง access_token มาใน URL query param (เพราะ httpOnly cookie
+   * รับ refresh token ไว้แล้ว) ฟังก์ชันนี้:
+   * 1. เก็บ access_token ใน memory + localStorage
+   * 2. ดึง user info ด้วย /api/auth/me เพื่อ populate currentUser signal
+   *
+   * @param token  access_token จาก query param ?token=...
+   */
+  handleSsoToken(token: string): Promise<void> {
+    localStorage.setItem(TOKEN_KEY, token);
+    this.accessToken.set(token);
+
+    return firstValueFrom(
+      this.me().pipe(
+        catchError(() => {
+          this.clearSession();
+          return of(null);
+        }),
+      ),
+    ).then(() => {});
+  }
+
   refresh(): Observable<RefreshResponse> {
     return this.http
       .post<RefreshResponse>('/api/auth/refresh', {}, { withCredentials: true })

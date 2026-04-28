@@ -113,15 +113,7 @@ Units reference a house model for physical specs (bedrooms, area, etc.) only. **
 | project_id          | BIGINT FK     | References `projects.id`                 |
 | code                | VARCHAR(50)   | Model code (e.g., `TYPE-A`, `VILLA-DX`)  |
 | name                | VARCHAR(255)  | Model name (e.g., `บ้านเดี่ยว Type A`)    |
-| description         | TEXT          | Model description and features           |
-| bedrooms            | INT           | Number of bedrooms                       |
-| bathrooms           | INT           | Number of bathrooms                      |
-| floors              | INT           | Number of floors (stories)               |
 | area_sqm            | DECIMAL(10,2) | Usable area in square meters             |
-| land_area_sqw       | DECIMAL(10,2) | Land area in square wah (for houses)     |
-| image_url           | VARCHAR(500)  | Model image / floor plan URL             |
-| status              | ENUM          | `active`, `inactive`                     |
-| total_units         | INT           | Total planned units of this model        |
 | created_at          | DATETIME      | Record creation timestamp                |
 | updated_at          | DATETIME      | Record update timestamp                  |
 
@@ -131,9 +123,8 @@ UNIQUE(project_id, code)
 
 1. `code` must be unique within the same project.
 2. A house model belongs to exactly one project.
-3. **ราคาขาย ต้นทุน และงบมาตรฐาน ไม่อยู่ในแบบบ้าน** — ต้องกรอกที่ยูนิตเท่านั้น เพราะยูนิตแบบเดียวกันอาจมีราคาต่างกันได้
+3. house_models เก็บแค่ code, name, area_sqm — ข้อมูลอื่นเก็บที่ project_units
 4. Deleting a house model is only allowed if **no units** reference it.
-5. `land_area_sqw` is relevant for house/townhouse projects — nullable for condos.
 
 ## API Endpoints
 
@@ -152,9 +143,6 @@ UNIQUE(project_id, code)
 |------------|--------|---------------------------------|
 | project_id | int    | Filter by project               |
 | search     | string | Search by code or name          |
-| status     | string | Filter: `active`, `inactive`    |
-| page       | int    | Page number (default: 1)        |
-| per_page   | int    | Items per page (default: 20)    |
 
 ### Request Body (POST / PUT)
 
@@ -163,15 +151,7 @@ UNIQUE(project_id, code)
   "project_id": 1,
   "code": "TYPE-A",
   "name": "บ้านเดี่ยว Type A",
-  "description": "3 bedrooms, 2 bathrooms, 2-story detached house with garden",
-  "bedrooms": 3,
-  "bathrooms": 2,
-  "floors": 2,
-  "area_sqm": 150.0,
-  "land_area_sqw": 50.0,
-  "image_url": "/uploads/models/type-a.jpg",
-  "status": "active",
-  "total_units": 20
+  "area_sqm": 150.0
 }
 ```
 
@@ -182,29 +162,19 @@ UNIQUE(project_id, code)
   "id": 2,
   "code": "TYPE-A",
   "name": "บ้านเดี่ยว Type A",
-  "bedrooms": 3,
-  "bathrooms": 2,
-  "floors": 2,
   "area_sqm": 150.0,
-  "land_area_sqw": 50.0,
-  "status": "active",
-  "units_count": 15,
-  "units_available": 8,
-  "units_sold": 7,
-  "project": { "id": 1, "code": "PJ-001", "name": "The Garden Residence" }
+  "unit_count": 15
 }
 ```
 
 ## UI Screen
 
 ### List View
-- `mat-table` with columns: Code, Name, Bedrooms, Bathrooms, Floors, Area, Land, Units (available/total), Status, Actions
-- Filter bar: Project selector, Status filter, Search input
-- Status chips (`MatChipsModule`): active = green, inactive = grey
+- `mat-table` with columns: Code, Name, Area (sqm), Unit Count, Actions
+- Filter bar: Search input
 
 ### Create / Edit Form (Dialog)
-- Fields: Project (required, disabled on edit), Code (required), Name (required), Description, Bedrooms, Bathrooms, Floors, Area sqm, Land Area sqw (optional), Image URL, Total Units, Status
-- **ไม่มี** ราคาขายเริ่มต้น, ต้นทุนเริ่มต้น, งบมาตรฐาน — ข้อมูลเหล่านี้กรอกที่ยูนิตเท่านั้น
+- Fields: Code (required), Name (required), Area sqm (required)
 
 ### Detail View
 - Model info card with image preview
@@ -277,7 +247,52 @@ UNIQUE(project_id, name)
 
 ---
 
-# 4. Unit Management (ยูนิต)
+# 4. Phase Management (เฟสโครงการ)
+
+## Purpose
+
+จัดการ Phase ของโครงการ เช่น "Phase 1", "Phase 2" สำหรับแบ่งกลุ่มยูนิตตามเฟสการขาย ใช้สำหรับ filter ข้อมูลใน Dashboard และจัดกลุ่มยูนิต
+
+## Data Model — Table: `project_phases`
+
+| Column      | Type          | Description                              |
+|-------------|---------------|------------------------------------------|
+| id          | BIGINT PK     | Auto-increment                           |
+| project_id  | BIGINT FK     | References `projects.id`                 |
+| name        | VARCHAR(100)  | ชื่อ Phase (เช่น "Phase 1", "เฟส A")      |
+| sort_order  | INT           | ลำดับการแสดงผล (default: 0)               |
+| created_at  | DATETIME      | Record creation timestamp                |
+| updated_at  | DATETIME      | Record update timestamp                  |
+
+UNIQUE(project_id, name)
+
+## Business Rules
+
+1. ชื่อ Phase ห้ามซ้ำภายในโครงการเดียวกัน
+2. Phase เป็น optional — ยูนิตสามารถไม่มี phase ได้ (`phase_id = NULL`)
+3. ลบได้เฉพาะเมื่อ **ไม่มียูนิตอ้างอิง** (`phase_id`)
+4. เมื่อลบ Phase ที่มียูนิตอ้างอิง → ต้องย้ายยูนิตออกก่อน (FK ON DELETE SET NULL เป็น safety net)
+5. Dashboard ใช้ Phase dropdown เพื่อ filter ข้อมูลทุก section
+
+## API Endpoints
+
+| Method | Path                        | Description                    |
+|--------|-----------------------------|--------------------------------|
+| GET    | /api/phases?project_id=     | รายการ Phase พร้อม unit_count   |
+| POST   | /api/phases                 | สร้าง Phase ใหม่                |
+| PUT    | /api/phases/{id}            | แก้ไขชื่อ/ลำดับ                |
+| DELETE | /api/phases/{id}            | ลบ (เฉพาะไม่มียูนิตอ้างอิง)    |
+
+## UI
+
+- URL: `/phases` — อยู่ภายใต้เมนู "ข้อมูลหลัก"
+- สิทธิ์: admin, manager
+- `mat-table` คอลัมน์: ลำดับ, ชื่อ Phase, จำนวนยูนิต, Actions (แก้ไข/ลบ)
+- Create/Edit: `MatDialogModule` — ชื่อ + ลำดับ
+
+---
+
+# 5. Unit Management (ยูนิต)
 
 ## Purpose
 
@@ -291,6 +306,7 @@ Units are the core entity for sales transactions and promotion usage.
 |---------------------|---------------|------------------------------------------|
 | id                  | BIGINT PK     | Auto-increment                           |
 | project_id          | BIGINT FK     | References `projects.id`                 |
+| phase_id            | BIGINT FK NULL| References `project_phases.id` (nullable, ON DELETE SET NULL) |
 | house_model_id      | BIGINT FK NULL| References `house_models.id` (nullable)  |
 | unit_code           | VARCHAR(50)   | Unique unit code within project          |
 | unit_number         | VARCHAR(50)   | Display unit number / room number        |
@@ -300,12 +316,10 @@ Units are the core entity for sales transactions and promotion usage.
 | unit_cost           | DECIMAL(15,2) | Company cost (อัปเดตจาก Bottom Line import) |
 | appraisal_price     | DECIMAL(15,2) NULL | ราคาประเมินจากกรมที่ดิน (อัปเดตจาก Bottom Line import) |
 | bottom_line_key     | VARCHAR(50) NULL   | FK → `bottom_lines.import_key` — ถูก import ด้วย key ไหน |
-| area_sqm            | DECIMAL(10,2) | Unit area in square meters               |
+| land_area_sqw       | DECIMAL(10,2) NULL | ขนาดที่ดิน (ตร.ว.) — เก็บที่ unit เพราะ type เดียวกันที่ดินต่างกันได้ |
 | unit_type_id        | BIGINT FK NULL| References `unit_types.id` — ประเภทยูนิต (เลือกจาก master ของโครงการ) |
 | standard_budget     | DECIMAL(15,2) | Standard promotion budget for this unit  |
 | status              | ENUM          | `available`, `reserved`, `sold`, `transferred` |
-| customer_name       | VARCHAR(255)  | Customer name (filled after reservation) |
-| salesperson         | VARCHAR(255)  | Assigned salesperson                     |
 | sale_date           | DATE NULL     | Date of sale                             |
 | transfer_date       | DATE NULL     | Date of ownership transfer               |
 | remark              | TEXT          | Notes                                    |
@@ -358,7 +372,6 @@ UNIQUE(project_id, unit_code)
   "building": "Building A",
   "base_price": 3000000,
   "unit_cost": 2500000,
-  "area_sqm": 35.5,
   "unit_type_id": 3,
   "standard_budget": 100000,
   "status": "available",

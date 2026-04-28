@@ -49,22 +49,6 @@ export interface HouseModelFormDialogData {
           }
         </mat-form-field>
 
-        <!-- ห้องนอน / ห้องน้ำ / ชั้น -->
-        <mat-form-field appearance="outline">
-          <mat-label>จำนวนห้องนอน</mat-label>
-          <input matInput type="number" formControlName="bedrooms" min="0" max="10">
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>จำนวนห้องน้ำ</mat-label>
-          <input matInput type="number" formControlName="bathrooms" min="0" max="10">
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>จำนวนชั้น</mat-label>
-          <input matInput type="number" formControlName="floors" min="1" max="5">
-        </mat-form-field>
-
         <!-- พื้นที่ -->
         <mat-form-field appearance="outline">
           <mat-label>พื้นที่ใช้สอย (ตร.ม.)</mat-label>
@@ -78,11 +62,6 @@ export interface HouseModelFormDialogData {
           }
         </mat-form-field>
 
-        <mat-form-field appearance="outline">
-          <mat-label>พื้นที่ดิน (ตร.ว.)</mat-label>
-          <input matInput currencyMask [options]="{ precision: 2, align: 'left' }" formControlName="land_area_sqw">
-          <span matSuffix class="text-slate-400 text-sm mr-2">ตร.ว.</span>
-        </mat-form-field>
 
 
         <!-- Server error -->
@@ -112,13 +91,9 @@ export class HouseModelFormDialogComponent {
   serverError = signal<string | null>(null);
 
   form = this.fb.group({
-    code:               [this.data.model?.code ?? '', Validators.required],
-    name:               [this.data.model?.name ?? '', Validators.required],
-    bedrooms:           [this.data.model?.bedrooms ?? 0, [Validators.min(0), Validators.max(10)]],
-    bathrooms:          [this.data.model?.bathrooms ?? 0, [Validators.min(0), Validators.max(10)]],
-    floors:             [this.data.model?.floors ?? 1, [Validators.min(1), Validators.max(5)]],
-    area_sqm:           [this.data.model?.area_sqm ?? null, [Validators.required, Validators.min(0.01)]],
-    land_area_sqw:      [this.data.model?.land_area_sqw ?? null],
+    code:     [this.data.model?.code ?? '', Validators.required],
+    name:     [this.data.model?.name ?? '', Validators.required],
+    area_sqm: [this.data.model?.area_sqm ?? null, [Validators.required, Validators.min(0.01)]],
   });
 
   save(): void {
@@ -128,14 +103,10 @@ export class HouseModelFormDialogComponent {
 
     const v = this.form.value;
     const payload = {
-      project_id:         this.data.projectId,
-      code:               v.code!,
-      name:               v.name!,
-      bedrooms:           v.bedrooms ?? 0,
-      bathrooms:          v.bathrooms ?? 0,
-      floors:             v.floors ?? 1,
-      area_sqm:           v.area_sqm!,
-      land_area_sqw:      v.land_area_sqw ?? null,
+      project_id: this.data.projectId,
+      code:       v.code!,
+      name:       v.name!,
+      area_sqm:   v.area_sqm!,
     };
 
     const obs = this.data.mode === 'create'

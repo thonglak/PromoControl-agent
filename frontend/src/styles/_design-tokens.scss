@@ -91,3 +91,56 @@
   --font-size-kpi: 32px;
   --font-size-table: 13px;
 }
+
+// ── Dark Theme Overrides ──────────────────────────────────────────────────
+html.dark-theme {
+  --color-primary-900: #9DC3E5;
+  --color-primary-700: #6FA3D4;
+  --color-primary-500: #5A9BD0;
+  --color-primary-300: #1F4B73;
+  --color-primary-100: #0A1A2C;
+  --color-primary: var(--color-primary-700);
+
+  --color-gray-900: #F3F4F6;
+  --color-gray-700: #D1D5DB;
+  --color-gray-500: #9CA3AF;
+  --color-gray-300: #4B5563;
+  --color-gray-200: #374151;
+  --color-gray-100: #1F2937;
+  --color-gray-50:  #111827;
+
+  --color-bg: #0F172A;
+  --color-surface: #1E293B;
+  --color-section: #1A2332;
+  --color-border: #334155;
+
+  --color-text-primary: #CBD5E1;
+  --color-text-secondary: #8896AB;
+  --color-text-on-primary: #0F172A;
+
+  --color-success-subtle: #064E3B;
+  --color-error-subtle: #7F1D1D;
+  --color-warning-subtle: #78350F;
+  --color-info-subtle: #0C4A6E;
+  --color-primary-subtle: #0A1A2C;
+  --color-neutral-subtle: #1F2937;
+
+  // Financial — สีสว่างขึ้นเพื่ออ่านได้บนพื้นมืด
+  --color-success: #6EE7B7;
+  --color-warning: #FCD34D;
+  --color-error: #FCA5A5;
+  --color-info: #93C5FD;
+  --color-profit: #6EE7B7;
+  --color-loss: #FCA5A5;
+  --color-discount: #FCD34D;
+  --color-budget: #93C5FD;
+
+  // Accent
+  --color-accent: #D4B67F;
+  --color-accent-warm: #C8A96B;
+  --color-accent-light: #3D2E1A;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+}

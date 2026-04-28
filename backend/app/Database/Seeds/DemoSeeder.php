@@ -106,7 +106,6 @@ class DemoSeeder extends Seeder
                 'unit_number'     => 'A05-01',
                 'floor'           => '5',
                 'building'        => 'A',
-                'area_sqm'        => 30.00,
                 'unit_type'       => 'Studio',
                 'base_price'      => 2500000.00,
                 'unit_cost'       => 1800000.00,
@@ -121,7 +120,6 @@ class DemoSeeder extends Seeder
                 'unit_number'     => 'A08-01',
                 'floor'           => '8',
                 'building'        => 'A',
-                'area_sqm'        => 30.00,
                 'unit_type'       => 'Studio',
                 'base_price'      => 2600000.00,
                 'unit_cost'       => 1850000.00,
@@ -137,7 +135,6 @@ class DemoSeeder extends Seeder
                 'unit_number'     => 'B10-01',
                 'floor'           => '10',
                 'building'        => 'B',
-                'area_sqm'        => 45.00,
                 'unit_type'       => '1 Bedroom',
                 'base_price'      => 3500000.00,
                 'unit_cost'       => 2600000.00,
@@ -152,7 +149,6 @@ class DemoSeeder extends Seeder
                 'unit_number'     => 'B12-01',
                 'floor'           => '12',
                 'building'        => 'B',
-                'area_sqm'        => 45.00,
                 'unit_type'       => '1 Bedroom',
                 'base_price'      => 3600000.00,
                 'unit_cost'       => 2650000.00,
@@ -168,7 +164,6 @@ class DemoSeeder extends Seeder
                 'unit_number'     => 'PH30-01',
                 'floor'           => '30',
                 'building'        => 'A',
-                'area_sqm'        => 120.00,
                 'unit_type'       => 'Penthouse',
                 'base_price'      => 12000000.00,
                 'unit_cost'       => 8500000.00,
@@ -180,8 +175,6 @@ class DemoSeeder extends Seeder
 
         foreach ($units as &$unit) {
             $unit['bottom_line_key'] = null;
-            $unit['customer_name']   = null;
-            $unit['salesperson']     = null;
             $unit['sale_date']       = null;
             $unit['transfer_date']   = null;
             $unit['remark']          = null;

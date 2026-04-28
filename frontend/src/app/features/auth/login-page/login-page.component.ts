@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -22,6 +23,7 @@ import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.c
     MatButtonModule,
     MatProgressSpinnerModule,
     MatDialogModule,
+    MatDividerModule,
     SvgIconComponent,
   ],
   templateUrl: './login-page.component.html',
@@ -76,5 +78,11 @@ export class LoginPageComponent implements OnInit {
     ref.afterClosed().subscribe((success: boolean) => {
       if (success) this.needsSetup.set(false);
     });
+  }
+
+  /** เริ่ม SSO flow — redirect ไปยัง Narai Connect ผ่าน backend */
+  loginWithNarai(): void {
+    // ใช้ full redirect (ไม่ใช่ HttpClient) เพราะต้องส่ง browser ไป Narai
+    window.location.href = '/api/auth/sso/authorize';
   }
 }

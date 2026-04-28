@@ -47,7 +47,7 @@
       </div>
 
       @if (form.get('value_mode')?.value === 'calculated') {
-        <div class="flex items-start gap-2 p-3 rounded-lg text-sm" style="background: var(--color-warning-subtle); border: 1px solid #FFC107; color: #8B6914">
+        <div class="flex items-start gap-2 p-3 rounded-lg text-sm" style="background: var(--color-warning-subtle); border: 1px solid #FFC107; color: var(--color-warning)">
           <app-icon name="exclamation-triangle" class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--color-warning)" />
           <span>ต้องตั้งค่าสูตรคำนวณในหน้า Fee Formula หลังบันทึก</span>
         </div>
@@ -187,7 +187,7 @@
     </div>
 
     @if (serverError()) {
-      <div class="p-3 rounded-lg text-sm" style="background: var(--color-error-subtle); border: 1px solid #EF9A9A; color: var(--color-error)">
+      <div class="p-3 rounded-lg text-sm" style="background: var(--color-error-subtle); border: 1px solid var(--color-error); color: var(--color-error)">
         {{ serverError() }}
       </div>
     }

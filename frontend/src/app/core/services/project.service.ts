@@ -7,6 +7,7 @@ export interface Project {
   project_type: string;
   status: string;
   access_level: 'view' | 'edit';
+  approval_required?: boolean | number;
   allow_over_budget?: boolean | number;
   unit_count?: number;
 }

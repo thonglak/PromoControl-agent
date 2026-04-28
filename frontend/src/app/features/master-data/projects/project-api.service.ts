@@ -10,9 +10,9 @@ export interface Project {
   project_type: 'condo' | 'house' | 'townhouse' | 'mixed';
   status: 'active' | 'inactive' | 'completed';
   location?: string;
-  auto_approve: boolean | number;
+  approval_required: boolean | number;
   allow_over_budget: boolean | number;
-  pool_budget: number;
+  pool_budget_amount: number;
   unit_count?: number;
 }
 
@@ -21,9 +21,9 @@ export interface ProjectCreatePayload {
   name: string;
   project_type: string;
   location?: string;
-  auto_approve?: boolean;
+  approval_required?: boolean;
   allow_over_budget?: boolean;
-  pool_budget?: number;
+  pool_budget_amount?: number;
 }
 
 export interface ProjectUpdatePayload {
@@ -31,9 +31,9 @@ export interface ProjectUpdatePayload {
   project_type?: string;
   status?: string;
   location?: string;
-  auto_approve?: boolean;
+  approval_required?: boolean;
   allow_over_budget?: boolean;
-  pool_budget?: number;
+  pool_budget_amount?: number;
 }
 
 @Injectable({ providedIn: 'root' })

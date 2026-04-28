@@ -16,6 +16,8 @@ const PUBLIC_PATHS = [
   '/api/auth/setup',
   '/api/auth/login',
   '/api/auth/refresh',
+  '/api/auth/sso/authorize',
+  '/api/auth/sso/callback',
 ];
 
 // ─── Module-level refresh state ───────────────────────────────────────────

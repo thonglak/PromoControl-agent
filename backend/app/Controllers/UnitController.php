@@ -5,6 +5,10 @@ namespace App\Controllers;
 use App\Models\UnitModel;
 use App\Models\HouseModelModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class UnitController extends BaseController
 {
@@ -110,12 +114,7 @@ class UnitController extends BaseController
         if ($houseModelId) {
             $hm = $this->houseModel->find($houseModelId);
             if ($hm) {
-                $defaults = [
-                    
-                    
-                    
-                    'area_sqm'        => (float) $hm['area_sqm'],
-                ];
+                $defaults = [];
             }
         }
 
@@ -233,12 +232,7 @@ class UnitController extends BaseController
             if ($houseModelId) {
                 $hm = $this->houseModel->find($houseModelId);
                 if ($hm) {
-                    $defaults = [
-                        'area_sqm' => (float) $hm['area_sqm'],
-                        
-                        
-                        
-                    ];
+                    $defaults = [];
                 }
             }
 
@@ -256,6 +250,109 @@ class UnitController extends BaseController
             'message' => "สร้างยูนิตสำเร็จ {$created} รายการ",
             'data'    => ['total' => count($units), 'created' => $created, 'errors' => $errors],
         ]);
+    }
+
+    // ── GET /api/units/export?project_id= ───────────────────────────────
+
+    public function exportExcel(): ResponseInterface
+    {
+        $projectId = (int) ($this->request->getGet('project_id') ?? 0);
+        if ($projectId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        }
+        if (!$this->canAccessProject($projectId)) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
+        }
+
+        $filters = [
+            'house_model_id' => $this->request->getGet('house_model_id'),
+            'status'         => $this->request->getGet('status'),
+            'search'         => $this->request->getGet('search'),
+        ];
+
+        $units = $this->unitModel->getListWithModel($projectId, $filters);
+
+        // สร้าง Spreadsheet
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('ยูนิต');
+
+        // ── Header row ──
+        $headers = [
+            'A1' => 'รหัสยูนิต',
+            'B1' => 'เลขที่ยูนิต',
+            'C1' => 'แบบบ้าน',
+            'D1' => 'อาคาร',
+            'E1' => 'ชั้น',
+            'F1' => 'ราคาขาย',
+            'G1' => 'ต้นทุน',
+            'H1' => 'ราคาประเมิน',
+            'I1' => 'งบมาตรฐาน',
+            'J1' => 'สถานะ',
+            'K1' => 'ลูกค้า',
+            'L1' => 'พนักงานขาย',
+        ];
+
+        foreach ($headers as $cell => $label) {
+            $sheet->setCellValue($cell, $label);
+        }
+
+        // Style header
+        $headerStyle = [
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ];
+        $sheet->getStyle('A1:L1')->applyFromArray($headerStyle);
+
+        // ── Data rows ──
+        $statusMap = [
+            'available'   => 'ว่าง',
+            'reserved'    => 'จอง',
+            'sold'        => 'ขายแล้ว',
+            'transferred' => 'โอนแล้ว',
+        ];
+
+        $row = 2;
+        foreach ($units as $u) {
+            $sheet->setCellValue("A{$row}", $u['unit_code'] ?? '');
+            $sheet->setCellValue("B{$row}", $u['unit_number'] ?? '');
+            $sheet->setCellValue("C{$row}", trim(($u['house_model_code'] ?? '') . ' ' . ($u['house_model_name'] ?? '')));
+            $sheet->setCellValue("D{$row}", $u['building'] ?? '');
+            $sheet->setCellValue("E{$row}", $u['floor'] ?? '');
+            $sheet->setCellValue("F{$row}", (float) ($u['base_price'] ?? 0));
+            $sheet->setCellValue("G{$row}", (float) ($u['unit_cost'] ?? 0));
+            $sheet->setCellValue("H{$row}", (float) ($u['appraisal_price'] ?? 0));
+            $sheet->setCellValue("I{$row}", (float) ($u['standard_budget'] ?? 0));
+            $sheet->setCellValue("J{$row}", $statusMap[$u['status'] ?? ''] ?? $u['status'] ?? '');
+            $sheet->setCellValue("K{$row}", $u['customer_name'] ?? '');
+            $sheet->setCellValue("L{$row}", $u['salesperson'] ?? '');
+            $row++;
+        }
+
+        // Format ตัวเลขเป็น #,##0
+        $lastRow = max($row - 1, 1);
+        $sheet->getStyle("F2:I{$lastRow}")->getNumberFormat()->setFormatCode('#,##0');
+
+        // Auto-width คอลัมน์
+        foreach (range('A', 'L') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // ── Write to output ──
+        $writer = new Xlsx($spreadsheet);
+        ob_start();
+        $writer->save('php://output');
+        $content = ob_get_clean();
+
+        $date = date('Ymd');
+        $filename = "units-export-{$date}.xlsx";
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->setHeader('Content-Disposition', "attachment; filename=\"{$filename}\"")
+            ->setBody($content);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────
@@ -298,7 +395,7 @@ class UnitController extends BaseController
             'standard_budget' => (float) ($get('standard_budget') ?? 0),
         ];
 
-        $optionals = ['floor', 'building', 'area_sqm', 'unit_type_id', 'house_model_id',
+        $optionals = ['floor', 'building', 'land_area_sqw', 'unit_type_id', 'house_model_id',
                       'appraisal_price', 'customer_name', 'salesperson',
                       'sale_date', 'transfer_date', 'remark', 'status'];
 

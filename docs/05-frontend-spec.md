@@ -15,7 +15,7 @@ Do NOT use PrimeNG. Do NOT use `pi pi-*` classes.
 
 ```
 Login → [สร้าง Admin (ถ้ายังไม่มี user)] → Select Project → Dashboard
-         ├── Master Data → Projects → House Models → Units
+         ├── Master Data → Projects → House Models → Units → Phase
          ├── Bottom Line → Import / ประวัติ Import / ตั้งค่า Mapping
          ├── Promotion Items → Unit Promotion Setup
          ├── Fee Formulas → สูตรคำนวณ / มาตรการ-นโยบาย / ทดสอบสูตร
@@ -64,6 +64,31 @@ Full-page login (no sidebar/topbar).
 - คลิกเลือก → เก็บ `selectedProjectId` + `access_level` ใน `ProjectService` → navigate to Dashboard
 - ถ้ามีสิทธิ์เข้าโครงการเดียว → auto-select ข้ามไป Dashboard
 - สามารถเปลี่ยนโครงการได้ตลอดจาก sidebar header
+
+### Dashboard (Sales-Focused)
+สรุปยอดขายและ stock ของโครงการ แบ่งเป็น 4 sections:
+
+1. **Header** — ชื่อ "Dashboard" + Phase dropdown (filter เฉพาะ phase, default = "All")
+2. **Row 1 (50/50):**
+   - ซ้าย "ยอดขายตั้งแต่เริ่มต้นถึงปัจจุบัน" — จำนวนยูนิตที่ขาย, มูลค่าขายสุทธิ, ราคาเฉลี่ยต่อยูนิต
+   - ขวา "Stock ที่เหลือ" — จำนวนยูนิตเหลือ, มูลค่าสุทธิเหลือ, ราคาเฉลี่ยต่อยูนิต
+3. **Row 2 (50/50):**
+   - ซ้าย "ส่วนลดต่อยูนิตที่เหลือ" — input field + ปุ่มคำนวณ/Reset
+   - ขวา "มูลค่าประมาณการ" — มูลค่าหลังหักส่วนลด, ราคาเฉลี่ย, % ส่วนลด
+4. **Row 3 (full-width):**
+   - "สรุปการขาย ทั้งโครงการ" — 2 คอลัมน์: ข้อมูลยอดขายทั้งโครงการ (ซ้าย) + เปรียบเทียบกับมูลค่าอนุมัติ (ขวา, ค่าลบแสดงสีแดง)
+
+API: `GET /api/dashboard`, `POST /api/dashboard/calculate-discount`
+Styling: ตัวเลขชิดขวา tabular-nums, label ชิดซ้าย, ทศนิยม 2 ตำแหน่ง (ยกเว้นจำนวนยูนิต), tooltip icon สำหรับ field ที่ต้องอธิบาย
+
+### Phase Management (จัดการเฟสโครงการ)
+จัดการ Phase ของโครงการ (เช่น Phase 1, Phase 2) สำหรับแบ่งกลุ่มยูนิต
+- URL: `/phases` — อยู่ภายใต้เมนู "ข้อมูลหลัก"
+- สิทธิ์: admin, manager
+- List view: `mat-table` คอลัมน์ ลำดับ, ชื่อ Phase, จำนวนยูนิต, Actions (แก้ไข/ลบ)
+- ปุ่มลบ disabled ถ้ามียูนิตอ้างอิง (unit_count > 0)
+- Create/Edit: `MatDialogModule` — ชื่อ Phase (required, unique ในโครงการ), ลำดับ
+- API: CRUD `/api/phases`
 
 ### User Management (admin only)
 Manage system users and project assignments. Admin เท่านั้นที่สามารถสร้าง/แก้ไข user ได้
@@ -180,7 +205,7 @@ Record promotion usage — the most important screen in the system.
 **Screen Panels:**
 
 Section 1 — Unit Information:
-Project, Unit Code, Base Price, Unit Cost, Customer, Salesperson, Sale Date
+Project, Unit Code (`mat-autocomplete` — พิมพ์ค้นหาได้ทั้ง unit_code และ house_model_name), Base Price, Unit Cost, Customer, Salesperson, Sale Date
 
 Section 2 — Available Budget:
 Unit Standard Budget, Project Pool Budget, Management Special Budget, Total Budget Available

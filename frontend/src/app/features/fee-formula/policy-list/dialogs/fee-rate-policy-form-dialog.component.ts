@@ -61,7 +61,7 @@ export class FeeRatePolicyFormDialogComponent implements OnInit {
     priority:               [this.policy?.priority ?? 0, Validators.required],
     effective_from:         [this.policy?.effective_from ? new Date(this.policy.effective_from) : null as Date | null, Validators.required],
     effective_to:           [this.policy?.effective_to ? new Date(this.policy.effective_to) : null as Date | null, Validators.required],
-    is_active:              [this.policy?.is_active ?? true],
+    is_active:              [this.policy ? !!Number(this.policy.is_active) : true],
     // Conditions builder
     has_max_price:          [!!this.cond.max_base_price],
     max_base_price:         [this.cond.max_base_price ?? null as number | null],

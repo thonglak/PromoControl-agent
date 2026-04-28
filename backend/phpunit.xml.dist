@@ -50,14 +50,14 @@
         <const name="CONFIGPATH" value="./app/Config/"/>
         <!-- Directory containing the front controller (index.php) -->
         <const name="PUBLICPATH" value="./public/"/>
-        <!-- Database configuration -->
-        <!-- Uncomment to provide your own database for testing
-            <env name="database.tests.hostname" value="localhost"/>
-            <env name="database.tests.database" value="tests"/>
-            <env name="database.tests.username" value="tests_user"/>
-            <env name="database.tests.password" value=""/>
+        <!-- Database configuration — ใช้ MySQL ใน Docker container -->
+            <env name="database.tests.hostname" value="promo_mysql"/>
+            <env name="database.tests.database" value="promo_db"/>
+            <env name="database.tests.username" value="promo_user"/>
+            <env name="database.tests.password" value="promo_pass"/>
             <env name="database.tests.DBDriver" value="MySQLi"/>
-            <env name="database.tests.DBPrefix" value="tests_"/>
-            -->
+            <env name="database.tests.DBPrefix" value=""/>
+            <env name="database.tests.port" value="3306"/>
+            <env name="JWT_SECRET" value="6e23888f6f0f40d0f52a0b5ab434e1aa14581002881db8ee0b1a98731a314898"/>
     </php>
 </phpunit>

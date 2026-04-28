@@ -24,7 +24,6 @@ export interface TransferDialogData {
     id: number;
     sale_no: string;
     unit_code: string;
-    customer_name: string;
     net_price: number;
   };
 }
@@ -45,7 +44,6 @@ export interface TransferDialogData {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--mat-sys-surface-container); padding: 16px; border-radius: 8px">
           <div><span style="color: var(--mat-sys-on-surface-variant)">ยูนิต:</span> <strong>{{ data.transaction.unit_code }}</strong></div>
           <div><span style="color: var(--mat-sys-on-surface-variant)">เลขที่:</span> <strong>{{ data.transaction.sale_no }}</strong></div>
-          <div><span style="color: var(--mat-sys-on-surface-variant)">ลูกค้า:</span> <strong>{{ data.transaction.customer_name }}</strong></div>
           <div><span style="color: var(--mat-sys-on-surface-variant)">ราคาสุทธิ:</span> <strong>{{ data.transaction.net_price | number }} บาท</strong></div>
         </div>
 

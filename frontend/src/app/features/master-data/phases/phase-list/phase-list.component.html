@@ -1,0 +1,76 @@
+<div class="px-6 py-6 space-y-6 max-w-screen-xl mx-auto">
+
+  <!-- Header -->
+  <app-page-header title="จัดการ Phase" subtitle="กำหนดเฟสของโครงการ เช่น Phase 1, Phase 2">
+    @if (canEdit) {
+      <div actions>
+        <button mat-flat-button color="primary" (click)="openCreate()">
+          <app-icon name="plus" class="w-4 h-4 mr-1"></app-icon>
+          เพิ่ม Phase
+        </button>
+      </div>
+    }
+  </app-page-header>
+
+  <!-- Loading -->
+  @if (loading()) {
+    <div class="flex justify-center items-center py-20">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  }
+
+  @if (!loading()) {
+    <app-section-card [noPadding]="true">
+      @if (phases().length > 0) {
+        <div class="overflow-x-auto">
+          <table mat-table [dataSource]="phases()" class="w-full">
+
+            <!-- ลำดับ -->
+            <ng-container matColumnDef="sort_order">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !bg-slate-50 !w-20 !text-center">ลำดับ</th>
+              <td mat-cell *matCellDef="let row" class="!text-sm !text-center tabular-nums">{{ row.sort_order }}</td>
+            </ng-container>
+
+            <!-- ชื่อ Phase -->
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !bg-slate-50">ชื่อ Phase</th>
+              <td mat-cell *matCellDef="let row" class="!text-sm !font-medium !text-slate-800">{{ row.name }}</td>
+            </ng-container>
+
+            <!-- จำนวนยูนิต -->
+            <ng-container matColumnDef="unit_count">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !bg-slate-50 !text-right !w-32">จำนวนยูนิต</th>
+              <td mat-cell *matCellDef="let row" class="!text-sm !text-right tabular-nums">{{ row.unit_count }}</td>
+            </ng-container>
+
+            <!-- Actions -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef class="!text-xs !bg-slate-50 !w-24"></th>
+              <td mat-cell *matCellDef="let row" class="!text-center">
+                @if (canEdit) {
+                  <button mat-icon-button matTooltip="แก้ไข" class="!text-slate-400 hover:!text-primary-700" (click)="openEdit(row)">
+                    <app-icon name="pencil" class="w-4 h-4"></app-icon>
+                  </button>
+                  <button mat-icon-button matTooltip="ลบ" class="!text-slate-400 hover:!text-red-600"
+                          [disabled]="row.unit_count > 0" (click)="confirmDelete(row)">
+                    <app-icon name="trash" class="w-4 h-4"></app-icon>
+                  </button>
+                }
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-slate-50 transition-colors"></tr>
+          </table>
+        </div>
+      } @else {
+        <app-empty-state
+          title="ยังไม่มี Phase"
+          icon="squares-2x2"
+          description="เพิ่ม Phase เพื่อแบ่งกลุ่มยูนิตตามเฟสการขาย">
+        </app-empty-state>
+      }
+    </app-section-card>
+  }
+
+</div>

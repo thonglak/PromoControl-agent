@@ -22,6 +22,22 @@
     }
   </div>
 
+  <!-- ── Theme toggle ─────────────────────────────────────────────────── -->
+  <button
+    type="button"
+    (click)="theme.toggle()"
+    class="w-8 h-8 flex items-center justify-center mr-1 flex-shrink-0 transition-colors
+           border-0 bg-transparent cursor-pointer"
+    style="border-radius: var(--radius-md); color: var(--color-gray-500)"
+    onmouseover="this.style.backgroundColor='var(--color-gray-100)'"
+    onmouseout="this.style.backgroundColor='transparent'">
+    @if (theme.isDark()) {
+      <app-icon name="sun" class="w-5 h-5" />
+    } @else {
+      <app-icon name="moon" class="w-5 h-5" />
+    }
+  </button>
+
   <!-- ── Right: User menu trigger ─────────────────────────────────────── -->
   <button
     type="button"

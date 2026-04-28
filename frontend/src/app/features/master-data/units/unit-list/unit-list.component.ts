@@ -35,7 +35,6 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: 'appraisal_price',  label: 'ราคาประเมิน',   visible: true },
   { key: 'standard_budget',  label: 'งบมาตรฐาน',    visible: true },
   { key: 'status',           label: 'สถานะ',         visible: true },
-  { key: 'customer_name',    label: 'ลูกค้า',        visible: true },
   { key: 'actions',          label: 'จัดการ',         visible: true, locked: true },
 ];
 

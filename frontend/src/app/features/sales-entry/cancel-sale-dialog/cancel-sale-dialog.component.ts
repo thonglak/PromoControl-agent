@@ -36,9 +36,9 @@ export interface CancelSaleDialogData {
         </div>
 
         <!-- Warning -->
-        <div style="background: #FFF3E0; border-left: 4px solid #FF9800; padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 0.9em">
-          <strong style="color: #E65100">การยกเลิกจะ:</strong>
-          <ul style="margin: 4px 0 0; padding-left: 20px; color: #BF360C">
+        <div style="background: var(--color-warning-subtle); border-left: 4px solid #FF9800; padding: 12px 16px; border-radius: 0 4px 4px 0; font-size: 0.9em">
+          <strong style="color: var(--color-warning)">การยกเลิกจะ:</strong>
+          <ul style="margin: 4px 0 0; padding-left: 20px; color: var(--color-warning)">
             <li>คืนงบทั้งหมดกลับไปยังแหล่งเดิม</li>
             <li>เปลี่ยนสถานะยูนิตเป็น "ว่าง"</li>
             <li>ไม่สามารถย้อนกลับได้</li>

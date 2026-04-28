@@ -368,7 +368,7 @@ export class NumberSeriesEditDialogComponent implements OnInit, OnDestroy {
     running_digits: [this.data.series.running_digits,  [Validators.required]],
     reset_cycle:    [this.data.series.reset_cycle,     [Validators.required]],
     next_number:    [this.data.series.next_number,     [Validators.required, Validators.min(1)]],
-    is_active:      [this.data.series.is_active],
+    is_active:      [!!Number(this.data.series.is_active)],
   });
 
   // ── Signal ที่เก็บค่าจาก form (bridge reactive form → signal) ──────────

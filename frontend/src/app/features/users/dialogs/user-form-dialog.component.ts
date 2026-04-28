@@ -69,7 +69,7 @@ export class UserFormDialogComponent implements OnInit {
         email:     u.email,
         role:      u.role,
         phone:     u.phone ?? '',
-        is_active: u.is_active,
+        is_active: !!Number(u.is_active),
       });
       this.form.get('email')!.disable();
       // Password optional on edit

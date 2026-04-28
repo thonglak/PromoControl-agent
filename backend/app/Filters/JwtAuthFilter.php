@@ -33,6 +33,8 @@ class JwtAuthFilter implements FilterInterface
         'api/auth/setup',
         'api/auth/login',
         'api/auth/refresh',
+        'api/auth/sso/authorize',
+        'api/auth/sso/callback',
     ];
 
     /**

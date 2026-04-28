@@ -20,10 +20,9 @@ export interface Unit {
   unit_type_id?: number | null;
   unit_type_name?: string | null;
   unit_type_label?: string | null;
+  land_area_sqw?: number | null;
   standard_budget: number;
   status: 'available' | 'reserved' | 'sold' | 'transferred';
-  customer_name?: string | null;
-  salesperson?: string | null;
   sale_date?: string | null;
   transfer_date?: string | null;
   remark?: string | null;
@@ -39,14 +38,12 @@ export interface UnitPayload {
   base_price: number;
   unit_cost: number;
   appraisal_price?: number | null;
-  area_sqm?: number | null;
   unit_type_id?: number | null;
   unit_type_name?: string | null;
   unit_type_label?: string | null;
+  land_area_sqw?: number | null;
   standard_budget: number;
   status?: string;
-  customer_name?: string | null;
-  salesperson?: string | null;
   remark?: string | null;
 }
 

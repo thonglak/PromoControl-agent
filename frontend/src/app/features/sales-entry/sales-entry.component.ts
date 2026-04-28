@@ -413,15 +413,13 @@ export class SalesEntryComponent implements OnInit {
 
   private executeSave(
     unit: Unit,
-    formValues: { customer_name: string; salesperson: string; sale_date: string },
+    formValues: { sale_date: string },
     items: any[]
   ): void {
     const payload = {
       project_id: this.projectId(),
       unit_id: unit.id,
       sale_date: formValues.sale_date,
-      customer_name: formValues.customer_name,
-      salesperson: formValues.salesperson,
       items: items.map(i => ({
         promotion_item_id: i.promotion_item_id,
         used_value: i.used_value,
@@ -547,18 +545,19 @@ export class SalesEntryComponent implements OnInit {
         const unitInfo = this.unitInfoSection();
         if (unitInfo) {
           unitInfo.allowSoldUnit.set(true);
-          await unitInfo.loadUnitsForProject(projectId);
 
-          // 3. Pre-fill controls หลังจาก units โหลดเสร็จ
-          // unit.id จาก API เป็น string — ส่งค่าตรงๆ ให้ match กับ mat-option [value]
-          unitInfo.unitControl.setValue(tx.unit_id as any);
-          // edit mode: ห้ามเปลี่ยนยูนิต
-          unitInfo.unitControl.disable();
-          unitInfo.customerNameControl.setValue(tx.customer_name ?? '');
-          unitInfo.salespersonControl.setValue(tx.salesperson ?? '');
+          // เซ็ต sale_date ก่อน เพื่อให้ loadEligibleItems ใช้ค่าถูกต้อง
           if (tx.sale_date) {
             unitInfo.saleDateControl.setValue(new Date(tx.sale_date + 'T00:00:00'));
+            this.saleDate.set(tx.sale_date);
           }
+
+          // เซ็ต unit_id (Number) ก่อน loadUnitsForProject เพื่อซิงค์ selectedUnit + display text
+          unitInfo.unitControl.setValue(Number(tx.unit_id));
+          await unitInfo.loadUnitsForProject(projectId);
+
+          // edit mode: ห้ามเปลี่ยนยูนิต
+          unitInfo.unitControl.disable();
         }
       },
       error: () => {

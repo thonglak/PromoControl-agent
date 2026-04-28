@@ -6,6 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
 import { ProjectService } from '../../core/services/project.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
 
 import { DecimalPipe } from "@angular/common";
@@ -22,6 +23,7 @@ export class ProjectSelectionPageComponent implements OnInit {
   private readonly projectService = inject(ProjectService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
+  readonly theme = inject(ThemeService);
 
   readonly currentUser = this.auth.currentUser;
   readonly loading = signal(true);

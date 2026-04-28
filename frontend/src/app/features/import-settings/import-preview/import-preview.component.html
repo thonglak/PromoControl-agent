@@ -1,0 +1,202 @@
+<div class="p-6 bg-[#F6F8FB] min-h-full">
+
+  <!-- Header -->
+  <app-page-header title="Import Preview" subtitle="อัปโหลดไฟล์ Excel เพื่อตรวจสอบข้อมูลก่อน Import" />
+
+  <!-- Section A: Config + File Upload -->
+  <app-section-card class="mb-4">
+    <div class="flex flex-col gap-4">
+
+      <!-- Config selector -->
+      <div class="flex flex-wrap gap-4 items-end">
+        <mat-form-field appearance="outline" class="w-72">
+          <mat-label>เลือก Config</mat-label>
+          <mat-select [(ngModel)]="selectedConfigId">
+            <mat-option [value]="null">ไม่ใช้ config — detect อัตโนมัติ</mat-option>
+            @for (cfg of configs(); track cfg.id) {
+              <mat-option [value]="cfg.id">
+                {{ cfg.config_name }}
+                @if (cfg.is_default) { <span class="text-amber-500 ml-1">(Default)</span> }
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <!-- Drag & Drop Zone -->
+      <div
+        class="border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer"
+        [class.border-[#16324F]]="isDragging()"
+        [class.bg-[#DCEAF6]]="isDragging()"
+        [class.border-gray-300]="!isDragging()"
+        [class.bg-gray-50]="!isDragging()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave()"
+        (drop)="onDrop($event)"
+        (click)="triggerFileInput()">
+
+        <input #fileInput type="file" accept=".xlsx,.xls,.csv" class="hidden" (change)="onFileSelected($event)" />
+
+        @if (selectedFile()) {
+          <div class="flex flex-col items-center gap-2">
+            <app-icon name="document-text" class="w-10 h-10 text-[#16324F]" />
+            <p class="font-medium text-[#16324F]">{{ selectedFile()!.name }}</p>
+            <p class="text-sm text-gray-400">{{ (selectedFile()!.size / 1024).toFixed(1) }} KB — คลิกเพื่อเปลี่ยนไฟล์</p>
+          </div>
+        } @else {
+          <div class="flex flex-col items-center gap-2 text-gray-400">
+            <app-icon name="cloud-arrow-up" class="w-10 h-10" />
+            <p class="text-base">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</p>
+            <p class="text-sm">รองรับ .xlsx, .xls, .csv</p>
+          </div>
+        }
+      </div>
+
+      <!-- Preview Button -->
+      <div class="flex justify-end">
+        <button mat-flat-button class="!bg-[#16324F] !text-white px-6"
+                [disabled]="!selectedFile() || loading()"
+                (click)="doPreview()">
+          @if (loading()) {
+            <mat-spinner diameter="16" class="!inline-block mr-2" />
+          } @else {
+            <app-icon name="magnifying-glass" class="w-4 h-4 mr-2" />
+          }
+          อ่านไฟล์และ Preview
+        </button>
+      </div>
+    </div>
+  </app-section-card>
+
+  @if (previewResult()) {
+
+    <!-- Section B: Detected Columns (shown when no config) -->
+    @if (!selectedConfigId && detectedColumnKeys().length > 0) {
+      <app-section-card class="mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-[#16324F] uppercase tracking-wide">Columns ที่ตรวจพบ</h3>
+          <button mat-stroked-button (click)="saveAsConfig()" class="text-sm">
+            <app-icon name="bookmark" class="w-4 h-4 mr-1" />
+            บันทึกเป็น Config ใหม่
+          </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-lg border border-gray-200">
+          <table mat-table [dataSource]="detectedColumnKeys()" class="w-full">
+
+            <!-- Column Letter -->
+            <ng-container matColumnDef="col_key">
+              <th mat-header-cell *matHeaderCellDef class="!bg-gray-50 !text-xs !font-semibold !text-gray-600">Column</th>
+              <td mat-cell *matCellDef="let key" class="!font-mono !font-semibold !text-[#16324F]">{{ key }}</td>
+            </ng-container>
+
+            <!-- Header จากไฟล์ -->
+            <ng-container matColumnDef="header">
+              <th mat-header-cell *matHeaderCellDef class="!bg-gray-50 !text-xs !font-semibold !text-gray-600">Header จากไฟล์</th>
+              <td mat-cell *matCellDef="let key" class="!text-sm !text-gray-700">
+                {{ previewResult()!.detected_columns[key].header }}
+              </td>
+            </ng-container>
+
+            <!-- ตัวอย่างข้อมูล -->
+            <ng-container matColumnDef="samples">
+              <th mat-header-cell *matHeaderCellDef class="!bg-gray-50 !text-xs !font-semibold !text-gray-600">ตัวอย่างข้อมูล</th>
+              <td mat-cell *matCellDef="let key" class="!text-sm !text-gray-500">{{ getSamples(key) }}</td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="['col_key','header','samples']"></tr>
+            <tr mat-row *matRowDef="let row; columns: ['col_key','header','samples'];" class="hover:bg-gray-50"></tr>
+          </table>
+        </div>
+      </app-section-card>
+    }
+
+    <!-- Section C: Summary Cards -->
+    <div class="grid grid-cols-3 gap-4 mb-4">
+      <!-- จำนวนแถวทั้งหมด -->
+      <div class="bg-[#DCEAF6] rounded-2xl p-6 flex flex-col gap-1">
+        <p class="text-xs font-semibold text-[#16324F] uppercase tracking-wide">จำนวนแถวทั้งหมด</p>
+        <p class="text-3xl font-bold text-[#16324F]">{{ totalRows | number }}</p>
+        <p class="text-sm text-[#2F6EA3]">{{ previewResult()!.file_info.file_name }}</p>
+      </div>
+
+      <!-- แถวที่อ่านได้ -->
+      <div class="bg-green-50 rounded-2xl p-6 flex flex-col gap-1">
+        <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">แถวที่อ่านได้</p>
+        <p class="text-3xl font-bold text-green-700">{{ validRows | number }}</p>
+        <p class="text-sm text-green-500">พร้อม Import</p>
+      </div>
+
+      <!-- แถวที่มีปัญหา -->
+      <div class="bg-red-50 rounded-2xl p-6 flex flex-col gap-1">
+        <p class="text-xs font-semibold text-red-600 uppercase tracking-wide">แถวที่มีปัญหา</p>
+        <p class="text-3xl font-bold text-red-600">{{ errorRows | number }}</p>
+        <p class="text-sm text-red-400">ตรวจสอบอีกครั้ง</p>
+      </div>
+    </div>
+
+    <!-- Section D: Preview Table -->
+    @if (previewColumns().length > 0) {
+      <app-section-card>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-[#16324F] uppercase tracking-wide">ตัวอย่างข้อมูล</h3>
+          @if (previewResult()!.mapping_used) {
+            <span class="text-xs text-gray-500">
+              Config: <span class="font-medium text-[#16324F]">{{ previewResult()!.mapping_used!.config_name }}</span>
+            </span>
+          }
+        </div>
+
+        <div class="overflow-x-auto rounded-lg border border-gray-200">
+          <table mat-table [dataSource]="pagedRows()" matSort class="w-full">
+
+            @for (col of previewColumns(); track col) {
+              <ng-container [matColumnDef]="col">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header
+                    class="!bg-gray-50 !text-xs !font-semibold !text-gray-700 !uppercase !tracking-wide"
+                    [class.!text-right]="isNumericCol(col)">
+                  {{ col }}
+                </th>
+                <td mat-cell *matCellDef="let row"
+                    class="!text-sm !text-gray-700"
+                    [class.!text-right]="isNumericCol(col)"
+                    [class.!font-mono]="isNumericCol(col)">
+                  @if (isNumericCol(col)) {
+                    {{ getCellValue(row, col) | number:'1.2-2' }}
+                  } @else {
+                    {{ getCellValue(row, col) }}
+                  }
+                </td>
+                <td mat-footer-cell *matFooterCellDef
+                    class="!bg-[#F1F5F9] !font-semibold !text-xs"
+                    [class.!text-right]="isNumericCol(col)">
+                  @if (isNumericCol(col)) {
+                    <div class="flex flex-col gap-0.5 text-right">
+                      <span class="text-[#16324F]">฿{{ getTotal(col) | number:'1.0-0' }}</span>
+                      <span class="text-gray-400 font-normal">n={{ getCount(col) }}</span>
+                    </div>
+                  }
+                </td>
+              </ng-container>
+            }
+
+            <tr mat-header-row *matHeaderRowDef="previewColumns(); sticky: true"></tr>
+            <tr mat-row *matRowDef="let row; columns: previewColumns();" class="hover:bg-gray-50"></tr>
+            <tr mat-footer-row *matFooterRowDef="previewColumns(); sticky: true"
+                class="bg-[#F1F5F9]"></tr>
+          </table>
+        </div>
+
+        <mat-paginator
+          [length]="previewResult()!.preview_rows.length"
+          [pageSize]="pageSize()"
+          [pageIndex]="pageIndex()"
+          [pageSizeOptions]="[20, 50, 100]"
+          (page)="onPage($event)"
+          class="border-t border-gray-100">
+        </mat-paginator>
+      </app-section-card>
+    }
+
+  }
+</div>

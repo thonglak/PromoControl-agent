@@ -88,9 +88,9 @@ export interface UnitFormDialogData {
         }
 
         <mat-form-field appearance="outline">
-          <mat-label>พื้นที่ใช้สอย (ตร.ม.)</mat-label>
-          <input matInput currencyMask [options]="{ precision: 2, align: 'left' }" formControlName="area_sqm">
-          <span matSuffix class="text-slate-400 text-sm mr-2">ตร.ม.</span>
+          <mat-label>ขนาดที่ดิน (ตร.ว.)</mat-label>
+          <input matInput currencyMask [options]="{ precision: 2, align: 'left' }" formControlName="land_area_sqw">
+          <span matSuffix class="text-slate-400 text-sm mr-2">ตร.ว.</span>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="sm:col-span-2">
@@ -183,7 +183,7 @@ export class UnitFormDialogComponent implements OnInit {
     building:        [this.data.unit?.building ?? ''],
     floor:           [this.data.unit?.floor ?? null],
     unit_type_id:    [this.data.unit?.unit_type_id ?? null],
-    area_sqm:        [this.data.unit?.area_sqm ?? null],
+    land_area_sqw:   [this.data.unit?.land_area_sqw ?? null],
     base_price:      [this.data.unit?.base_price ?? null, [Validators.required, Validators.min(0.01)]],
     unit_cost:       [this.data.unit?.unit_cost ?? null, [Validators.required, Validators.min(0)]],
     appraisal_price: [this.data.unit?.appraisal_price ?? null],
@@ -198,11 +198,8 @@ export class UnitFormDialogComponent implements OnInit {
     });
   }
 
-  onModelChange(modelId: number | null): void {
-    if (!modelId) return;
-    const model = this.houseModels().find(m => m.id === modelId);
-    if (!model) return;
-    if (!this.form.value.area_sqm)        this.form.patchValue({ area_sqm: model.area_sqm });
+  onModelChange(_modelId: number | null): void {
+    // area_sqm มาจาก house_models แล้ว ไม่ต้อง auto-fill
   }
 
   save(): void {
@@ -219,7 +216,7 @@ export class UnitFormDialogComponent implements OnInit {
       building:        v.building || null,
       floor:           v.floor ?? null,
       unit_type_id:    v.unit_type_id ?? null,
-      area_sqm:        v.area_sqm ?? null,
+      land_area_sqw:   v.land_area_sqw ?? null,
       base_price:      v.base_price!,
       unit_cost:       v.unit_cost!,
       appraisal_price: v.appraisal_price ?? null,

@@ -67,8 +67,8 @@ export class PromotionItemFormDialogComponent implements OnInit {
     max_value:          [this.item?.max_value ?? null as number | null],
     default_used_value: [this.item?.default_used_value ?? null as number | null],
     discount_convert_value: [this.item?.discount_convert_value ?? null as number | null],
-    is_unit_standard:   [this.item?.is_unit_standard ?? false],
-    is_active:          [this.item?.is_active ?? true],
+    is_unit_standard:   [!!Number(this.item?.is_unit_standard)],
+    is_active:          [this.item ? !!Number(this.item.is_active) : true],
     sort_order:         [this.item?.sort_order ?? 0],
     // Eligibility radios
     hm_mode:            [this.item && this.item.eligible_house_models.length > 0 ? 'specific' : 'all'],

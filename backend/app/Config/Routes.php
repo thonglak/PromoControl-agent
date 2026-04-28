@@ -12,6 +12,10 @@ $routes->post('api/auth/setup',      'AuthController::setup');
 $routes->post('api/auth/login',      'AuthController::login');
 $routes->post('api/auth/refresh',    'AuthController::refresh');
 
+// Narai Connect SSO routes (public — ไม่ต้องตรวจ JWT)
+$routes->get('api/auth/sso/authorize', 'SsoController::authorize');
+$routes->get('api/auth/sso/callback',  'SsoController::callback');
+
 // Authenticated routes
 $routes->group('api', static function (RouteCollection $routes): void {
 
@@ -55,6 +59,7 @@ $routes->group('api', static function (RouteCollection $routes): void {
 
     $routes->group('units', static function (RouteCollection $routes): void {
         $routes->get('/',        'UnitController::index');
+        $routes->get('export',   'UnitController::exportExcel');
         $routes->get('(:num)',   'UnitController::show/$1');
     });
     $routes->group('units', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
@@ -100,6 +105,16 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->put('(:num)',     'UnitTypeController::update/$1');
         $routes->delete('(:num)',  'UnitTypeController::delete/$1');
     });
+    // Phases (เฟสโครงการ)
+    $routes->group('phases', static function (RouteCollection $routes): void {
+        $routes->get('/',        'PhaseController::index');
+    });
+    $routes->group('phases', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
+        $routes->post('/',         'PhaseController::create');
+        $routes->put('(:num)',     'PhaseController::update/$1');
+        $routes->delete('(:num)',  'PhaseController::delete/$1');
+    });
+
     // Promotion Items (รายการโปรโมชั่น)
     $routes->group('promotion-items', static function (RouteCollection $routes): void {
         $routes->get('/',          'PromotionItemController::index');
@@ -201,15 +216,58 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->get('budget/export',    'ReportController::exportBudget');
     });
 
+    // Sync Target Tables (ตั้งค่า target table สำหรับ sync — admin only)
+    $routes->group('sync-target-tables', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
+        $routes->get('/',              'SyncTargetTableController::index');
+        $routes->post('/',             'SyncTargetTableController::store');
+        $routes->put('(:num)',         'SyncTargetTableController::update/$1');
+        $routes->delete('(:num)',      'SyncTargetTableController::delete/$1');
+        $routes->get('(:num)/columns', 'SyncTargetTableController::columns/$1');
+    });
+
+    // External API Configs (ตั้งค่า API ภายนอก — admin, manager)
+    $routes->group('external-api-configs', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
+        $routes->get('/',          'ExternalApiConfigController::index');
+        $routes->post('/',         'ExternalApiConfigController::create');
+        $routes->put('(:num)',     'ExternalApiConfigController::update/$1');
+        $routes->delete('(:num)',  'ExternalApiConfigController::delete/$1');
+    });
+
+    // Sync from API (ดึงยูนิตจาก API ภายนอก — admin, manager)
+    $routes->group('sync-from-api', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
+        $routes->get('/',          'SyncFromApiController::index');
+        $routes->post('fetch',     'SyncFromApiController::fetch');
+        $routes->post('test',      'SyncFromApiController::test');
+        $routes->get('(:num)',     'SyncFromApiController::show/$1');
+        $routes->post('(:num)/sync', 'SyncFromApiController::sync/$1');
+        $routes->post('(:num)/sync-house-models', 'SyncFromApiController::syncHouseModels/$1');
+        $routes->put('(:num)',     'SyncFromApiController::update/$1');
+        $routes->delete('(:num)',  'SyncFromApiController::delete/$1');
+    });
+
+    // API Field Mappings (จับคู่ field)
+    $routes->group('api-field-mappings', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
+        $routes->get('/',             'ApiFieldMappingController::index');
+        $routes->get('target-fields', 'ApiFieldMappingController::targetFields');
+        $routes->get('source-fields', 'ApiFieldMappingController::sourceFields');
+        $routes->get('(:num)',        'ApiFieldMappingController::show/$1');
+        $routes->get('(:num)/export', 'ApiFieldMappingController::export/$1');
+        $routes->post('/',            'ApiFieldMappingController::create');
+        $routes->post('import',       'ApiFieldMappingController::import');
+        $routes->put('(:num)',        'ApiFieldMappingController::update/$1');
+        $routes->delete('(:num)',     'ApiFieldMappingController::delete/$1');
+    });
+
     // Dev Tools (สำหรับทดสอบ — admin only)
     $routes->group('dev', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
         $routes->post('clear-transactions', 'DevToolController::clearTransactions');
     });
 
-    // Dashboard
-    $routes->get('dashboard/summary', 'DashboardController::summary');
-    $routes->get('dashboard/recent-sales', 'DashboardController::recentSales');
-    $routes->get('dashboard/charts', 'DashboardController::charts');
+    // Dashboard (Sales-Focused)
+    $routes->get('dashboard', 'DashboardController::summary');
+    $routes->post('dashboard/calculate-discount', 'DashboardController::calculateDiscount');
+
+    // (phases route อยู่ใน PhaseController group ด้านบน)
 
 
 });

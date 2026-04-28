@@ -1,20 +1,24 @@
-<div class="p-6 space-y-6" style="max-width: 1440px; margin: 0 auto;">
+<div class="px-6 py-6 space-y-6 max-w-screen-xl mx-auto">
 
-  <!-- Header -->
-  <app-page-header title="แดชบอร์ด" [subtitle]="projectName()">
-    @if (canWrite()) {
-      <div actions class="flex gap-2">
-        <button mat-flat-button color="primary" (click)="goToSales()">
-          <app-icon name="document-text" class="w-4 h-4 mr-1"></app-icon>
-          บันทึกการขาย
-        </button>
-        <button mat-stroked-button (click)="goToBudget()">
-          <app-icon name="banknotes" class="w-4 h-4 mr-1"></app-icon>
-          จัดการงบ
-        </button>
-      </div>
-    }
-  </app-page-header>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- HEADER: Title + Phase Dropdown                                        -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-page-title text-primary-900 m-0">Dashboard</h1>
+      <p class="text-caption text-gray-500 mt-1">{{ projectName() }}</p>
+    </div>
+
+    <mat-form-field appearance="outline" class="w-48" subscriptSizing="dynamic">
+      <mat-label>Phase</mat-label>
+      <mat-select [value]="selectedPhaseId()" (selectionChange)="onPhaseChange($event.value)">
+        <mat-option [value]="null">- All -</mat-option>
+        @for (phase of phases(); track phase.id) {
+          <mat-option [value]="phase.id">{{ phase.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
 
   <!-- Loading -->
   @if (loading()) {
@@ -25,151 +29,274 @@
 
   <!-- Error -->
   @if (error()) {
-    <div class="p-4 text-sm" style="background-color: var(--color-error-subtle); border: 1px solid var(--color-error); border-radius: var(--radius-md); color: var(--color-error)">
+    <div class="rounded-md border px-4 py-3 text-sm bg-red-50 border-red-200 text-loss">
       {{ error() }}
-      <button class="ml-3 underline" (click)="retry()">ลองใหม่</button>
+      <button class="ml-3 underline font-medium" (click)="retry()">ลองใหม่</button>
     </div>
   }
 
-  @if (!loading() && summary()) {
+  @if (!loading() && dashboardData()) {
 
-    <!-- Row 1: KPI Stat Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-      <app-stat-card label="ยอดขายรวม" [value]="totalSalesAmount()" prefix="฿"
-                     icon="currency-dollar" variant="default"
-                     [description]="totalActiveLabel()" />
-      <app-stat-card label="ส่วนลดรวม" [value]="totalDiscount()" prefix="฿"
-                     icon="tag" variant="discount" />
-      <app-stat-card label="กำไรรวม" [value]="totalProfit()" prefix="฿"
-                     icon="chart-bar" [variant]="totalProfit() > 0 ? 'profit' : 'loss'" />
-      <app-stat-card label="ต้นทุนจากของแถม" [value]="promoBurden()" prefix="฿"
-                     icon="receipt-percent" variant="loss" />
-      <app-stat-card label="งบประมาณคงเหลือ" [value]="budgetRemaining()" prefix="฿"
-                     icon="banknotes" variant="budget"
-                     [description]="'ใช้ไป ' + budgetUsedPercent() + '%'" />
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 1: ยอดขาย (ซ้าย) + Stock เหลือ (ขวา)                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- ยอดขายตั้งแต่เริ่มต้นถึงปัจจุบัน -->
+      <app-section-card title="ยอดขายตั้งแต่เริ่มต้นถึงปัจจุบัน" icon="chart-bar">
+        <div class="space-y-0 -mx-2">
+          <!-- จำนวนยูนิตที่ขายได้ -->
+          <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+            <span class="text-body text-gray-700">จำนวนยูนิตที่ขายได้</span>
+            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+              {{ formatInteger(dashboardData()!.sold_units) }}
+            </span>
+          </div>
+
+          <div class="border-b border-gray-100 mx-2"></div>
+
+          <!-- มูลค่าขายสุทธิที่ขายได้ -->
+          <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+            <span class="text-body text-gray-700 flex items-center gap-1">
+              มูลค่าขายสุทธิที่ขายได้
+              <mat-icon
+                class="text-base text-gray-400 cursor-help"
+                matTooltip="ผลรวมราคาขายสุทธิ (net_price) จากรายการขายที่ active ทั้งหมด"
+                matTooltipPosition="above">info_outline</mat-icon>
+            </span>
+            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+              {{ formatNumber(dashboardData()!.sold_net_price) }}
+            </span>
+          </div>
+
+          <div class="border-b border-gray-100 mx-2"></div>
+
+          <!-- ราคาเฉลี่ยต่อยูนิต ที่ขายได้ -->
+          <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+            <span class="text-body text-gray-700">ราคาเฉลี่ยต่อยูนิต ที่ขายได้</span>
+            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+              {{ formatNumber(dashboardData()!.avg_price_sold) }}
+            </span>
+          </div>
+        </div>
+      </app-section-card>
+
+      <!-- Stock ที่เหลือ -->
+      <app-section-card title="Stock ที่เหลือ" icon="squares-2x2">
+        <div class="space-y-0 -mx-2">
+          <!-- จำนวนยูนิตที่เหลือ -->
+          <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+            <span class="text-body text-gray-700">จำนวนยูนิตที่เหลือ</span>
+            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+              {{ formatInteger(dashboardData()!.remaining_units) }}
+            </span>
+          </div>
+
+          <div class="border-b border-gray-100 mx-2"></div>
+
+          <!-- มูลค่าสุทธิที่เหลือ -->
+          <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+            <span class="text-body text-gray-700">มูลค่าสุทธิที่เหลือ</span>
+            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+              {{ formatNumber(dashboardData()!.stock_value) }}
+            </span>
+          </div>
+
+          <div class="border-b border-gray-100 mx-2"></div>
+
+          <!-- ราคาเฉลี่ยต่อยูนิต ที่เหลือ -->
+          <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+            <span class="text-body text-gray-700">ราคาเฉลี่ยต่อยูนิต ที่เหลือ</span>
+            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+              {{ formatNumber(dashboardData()!.avg_price_remaining) }}
+            </span>
+          </div>
+        </div>
+      </app-section-card>
     </div>
 
-    <!-- Row 2: 3 columns (stack on mobile) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 2: ส่วนลด (ซ้าย) + มูลค่าประมาณการ (ขวา)                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-      <!-- Column 1: ยอดขายล่าสุด (span 2) -->
-      <div class="lg:col-span-2">
-        <app-section-card title="ยอดขายล่าสุด" icon="clock" [noPadding]="true">
-          @if (recentSales() && recentSales().length > 0) {
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr style="border-bottom: 1px solid var(--color-border)">
-                    <th class="text-left py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">เลขที่</th>
-                    <th class="text-left py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">ยูนิต</th>
-                    <th class="text-right py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">ราคาขาย</th>
-                    <th class="text-right py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">ราคาสุทธิ</th>
-                    <th class="text-right py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">กำไร</th>
-                    <th class="text-left py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">วันที่</th>
-                    <th class="text-center py-2.5 px-4 font-semibold" style="background-color: var(--color-gray-50); color: var(--color-gray-700)">สถานะ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (sale of recentSales(); track sale.sale_no) {
-                    <tr
-                      class="cursor-pointer transition-colors"
-                      style="border-bottom: 1px solid var(--color-gray-100)"
-                      [class.opacity-60]="sale.status === 'cancelled'"
-                      (click)="goToSaleDetail(sale)">
-                      <td class="py-2.5 px-4">
-                        @if (sale.status === 'cancelled') {
-                          <span class="line-through">{{ sale.sale_no }}</span>
-                        } @else {
-                          {{ sale.sale_no }}
-                        }
-                      </td>
-                      <td class="py-2.5 px-4">{{ sale.unit_code }}</td>
-                      <td class="py-2.5 px-4 text-right tabular-nums">
-                        @if (sale.status === 'cancelled') {
-                          <span class="line-through">{{ formatCurrency(sale.base_price) }}</span>
-                        } @else {
-                          {{ formatCurrency(sale.base_price) }}
-                        }
-                      </td>
-                      <td class="py-2.5 px-4 text-right tabular-nums">
-                        @if (sale.status === 'cancelled') {
-                          <span class="line-through">{{ formatCurrency(sale.net_price) }}</span>
-                        } @else {
-                          {{ formatCurrency(sale.net_price) }}
-                        }
-                      </td>
-                      <td class="py-2.5 px-4 text-right tabular-nums font-medium" [style.color]="getProfitColor(sale.profit)">
-                        {{ formatCurrency(sale.profit) }}
-                      </td>
-                      <td class="py-2.5 px-4">{{ sale.sale_date | thaiDate }}</td>
-                      <td class="py-2.5 px-4 text-center">
-                        <app-status-chip type="transaction_status" [value]="sale.status" />
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          } @else {
-            <app-empty-state title="ยังไม่มีรายการขาย" icon="shopping-cart"
-                            description="เริ่มบันทึกรายการขายแรกของโครงการ" />
-          }
-        </app-section-card>
-      </div>
-
-      <!-- Column 2: สรุปสถานะยูนิต + สรุปงบประมาณ -->
-      <div class="space-y-6">
-
-        <!-- สถานะยูนิต -->
-        <app-section-card title="สถานะยูนิต" icon="squares-2x2">
-          @if (charts()?.unit_status_chart) {
-            <div class="space-y-3">
-              @for (item of charts()!.unit_status_chart; track item.status) {
-                <div class="flex items-center gap-3">
-                  <span class="w-16 text-sm text-right" style="color: var(--color-gray-700)">{{ item.label }}</span>
-                  <div class="flex-1 h-2.5 rounded-full overflow-hidden" style="background-color: var(--color-gray-100)">
-                    <div class="h-full rounded-full transition-all duration-500"
-                         [style.width.%]="item.count > 0 ? (item.count / totalUnits()) * 100 : 0"
-                         [style.background-color]="getUnitStatusColor(item.status)"></div>
-                  </div>
-                  <span class="w-8 text-sm font-medium" [style.color]="getUnitStatusColor(item.status)">{{ item.count }}</span>
-                </div>
+      <!-- ส่วนลดต่อยูนิตที่เหลือ -->
+      <app-section-card title="ส่วนลดต่อยูนิตที่เหลือ" icon="tag">
+        <div class="flex flex-col gap-4">
+          <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+            <mat-label>จำนวนส่วนลด (บาท/ยูนิต)</mat-label>
+            <input matInput
+                   type="number"
+                   min="0"
+                   [ngModel]="discountInput()"
+                   (ngModelChange)="discountInput.set($event)"
+                   placeholder="0"
+                   (keyup.enter)="onCalculateDiscount()">
+          </mat-form-field>
+          <div class="flex items-center gap-3">
+            <button mat-flat-button
+                    color="primary"
+                    (click)="onCalculateDiscount()"
+                    [disabled]="calculatingDiscount()">
+              @if (calculatingDiscount()) {
+                <mat-spinner diameter="18" class="mr-2 inline-block"></mat-spinner>
               }
+              คำนวณ
+            </button>
+            <button mat-stroked-button (click)="onResetDiscount()">
+              Reset
+            </button>
+          </div>
+        </div>
+      </app-section-card>
+
+      <!-- มูลค่าประมาณการ ยูนิตที่ยังไม่ขาย -->
+      <app-section-card title="มูลค่าประมาณการ ยูนิตที่ยังไม่ขาย" icon="calculator">
+        @if (discountResult()) {
+          <div class="space-y-0 -mx-2">
+            <!-- มูลค่าขายสุทธิหลังหักส่วนลด -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">มูลค่าขายสุทธิหลังหักส่วนลด</span>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ formatNumber(discountResult()!.net_after_discount) }}
+              </span>
             </div>
-          } @else {
-            <p class="text-sm" style="color: var(--color-gray-500)">กำลังโหลด...</p>
-          }
-        </app-section-card>
 
-        <!-- สรุปงบประมาณตาม Source -->
-        <app-section-card title="งบประมาณตามแหล่ง" icon="banknotes">
-          @if (charts()?.budget_usage_by_source) {
-            <div class="space-y-4">
-              @for (item of charts()!.budget_usage_by_source; track item.source) {
-                <div>
-                  <div class="flex justify-between items-center mb-1">
-                    <span class="text-sm font-medium" style="color: var(--color-gray-700)">{{ item.label }}</span>
-                    <span class="text-xs" style="color: var(--color-gray-500)">{{ formatCurrency(item.used) }} / {{ formatCurrency(item.allocated) }}</span>
-                  </div>
-                  <div class="h-2 rounded-full overflow-hidden" style="background-color: var(--color-gray-100)">
-                    <div class="h-full rounded-full transition-all duration-500"
-                         [style.width.%]="item.allocated > 0 ? (item.used / item.allocated) * 100 : 0"
-                         [style.background-color]="getBudgetBarColor(item)"></div>
-                  </div>
-                  @if (item.returned > 0) {
-                    <p class="text-xs mt-1" style="color: var(--color-profit)">คืนแล้ว: {{ formatCurrency(item.returned) }}</p>
-                  }
-                </div>
-              }
+            <div class="border-b border-gray-100 mx-2"></div>
+
+            <!-- ราคาเฉลี่ยต่อยูนิต หลังหักส่วนลด -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">ราคาเฉลี่ยต่อยูนิต หลังหักส่วนลด</span>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ formatNumber(discountResult()!.avg_after_discount) }}
+              </span>
             </div>
-          } @else {
-            <p class="text-sm" style="color: var(--color-gray-500)">กำลังโหลด...</p>
-          }
-        </app-section-card>
 
-      </div>
+            <div class="border-b border-gray-100 mx-2"></div>
 
+            <!-- มูลค่าส่วนลดรวม -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">มูลค่าส่วนลดรวมหลังที่ยังไม่ขาย</span>
+              <span class="text-body-lg font-semibold tabular-nums text-discount-color">
+                {{ formatNumber(discountResult()!.total_discount_amount) }}
+              </span>
+            </div>
+
+            <div class="border-b border-gray-100 mx-2"></div>
+
+            <!-- % ส่วนลด -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700 flex items-center gap-1">
+                % ส่วนลด
+                <mat-icon
+                  class="text-base text-gray-400 cursor-help"
+                  matTooltip="มูลค่าส่วนลดรวม / มูลค่าสุทธิที่เหลือ × 100"
+                  matTooltipPosition="above">info_outline</mat-icon>
+              </span>
+              <span class="text-body-lg font-semibold tabular-nums text-discount-color">
+                {{ formatNumber(discountResult()!.discount_percent) }}
+              </span>
+            </div>
+          </div>
+        } @else {
+          <div class="flex items-center justify-center py-8 text-gray-400 text-body">
+            กรอกส่วนลดและกดคำนวณ
+          </div>
+        }
+      </app-section-card>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 3: สรุปการขาย ทั้งโครงการ (Full-Width)                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    @if (discountResult()) {
+      <app-section-card title="สรุปการขาย ทั้งโครงการ" icon="building-office-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
+
+          <!-- คอลัมน์ซ้าย — ข้อมูลโครงการ -->
+          <div class="space-y-0 -mx-2">
+            <!-- จำนวนยูนิตทั้งโครงการ -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">จำนวนยูนิตทั้งโครงการ</span>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ formatInteger(discountResult()!.total_units) }}
+              </span>
+            </div>
+
+            <div class="border-b border-gray-100 mx-2"></div>
+
+            <!-- มูลค่าขายสุทธิทั้งโครงการ -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">มูลค่าขายสุทธิทั้งโครงการ</span>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ formatNumber(discountResult()!.project_net_sales) }}
+              </span>
+            </div>
+
+            <div class="border-b border-gray-100 mx-2"></div>
+
+            <!-- ราคาเฉลี่ยต่อยูนิต ทั้งโครงการ -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">ราคาเฉลี่ยต่อยูนิต ทั้งโครงการ</span>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ formatNumber(discountResult()!.avg_price_project) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- คอลัมน์ขวา — เปรียบเทียบกับมูลค่าอนุมัติ -->
+          <div class="space-y-0 -mx-2">
+            <!-- มูลค่าโครงการที่อนุมัติ -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">มูลค่าโครงการที่อนุมัติ</span>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ formatNumber(discountResult()!.approved_project_value) }}
+              </span>
+            </div>
+
+            <div class="border-b border-gray-100 mx-2"></div>
+
+            <!-- มูลค่าโครงการที่ทำได้ -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700 flex items-center gap-1">
+                มูลค่าโครงการที่ทำได้
+                <mat-icon
+                  class="text-base text-gray-400 cursor-help"
+                  matTooltip="มูลค่าขายสุทธิทั้งโครงการ = ยอดขายจริง + ประมาณการหลังหักส่วนลด"
+                  matTooltipPosition="above">info_outline</mat-icon>
+              </span>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ formatNumber(discountResult()!.value_achieved) }}
+              </span>
+            </div>
+
+            <div class="border-b border-gray-100 mx-2"></div>
+
+            <!-- มูลค่าส่วนต่าง -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">มูลค่าส่วนต่าง</span>
+              <span class="text-body-lg font-semibold tabular-nums"
+                    [class.text-profit]="discountResult()!.value_difference >= 0"
+                    [class.text-loss]="discountResult()!.value_difference < 0">
+                {{ formatNumber(discountResult()!.value_difference) }}
+              </span>
+            </div>
+
+            <div class="border-b border-gray-100 mx-2"></div>
+
+            <!-- % ส่วนต่าง -->
+            <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
+              <span class="text-body text-gray-700">% ส่วนต่าง</span>
+              <span class="text-body-lg font-semibold tabular-nums"
+                    [class.text-profit]="discountResult()!.difference_percent >= 0"
+                    [class.text-loss]="discountResult()!.difference_percent < 0">
+                {{ formatNumber(discountResult()!.difference_percent) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </app-section-card>
+    }
 
   }
 

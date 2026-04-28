@@ -223,17 +223,9 @@ class HouseModelController extends BaseController
     private function extractData(array $body): array
     {
         return array_filter([
-            'code'               => isset($body['code'])               ? trim((string) $body['code'])               : null,
-            'name'               => isset($body['name'])               ? trim((string) $body['name'])               : null,
-            'description'        => isset($body['description'])        ? (string) $body['description']              : null,
-            'bedrooms'           => isset($body['bedrooms'])           ? (int) $body['bedrooms']                    : null,
-            'bathrooms'          => isset($body['bathrooms'])          ? (int) $body['bathrooms']                   : null,
-            'floors'             => isset($body['floors'])             ? (int) $body['floors']                      : null,
-            'area_sqm'           => isset($body['area_sqm'])           ? (float) $body['area_sqm']                  : null,
-            'land_area_sqw'      => isset($body['land_area_sqw'])      ? (float) $body['land_area_sqw']             : null,
-            'image_url'          => isset($body['image_url'])          ? (string) $body['image_url']                : null,
-            'total_units'        => isset($body['total_units'])        ? (int) $body['total_units']                 : null,
-            'status'             => isset($body['status'])             ? (string) $body['status']                   : null,
+            'code'     => isset($body['code'])     ? trim((string) $body['code']) : null,
+            'name'     => isset($body['name'])     ? trim((string) $body['name']) : null,
+            'area_sqm' => isset($body['area_sqm']) ? (float) $body['area_sqm']   : null,
         ], fn($v) => $v !== null);
     }
 }

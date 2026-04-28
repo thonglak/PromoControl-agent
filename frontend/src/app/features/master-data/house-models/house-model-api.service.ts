@@ -8,15 +8,7 @@ export interface HouseModel {
   project_id: number;
   code: string;
   name: string;
-  description?: string;
-  bedrooms: number;
-  bathrooms: number;
-  floors: number;
   area_sqm: number;
-  land_area_sqw?: number | null;
-  image_url?: string | null;
-  status: 'active' | 'inactive';
-  total_units: number;
   unit_count: number;
 }
 
@@ -24,12 +16,7 @@ export interface HouseModelPayload {
   project_id?: number;
   code: string;
   name: string;
-  bedrooms: number;
-  bathrooms: number;
-  floors: number;
   area_sqm: number;
-  land_area_sqw?: number | null;
-  image_url?: string;
 }
 
 @Injectable({ providedIn: 'root' })

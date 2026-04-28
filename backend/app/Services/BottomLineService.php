@@ -117,9 +117,11 @@ class BottomLineService
         $highestCol   = $sheet->getHighestColumn();
         $totalRows    = max(0, $highestRow - $dataStartRow + 1);
 
-        $ucCol = $mappingConfig["unit_code_column"] ?? "A";
-        $blCol = $mappingConfig["bottom_line_price_column"] ?? "B";
-        $apCol = $mappingConfig["appraisal_price_column"] ?? "C";
+        $ucCol  = $mappingConfig["unit_code_column"] ?? "A";
+        $blCol  = $mappingConfig["bottom_line_price_column"] ?? "B";
+        $apCol  = $mappingConfig["appraisal_price_column"] ?? "C";
+        $sbCol  = $mappingConfig["standard_budget_column"] ?? null;
+        $bpCol  = $mappingConfig["base_price_column"] ?? null;
 
         // Detect columns
         $detectedColumns = [];
@@ -138,12 +140,19 @@ class BottomLineService
         // Preview 5 rows ตาม mapping
         $previewRows = [];
         for ($r = $dataStartRow; $r < $dataStartRow + 5 && $r <= $highestRow; $r++) {
-            $previewRows[] = [
+            $row = [
                 "row"                => $r,
                 "unit_code"          => $sheet->getCell($ucCol . $r)->getCalculatedValue(),
                 "bottom_line_price"  => (float) ($sheet->getCell($blCol . $r)->getCalculatedValue() ?? 0),
                 "appraisal_price"    => (float) ($sheet->getCell($apCol . $r)->getCalculatedValue() ?? 0),
             ];
+            if ($sbCol) {
+                $row["standard_budget"] = (float) ($sheet->getCell($sbCol . $r)->getCalculatedValue() ?? 0);
+            }
+            if ($bpCol) {
+                $row["base_price"] = (float) ($sheet->getCell($bpCol . $r)->getCalculatedValue() ?? 0);
+            }
+            $previewRows[] = $row;
         }
 
         return [
@@ -188,10 +197,12 @@ class BottomLineService
         $unitCodeCol        = $mappingConfig['unit_code_column'] ?? 'A';
         $bottomLinePriceCol = $mappingConfig['bottom_line_price_column'] ?? 'B';
         $appraisalPriceCol  = $mappingConfig['appraisal_price_column'] ?? 'C';
+        $stdBudgetCol       = $mappingConfig['standard_budget_column'] ?? null;
+        $basePriceCol       = $mappingConfig['base_price_column'] ?? null;
 
         // โหลด unit codes ของ project
         $existingUnits = $this->db->table('project_units')
-            ->select('id, unit_code, unit_cost, appraisal_price')
+            ->select('id, unit_code, unit_cost, appraisal_price, standard_budget, base_price')
             ->where('project_id', $projectId)
             ->get()->getResultArray();
 
@@ -209,6 +220,8 @@ class BottomLineService
             $unitCode        = trim((string) ($sheet->getCell($unitCodeCol . $r)->getCalculatedValue() ?? ''));
             $bottomLinePrice = (float) ($sheet->getCell($bottomLinePriceCol . $r)->getCalculatedValue() ?? 0);
             $appraisalPrice  = (float) ($sheet->getCell($appraisalPriceCol . $r)->getCalculatedValue() ?? 0);
+            $standardBudget  = $stdBudgetCol ? (float) ($sheet->getCell($stdBudgetCol . $r)->getCalculatedValue() ?? 0) : null;
+            $basePrice       = $basePriceCol ? (float) ($sheet->getCell($basePriceCol . $r)->getCalculatedValue() ?? 0) : null;
 
             if ($unitCode === '') continue;
 
@@ -223,16 +236,27 @@ class BottomLineService
                 $status = 'unmatched';
             }
 
-            $rows[] = [
-                'row_number'        => $r,
-                'unit_code'         => $unitCode,
-                'bottom_line_price' => $bottomLinePrice,
-                'appraisal_price'   => $appraisalPrice,
-                'matched_unit_id'   => $existing['id'] ?? null,
-                'old_unit_cost'     => $existing['unit_cost'] ?? null,
-                'old_appraisal'     => $existing['appraisal_price'] ?? null,
-                'status'            => $status,
+            $row = [
+                'row_number'          => $r,
+                'unit_code'           => $unitCode,
+                'bottom_line_price'   => $bottomLinePrice,
+                'appraisal_price'     => $appraisalPrice,
+                'matched_unit_id'     => $existing['id'] ?? null,
+                'old_unit_cost'       => $existing['unit_cost'] ?? null,
+                'old_appraisal'       => $existing['appraisal_price'] ?? null,
+                'status'              => $status,
             ];
+
+            if ($standardBudget !== null) {
+                $row['standard_budget']     = $standardBudget;
+                $row['old_standard_budget'] = $existing['standard_budget'] ?? null;
+            }
+            if ($basePrice !== null) {
+                $row['base_price']     = $basePrice;
+                $row['old_base_price'] = $existing['base_price'] ?? null;
+            }
+
+            $rows[] = $row;
         }
 
         $totalRows = count($rows);
@@ -253,6 +277,14 @@ class BottomLineService
             );
 
             // 3. สร้าง dynamic table
+            $extraCols = '';
+            if ($stdBudgetCol) {
+                $extraCols .= "`standard_budget` DECIMAL(15,2) NULL, `old_standard_budget` DECIMAL(15,2) NULL,";
+            }
+            if ($basePriceCol) {
+                $extraCols .= "`base_price` DECIMAL(15,2) NULL, `old_base_price` DECIMAL(15,2) NULL,";
+            }
+
             $this->db->query("
                 CREATE TABLE `{$dynamicTable}` (
                     `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -260,6 +292,7 @@ class BottomLineService
                     `unit_code` VARCHAR(50) NOT NULL,
                     `bottom_line_price` DECIMAL(15,2) NOT NULL DEFAULT 0,
                     `appraisal_price` DECIMAL(15,2) NOT NULL DEFAULT 0,
+                    {$extraCols}
                     `matched_unit_id` BIGINT UNSIGNED NULL,
                     `old_unit_cost` DECIMAL(15,2) NULL,
                     `old_appraisal` DECIMAL(15,2) NULL,
@@ -276,13 +309,21 @@ class BottomLineService
             foreach ($rows as $row) {
                 if ($row['status'] !== 'matched' || !$row['matched_unit_id']) continue;
 
+                $updateData = [
+                    'unit_cost'       => $row['bottom_line_price'],
+                    'appraisal_price' => $row['appraisal_price'],
+                    'bottom_line_key' => $importKey,
+                ];
+                if (isset($row['standard_budget'])) {
+                    $updateData['standard_budget'] = $row['standard_budget'];
+                }
+                if (isset($row['base_price'])) {
+                    $updateData['base_price'] = $row['base_price'];
+                }
+
                 $this->db->table('project_units')
                     ->where('id', $row['matched_unit_id'])
-                    ->update([
-                        'unit_cost'       => $row['bottom_line_price'],
-                        'appraisal_price' => $row['appraisal_price'],
-                        'bottom_line_key' => $importKey,
-                    ]);
+                    ->update($updateData);
 
                 $this->db->table($dynamicTable)
                     ->where('matched_unit_id', $row['matched_unit_id'])
@@ -466,13 +507,15 @@ class BottomLineService
         $this->db->transBegin();
 
         try {
-            // UPDATE JOIN: คืนค่า unit_cost, appraisal_price, bottom_line_key จาก backup
+            // UPDATE JOIN: คืนค่า unit_cost, appraisal_price, standard_budget, base_price, bottom_line_key จาก backup
             $restoredRows = $this->db->query("
                 UPDATE `project_units` pu
                 JOIN `{$backupTable}` bt ON pu.id = bt.id
-                SET pu.unit_cost       = bt.unit_cost,
-                    pu.appraisal_price = bt.appraisal_price,
-                    pu.bottom_line_key = bt.bottom_line_key
+                SET pu.unit_cost        = bt.unit_cost,
+                    pu.appraisal_price  = bt.appraisal_price,
+                    pu.standard_budget  = bt.standard_budget,
+                    pu.base_price       = bt.base_price,
+                    pu.bottom_line_key  = bt.bottom_line_key
                 WHERE pu.project_id = ?
             ", [$projectId]);
 

@@ -20,7 +20,6 @@ import { AuthService } from '../../../core/services/auth.service';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
 import { TableConfigService, ColumnDef } from '../../../shared/services/table-config.service';
 import { TableSettingsDialogComponent } from '../../../shared/components/table-settings/table-settings-dialog.component';
-import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/components/section-card/section-card.component';
 import { formatThaiDate } from '../../../shared/pipes/thai-date.pipe';
 import { ThaiDatePipe } from '../../../shared/pipes/thai-date.pipe';
@@ -45,7 +44,6 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
   imports: [
     ThaiDatePipe,
     SectionCardComponent,
-    PageHeaderComponent,
     CommonModule, ReactiveFormsModule,
     MatTableModule, MatSortModule, MatPaginatorModule,
     MatFormFieldModule, MatSelectModule, MatInputModule,

@@ -19,6 +19,8 @@ export interface MappingConfig {
   unit_code_column: string;
   bottom_line_price_column: string;
   appraisal_price_column: string;
+  standard_budget_column?: string;
+  base_price_column?: string;
   header_row: number;
   data_start_row: number;
   sheet_name: string;
@@ -27,7 +29,7 @@ export interface MappingConfig {
 export interface PreviewResult {
   total_rows: number;
   detected_columns: Record<string, string>;
-  preview_rows: Array<{ row: number; unit_code: string; bottom_line_price: number; appraisal_price: number }>;
+  preview_rows: Array<{ row: number; unit_code: string; bottom_line_price: number; appraisal_price: number; standard_budget?: number; base_price?: number }>;
 }
 
 export interface ImportRequest {

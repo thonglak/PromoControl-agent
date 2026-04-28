@@ -27,8 +27,8 @@ class DashboardController extends BaseController
     }
 
     /**
-     * GET /api/dashboard/summary?project_id=
-     * Returns project summary + budget summary combined
+     * GET /api/dashboard?project_id=&phase=
+     * ข้อมูลหลักของ Dashboard (ยอดขาย, stock คงเหลือ)
      */
     public function summary(): ResponseInterface
     {
@@ -42,25 +42,26 @@ class DashboardController extends BaseController
             return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
         }
 
-        $projectSummary = $this->svc->getProjectSummary($projectId);
-        $budgetSummary = $this->svc->getBudgetSummary($projectId);
+        $phaseParam = $this->request->getGet('phase');
+        $phaseId = $phaseParam !== null && $phaseParam !== '' ? (int) $phaseParam : null;
 
-        return $this->response->setJSON([
-            'data' => [
-                'project_summary' => $projectSummary,
-                'budget_summary' => $budgetSummary,
-            ],
-        ]);
+        $data = $this->svc->getSalesDashboard($projectId, $phaseId);
+
+        return $this->response->setJSON(['data' => $data]);
     }
 
     /**
-     * GET /api/dashboard/recent-sales?project_id=&limit=
-     * Returns recent sales transactions
+     * POST /api/dashboard/calculate-discount
+     * คำนวณส่วนลดประมาณการสำหรับยูนิตที่ยังไม่ขาย
      */
-    public function recentSales(): ResponseInterface
+    public function calculateDiscount(): ResponseInterface
     {
-        $projectId = (int) ($this->request->getGet('project_id') ?? $this->request->getHeaderLine('X-Project-Id'));
-        $limit = (int) ($this->request->getGet('limit') ?? 10);
+        $body = $this->request->getJSON(true);
+
+        $projectId = (int) ($body['project_id'] ?? $this->request->getHeaderLine('X-Project-Id') ?? 0);
+        $discount  = (float) ($body['discount'] ?? 0);
+        $phaseParam = $body['phase'] ?? null;
+        $phaseId   = $phaseParam !== null && $phaseParam !== '' ? (int) $phaseParam : null;
 
         if (!$projectId) {
             return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
@@ -70,21 +71,20 @@ class DashboardController extends BaseController
             return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
         }
 
-        // Limit between 1 and 50
-        $limit = max(1, min(50, $limit));
+        if ($discount < 0) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'ส่วนลดต้องมีค่ามากกว่าหรือเท่ากับ 0']);
+        }
 
-        $recentSales = $this->svc->getRecentSales($projectId, $limit);
+        $data = $this->svc->calculateDiscount($projectId, $phaseId, $discount);
 
-        return $this->response->setJSON([
-            'data' => $recentSales,
-        ]);
+        return $this->response->setJSON(['data' => $data]);
     }
 
     /**
-     * GET /api/dashboard/charts?project_id=
-     * Returns unit status chart + budget usage by source
+     * GET /api/phases?project_id=
+     * ดึงรายการ phase ของโครงการ
      */
-    public function charts(): ResponseInterface
+    public function phases(): ResponseInterface
     {
         $projectId = (int) ($this->request->getGet('project_id') ?? $this->request->getHeaderLine('X-Project-Id'));
 
@@ -96,14 +96,8 @@ class DashboardController extends BaseController
             return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
         }
 
-        $unitStatusChart = $this->svc->getUnitStatusChart($projectId);
-        $budgetUsageBySource = $this->svc->getBudgetUsageBySource($projectId);
+        $data = $this->svc->getPhases($projectId);
 
-        return $this->response->setJSON([
-            'data' => [
-                'unit_status_chart' => $unitStatusChart,
-                'budget_usage_by_source' => $budgetUsageBySource,
-            ],
-        ]);
+        return $this->response->setJSON(['data' => $data]);
     }
 }

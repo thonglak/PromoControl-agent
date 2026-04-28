@@ -53,7 +53,7 @@ export interface UnitTypeDialogData { projectId: number; }
         <ng-container matColumnDef="is_active">
           <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !bg-slate-50 !text-center">สถานะ</th>
           <td mat-cell *matCellDef="let t" class="!text-center">
-            <mat-slide-toggle [checked]="t.is_active" (change)="toggleActive(t)" color="primary" />
+            <mat-slide-toggle [checked]="!!+t.is_active" (change)="toggleActive(t)" color="primary" />
           </td>
         </ng-container>
         <ng-container matColumnDef="actions">

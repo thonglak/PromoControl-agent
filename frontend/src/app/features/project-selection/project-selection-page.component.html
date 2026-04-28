@@ -10,11 +10,24 @@
           <p class="text-sm mt-0.5" style="color: var(--color-gray-500)">สวัสดี, {{ user.name }}</p>
         }
       </div>
-      <button mat-stroked-button (click)="logout()" class="flex items-center gap-2"
-              style="border-color: var(--color-primary); color: var(--color-primary)">
-        <app-icon name="arrow-right-on-rectangle" class="w-4 h-4" />
-        <span>ออกจากระบบ</span>
-      </button>
+      <div class="flex items-center gap-2">
+        <button type="button" (click)="theme.toggle()"
+                class="w-9 h-9 flex items-center justify-center border-0 bg-transparent cursor-pointer transition-colors"
+                style="border-radius: var(--radius-md); color: var(--color-gray-500)"
+                onmouseover="this.style.backgroundColor='var(--color-gray-100)'"
+                onmouseout="this.style.backgroundColor='transparent'">
+          @if (theme.isDark()) {
+            <app-icon name="sun" class="w-5 h-5" />
+          } @else {
+            <app-icon name="moon" class="w-5 h-5" />
+          }
+        </button>
+        <button mat-stroked-button (click)="logout()" class="flex items-center gap-2"
+                style="border-color: var(--color-primary); color: var(--color-primary)">
+          <app-icon name="arrow-right-on-rectangle" class="w-4 h-4" />
+          <span>ออกจากระบบ</span>
+        </button>
+      </div>
     </div>
   </header>
 

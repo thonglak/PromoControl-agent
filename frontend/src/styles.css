@@ -21,7 +21,7 @@ $theme: mat.define-light-theme((
   typography: mat.define-typography-config(
     $font-family: 'Inter, "Noto Sans Thai", system-ui, sans-serif',
   ),
-  density: 0,
+  density: -3,
 ));
 
 @include mat.all-component-themes($theme);

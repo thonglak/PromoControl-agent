@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\UserModel;
 use App\Models\RefreshTokenModel;
+use Config\AuthLoginResponse;
+use Config\AuthTokenConfig;
+use Config\UserData;
 use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 use RuntimeException;
 
 /**
@@ -19,23 +21,8 @@ use RuntimeException;
  */
 class AuthService
 {
-    // อายุ access token (วินาที)
-    private const ACCESS_TOKEN_TTL = 3600; // 60 นาที
-
-    // อายุ refresh token (วินาที)
-    private const REFRESH_TOKEN_TTL = 30 * 24 * 3600; // 30 วัน
-
-    // จำนวนครั้ง login ผิดสูงสุดก่อนล็อค
-    private const MAX_FAILED_ATTEMPTS = 5;
-
-    // ระยะเวลาล็อค (วินาที)
-    private const LOCKOUT_DURATION = 15 * 60; // 15 นาที
-
-    // bcrypt cost factor
-    private const BCRYPT_COST = 12;
-
-    // ชื่อ cookie สำหรับ refresh token
-    private const REFRESH_COOKIE_NAME = 'refresh_token';
+    // ค่า config ทั้งหมดถูก centralise ไว้ที่ Config\AuthTokenConfig
+    // เพื่อ single source of truth — ดู app/Config/Types.php
 
     private UserModel        $userModel;
     private RefreshTokenModel $tokenModel;
@@ -135,7 +122,11 @@ class AuthService
             throw new RuntimeException('บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ', 403);
         }
 
-        // ตรวจ password
+        // ตรวจ password (SSO-only user จะไม่มี password_hash — ป้องกันไม่ให้ login แบบ email/password)
+        if (empty($user['password_hash'])) {
+            throw new RuntimeException('บัญชีนี้ใช้การเข้าสู่ระบบผ่าน Narai Connect เท่านั้น', 401);
+        }
+
         if (! $this->verifyPassword($password, $user['password_hash'])) {
             $this->recordFailedAttempt($user);
             throw new RuntimeException('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 401);
@@ -159,12 +150,10 @@ class AuthService
         // Set refresh token เป็น httpOnly cookie
         $this->setRefreshTokenCookie($refreshToken);
 
-        return [
-            'access_token' => $accessToken,
-            'token_type'   => 'Bearer',
-            'expires_in'   => self::ACCESS_TOKEN_TTL,
-            'user'         => $this->formatUserResponse($userWithProjects),
-        ];
+        return AuthLoginResponse::forLogin(
+            $accessToken,
+            UserData::fromArray($userWithProjects)
+        )->toArray();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -205,11 +194,7 @@ class AuthService
         // Set refresh token cookie ใหม่
         $this->setRefreshTokenCookie($newRefreshToken);
 
-        return [
-            'access_token' => $newAccessToken,
-            'token_type'   => 'Bearer',
-            'expires_in'   => self::ACCESS_TOKEN_TTL,
-        ];
+        return AuthLoginResponse::forRefresh($newAccessToken)->toArray();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -248,10 +233,7 @@ class AuthService
             throw new RuntimeException('ไม่พบผู้ใช้งาน', 404);
         }
 
-        return array_merge(
-            $this->formatUserResponse($user),
-            ['permissions' => $this->buildPermissions($user['role'])]
-        );
+        return UserData::fromArray($user)->toArray();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -330,7 +312,7 @@ class AuthService
             'project_ids'    => $projectIds,
             'project_access' => $projectAccess,
             'iat'            => $now,
-            'exp'            => $now + self::ACCESS_TOKEN_TTL,
+            'exp'            => $now + AuthTokenConfig::ACCESS_TOKEN_TTL,
         ];
 
         return JWT::encode($payload, $secret, 'HS256');
@@ -345,7 +327,7 @@ class AuthService
      */
     public function hashPassword(string $password): string
     {
-        return password_hash($password, PASSWORD_BCRYPT, ['cost' => self::BCRYPT_COST]);
+        return password_hash($password, PASSWORD_BCRYPT, ['cost' => AuthTokenConfig::BCRYPT_COST]);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -391,9 +373,9 @@ class AuthService
             'updated_at'      => date('Y-m-d H:i:s'),
         ];
 
-        if ($attempts >= self::MAX_FAILED_ATTEMPTS) {
+        if ($attempts >= AuthTokenConfig::MAX_FAILED_ATTEMPTS) {
             // ล็อคบัญชี 15 นาที
-            $data['locked_until'] = date('Y-m-d H:i:s', time() + self::LOCKOUT_DURATION);
+            $data['locked_until'] = date('Y-m-d H:i:s', time() + AuthTokenConfig::LOCKOUT_DURATION);
         }
 
         $this->userModel->update($user['id'], $data);
@@ -404,8 +386,10 @@ class AuthService
      * - Raw token: random hex 64 chars
      * - เก็บ SHA-256 hash ใน DB (ไม่เก็บ raw token)
      * - Return raw token สำหรับ set ใน cookie
+     *
+     * public เพื่อให้ NaraiSsoService ใช้ได้ (SSO flow)
      */
-    private function generateRefreshToken(int $userId, ?string $userAgent = null, ?string $ipAddress = null): string
+    public function generateRefreshToken(int $userId, ?string $userAgent = null, ?string $ipAddress = null): string
     {
         $rawToken  = bin2hex(random_bytes(32)); // 64-char hex
         $tokenHash = $this->hashToken($rawToken);
@@ -413,7 +397,7 @@ class AuthService
         $this->tokenModel->insert([
             'user_id'    => $userId,
             'token_hash' => $tokenHash,
-            'expires_at' => date('Y-m-d H:i:s', time() + self::REFRESH_TOKEN_TTL),
+            'expires_at' => date('Y-m-d H:i:s', time() + AuthTokenConfig::REFRESH_TOKEN_TTL),
             'revoked'    => false,
             'user_agent' => $userAgent !== null ? substr($userAgent, 0, 500) : null,
             'ip_address' => $ipAddress,
@@ -434,18 +418,20 @@ class AuthService
     /**
      * Set httpOnly cookie สำหรับ refresh token
      * path=/api/auth — จำกัดเฉพาะ auth endpoints
+     *
+     * public เพื่อให้ NaraiSsoService ใช้ได้ (SSO flow)
      */
-    private function setRefreshTokenCookie(string $rawToken): void
+    public function setRefreshTokenCookie(string $rawToken): void
     {
         $response = service('response');
         $response->setCookie([
-            'name'     => self::REFRESH_COOKIE_NAME,
+            'name'     => AuthTokenConfig::REFRESH_COOKIE_NAME,
             'value'    => $rawToken,
-            'expire'   => self::REFRESH_TOKEN_TTL,
+            'expire'   => AuthTokenConfig::REFRESH_TOKEN_TTL,
             'httponly' => true,
             'secure'   => false,   // ตั้ง true บน production (HTTPS)
             'samesite' => 'Strict',
-            'path'     => '/api/auth',
+            'path'     => AuthTokenConfig::REFRESH_COOKIE_PATH,
         ]);
     }
 
@@ -455,7 +441,11 @@ class AuthService
     private function clearRefreshTokenCookie(): void
     {
         $response = service('response');
-        $response->deleteCookie(self::REFRESH_COOKIE_NAME, '', '/api/auth');
+        $response->deleteCookie(
+            AuthTokenConfig::REFRESH_COOKIE_NAME,
+            '',
+            AuthTokenConfig::REFRESH_COOKIE_PATH
+        );
     }
 
     /**
@@ -494,63 +484,5 @@ class AuthService
         if (! preg_match('/[0-9]/', $password)) {
             throw new RuntimeException('รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว', 400);
         }
-    }
-
-    /**
-     * สร้าง permissions object ตาม role
-     * ดูตาราง Permission Matrix ใน docs/08-authentication.md
-     */
-    private function buildPermissions(string $role): array
-    {
-        $isAdmin   = $role === 'admin';
-        $isManager = in_array($role, ['admin', 'manager'], true);
-        $canSales  = in_array($role, ['admin', 'manager', 'sales'], true);
-        $canView   = true; // ทุก role ดูข้อมูลได้
-
-        return [
-            'sales_entry' => [
-                'create'   => $canSales,
-                'view_own' => $canView,
-                'view_all' => in_array($role, ['admin', 'manager', 'finance', 'viewer'], true),
-            ],
-            'budget' => [
-                'transfer' => $isManager,
-                'approve'  => $isManager,
-                'view'     => $canView,
-            ],
-            'master_data' => [
-                'project'   => $isAdmin,
-                'unit'      => $isManager,
-                'promotion' => $isManager,
-            ],
-            'bottom_line' => [
-                'import'   => $isManager,
-                'history'  => in_array($role, ['admin', 'manager', 'finance', 'viewer'], true),
-                'rollback' => $isAdmin,
-                'mapping'  => $isManager,
-            ],
-            'reports'         => in_array($role, ['admin', 'manager', 'finance', 'viewer'], true),
-            'user_management' => $isAdmin,
-            'settings'        => $isAdmin,
-        ];
-    }
-
-    /**
-     * จัด format user data สำหรับ API response (ไม่มี password_hash)
-     * รวม permissions เสมอ เพื่อให้ frontend แสดงเมนูได้ถูกต้องตั้งแต่ login ครั้งแรก
-     */
-    private function formatUserResponse(array $user): array
-    {
-        return [
-            'id'          => (int) $user['id'],
-            'email'       => $user['email'],
-            'name'        => $user['name'],
-            'role'        => $user['role'],
-            'phone'       => $user['phone'] ?? null,
-            'avatar_url'  => $user['avatar_url'] ?? null,
-            'is_active'   => (bool) $user['is_active'],
-            'projects'    => $user['projects'] ?? [],
-            'permissions' => $this->buildPermissions($user['role']),
-        ];
     }
 }

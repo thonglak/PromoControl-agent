@@ -23,47 +23,65 @@ class ProjectModel extends Model
     protected $validStatuses     = ['active', 'inactive', 'completed'];
 
     /**
-     * ดึง projects พร้อม unit_count (LEFT JOIN)
+     * ดึง projects พร้อม unit_count (LEFT JOIN) พร้อม pagination
      * admin → ดูได้ทุก project
      * others → filter โดย $projectIds
+     * คืนค่า ['data' => [...], 'total' => N]
      */
     public function getProjectsWithUnitCount(
         array $projectIds = [],
         bool  $isAdmin    = false,
         string $search    = '',
         string $status    = '',
-        string $type      = ''
+        string $type      = '',
+        int $page         = 1,
+        int $perPage      = 20
     ): array {
-        $builder = $this->db->table('projects p')
+        // ถ้าไม่ใช่ admin และไม่มี project_ids → return ว่าง
+        if (! $isAdmin && empty($projectIds)) {
+            return ['data' => [], 'total' => 0];
+        }
+
+        // Count query (ไม่มี GROUP BY / JOIN เพื่อ performance)
+        $countBuilder = $this->db->table('projects p');
+        if (! $isAdmin) {
+            $countBuilder->whereIn('p.id', $projectIds);
+        }
+        if ($search !== '') {
+            $countBuilder->groupStart()->like('p.code', $search)->orLike('p.name', $search)->groupEnd();
+        }
+        if ($status !== '' && in_array($status, $this->validStatuses, true)) {
+            $countBuilder->where('p.status', $status);
+        }
+        if ($type !== '' && in_array($type, $this->validProjectTypes, true)) {
+            $countBuilder->where('p.project_type', $type);
+        }
+        $total = $countBuilder->countAllResults();
+
+        // Data query พร้อม LIMIT/OFFSET
+        $dataBuilder = $this->db->table('projects p')
             ->select('p.*, COUNT(pu.id) AS unit_count')
             ->join('project_units pu', 'pu.project_id = p.id', 'left')
             ->groupBy('p.id')
             ->orderBy('p.created_at', 'DESC');
 
-        // ตรวจสิทธิ์ — admin เห็นทุก project
         if (! $isAdmin) {
-            if (empty($projectIds)) {
-                return [];
-            }
-            $builder->whereIn('p.id', $projectIds);
+            $dataBuilder->whereIn('p.id', $projectIds);
         }
-
         if ($search !== '') {
-            $builder->groupStart()
-                ->like('p.code', $search)
-                ->orLike('p.name', $search)
-                ->groupEnd();
+            $dataBuilder->groupStart()->like('p.code', $search)->orLike('p.name', $search)->groupEnd();
         }
-
         if ($status !== '' && in_array($status, $this->validStatuses, true)) {
-            $builder->where('p.status', $status);
+            $dataBuilder->where('p.status', $status);
         }
-
         if ($type !== '' && in_array($type, $this->validProjectTypes, true)) {
-            $builder->where('p.project_type', $type);
+            $dataBuilder->where('p.project_type', $type);
         }
 
-        return $builder->get()->getResultArray();
+        $offset = ($page - 1) * $perPage;
+        $data   = $dataBuilder->limit($perPage, $offset)->get()->getResultArray();
+
+        return ['data' => $data, 'total' => $total];
     }
 
     /**
@@ -89,8 +107,28 @@ class ProjectModel extends Model
     }
 
     /**
-     * ลบ project และ related data ในลำดับที่ถูกต้อง
-     * ต้องตรวจ hasSalesTransactions() ก่อนเรียก
+     * ตรวจว่า project มี units หรือ house_models หรือไม่
+     * ใช้สำหรับ guard ก่อน soft-delete (spec: ลบได้เฉพาะกรณีไม่มี units)
+     */
+    public function hasUnitsOrHouseModels(int $projectId): bool
+    {
+        $unitCount = $this->db->table('project_units')
+            ->where('project_id', $projectId)->countAllResults();
+        if ($unitCount > 0) {
+            return true;
+        }
+
+        $modelCount = $this->db->table('house_models')
+            ->where('project_id', $projectId)->countAllResults();
+        return $modelCount > 0;
+    }
+
+    /**
+     * ลบ project และ related data ในลำดับที่ถูกต้อง (HARD DELETE)
+     *
+     * ⚠️  ใช้สำหรับ admin purge เท่านั้น — ไม่ใช่ delete ปกติ
+     * delete ปกติให้ใช้ soft-delete (update status = 'inactive') แทน
+     * ต้องตรวจ hasSalesTransactions() และ hasUnitsOrHouseModels() ก่อนเรียก
      */
     public function deleteProjectCascade(int $projectId): void
     {
@@ -105,10 +143,10 @@ class ProjectModel extends Model
         $db->table('bottom_line_mapping_columns')
             ->whereIn('preset_id', function ($q) use ($projectId) {
                 $q->select('id')
-                  ->from('bottom_line_mapping_presets')
+                  ->from('bottom_line_mappings')
                   ->where('project_id', $projectId);
             })->delete();
-        $db->table('bottom_line_mapping_presets')->where('project_id', $projectId)->delete();
+        $db->table('bottom_line_mappings')->where('project_id', $projectId)->delete();
         $db->table('bottom_lines')->where('project_id', $projectId)->delete();
         $db->table('project_units')->where('project_id', $projectId)->delete();
         $db->table('house_models')->where('project_id', $projectId)->delete();

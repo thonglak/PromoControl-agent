@@ -26,9 +26,6 @@ const TABLE_ID = 'house-model-list';
 const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: 'code',               label: 'รหัส',         visible: true },
   { key: 'name',               label: 'ชื่อแบบบ้าน',   visible: true },
-  { key: 'bedrooms',           label: 'ห้องนอน',      visible: true },
-  { key: 'bathrooms',          label: 'ห้องน้ำ',       visible: true },
-  { key: 'floors',             label: 'ชั้น',          visible: true },
   { key: 'area_sqm',           label: 'พื้นที่',        visible: true },
   { key: 'unit_count',         label: 'ยูนิต',         visible: true },
   { key: 'actions',            label: 'จัดการ',         visible: true, locked: true },

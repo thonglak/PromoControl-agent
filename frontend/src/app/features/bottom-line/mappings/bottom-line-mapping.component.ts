@@ -52,7 +52,10 @@ export class BottomLineMappingComponent implements OnInit {
   configSummary(p: MappingPreset): string {
     const c = p.mapping_config;
     if (!c) return '—';
-    return `Unit=${c.unit_code_column || '?'}, BL=${c.bottom_line_price_column || '?'}, App=${c.appraisal_price_column || '?'}`;
+    let s = `Unit=${c.unit_code_column || '?'}, BL=${c.bottom_line_price_column || '?'}, App=${c.appraisal_price_column || '?'}`;
+    if (c.standard_budget_column) s += `, StdBgt=${c.standard_budget_column}`;
+    if (c.base_price_column) s += `, Base=${c.base_price_column}`;
+    return s;
   }
 
   openCreate(): void {

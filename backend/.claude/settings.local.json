@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(docker exec promo_php:*)"
+      "Bash(docker exec promo_php:*)",
+      "Bash(git -C /home/janya/PromoControl-agent/backend rev-parse --git-dir)"
     ]
   }
 }

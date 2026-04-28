@@ -59,15 +59,29 @@ class ProjectController extends BaseController
         $status = (string) ($this->request->getGet('status')       ?? '');
         $type   = (string) ($this->request->getGet('project_type') ?? '');
 
-        $projects = $this->projectModel->getProjectsWithUnitCount(
+        $page    = max(1, (int) ($this->request->getGet('page')     ?? 1));
+        $perPage = max(1, min(100, (int) ($this->request->getGet('per_page') ?? 20)));
+
+        $result = $this->projectModel->getProjectsWithUnitCount(
             projectIds: array_map('intval', (array) ($this->request->project_ids ?? [])),
             isAdmin:    $this->isAdmin(),
             search:     $search,
             status:     $status,
-            type:       $type
+            type:       $type,
+            page:       $page,
+            perPage:    $perPage,
         );
 
-        return $this->response->setStatusCode(200)->setJSON(['data' => $projects]);
+        $total = $result['total'];
+        return $this->response->setStatusCode(200)->setJSON([
+            'data' => $result['data'],
+            'meta' => [
+                'total'     => $total,
+                'page'      => $page,
+                'per_page'  => $perPage,
+                'last_page' => $total > 0 ? (int) ceil($total / $perPage) : 1,
+            ],
+        ]);
     }
 
     // ─── GET /api/projects/:id ────────────────────────────────────────────
@@ -78,19 +92,21 @@ class ProjectController extends BaseController
             return $this->notFound();
         }
 
-        $project = $this->projectModel->find($id);
+        // รวม 3 queries เป็น 1 query พร้อม subqueries
+        // budget_used: เฉพาะ movements ที่ approved เท่านั้น (ตาม business rule)
+        $project = $this->db()->table('projects p')
+            ->select("p.*,
+                (SELECT COUNT(*) FROM project_units WHERE project_id = p.id) AS unit_count,
+                (SELECT COALESCE(SUM(amount), 0) FROM budget_movements WHERE project_id = p.id AND status = 'approved') AS budget_used")
+            ->where('p.id', $id)
+            ->get()->getRowArray();
+
         if ($project === null) {
             return $this->notFound();
         }
 
-        // Summary: unit_count + budget_used
-        $unitCount  = $this->db()->table('project_units')
-            ->where('project_id', $id)->countAllResults();
-        $budgetUsed = (float) ($this->db()->table('budget_movements')
-            ->selectSum('amount')->where('project_id', $id)->get()->getRow()->amount ?? 0);
-
-        $project['unit_count']  = $unitCount;
-        $project['budget_used'] = $budgetUsed;
+        $project['unit_count']  = (int)   $project['unit_count'];
+        $project['budget_used'] = (float) $project['budget_used'];
 
         return $this->response->setStatusCode(200)->setJSON(['data' => $project]);
     }
@@ -137,7 +153,8 @@ class ProjectController extends BaseController
             $db->transCommit();
         } catch (\Exception $e) {
             $db->transRollback();
-            return $this->response->setStatusCode(500)->setJSON(['error' => 'เกิดข้อผิดพลาดในการสร้างโครงการ: ' . $e->getMessage()]);
+            log_message('error', '[ProjectController::create] ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'เกิดข้อผิดพลาดในการสร้างโครงการ']);
         }
 
         $project = $this->projectModel->find((int) $projectId);
@@ -194,6 +211,11 @@ class ProjectController extends BaseController
 
     public function delete(int $id): ResponseInterface
     {
+        // ตรวจสิทธิ์การเข้าถึง project
+        if (! $this->canAccessProject($id)) {
+            return $this->notFound();
+        }
+
         $project = $this->projectModel->find($id);
         if ($project === null) {
             return $this->notFound();
@@ -205,11 +227,18 @@ class ProjectController extends BaseController
             ]);
         }
 
-        try {
-            $this->projectModel->deleteProjectCascade($id);
-        } catch (\RuntimeException $e) {
-            return $this->response->setStatusCode(500)->setJSON(['error' => $e->getMessage()]);
+        // ตรวจว่ามี units หรือ house_models หรือไม่ (spec: ลบได้เฉพาะกรณีไม่มี units)
+        if ($this->projectModel->hasUnitsOrHouseModels($id)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'error' => 'ไม่สามารถลบโครงการที่มียูนิตหรือแบบบ้านได้',
+            ]);
         }
+
+        // Soft-delete: เปลี่ยน status เป็น inactive แทนการลบจริง
+        $this->projectModel->update($id, [
+            'status'     => 'inactive',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
 
         return $this->response->setStatusCode(200)->setJSON(['message' => 'ลบโครงการสำเร็จ']);
     }

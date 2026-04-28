@@ -64,9 +64,14 @@ export class BottomLineImportComponent implements OnInit {
   projectName = computed(() => this.project.selectedProject()?.name ?? '');
   columns     = computed(() => Object.keys(this.columnSamples()));
 
-  // ── Table columns ──
-  previewColumns = ['row', 'unit_code', 'bottom_line_price', 'appraisal_price'];
-  reviewColumns  = ['row', 'unit_code', 'bottom_line_price', 'appraisal_price'];
+  // ── Table columns (dynamic — เพิ่ม standard_budget/base_price ถ้ามี mapping) ──
+  previewColumns = computed(() => {
+    const base = ['row', 'unit_code', 'bottom_line_price', 'appraisal_price'];
+    if (this.mappingForm.get('standard_budget_column')?.value) base.push('standard_budget');
+    if (this.mappingForm.get('base_price_column')?.value) base.push('base_price');
+    return base;
+  });
+  reviewColumns = computed(() => this.previewColumns());
 
   // ── Forms ──
   uploadForm: FormGroup = this.fb.group({
@@ -80,6 +85,8 @@ export class BottomLineImportComponent implements OnInit {
     unit_code_column:         ['A', Validators.required],
     bottom_line_price_column: ['B', Validators.required],
     appraisal_price_column:   ['C', Validators.required],
+    standard_budget_column:   [''],
+    base_price_column:        [''],
     save_preset:              [false],
     preset_name:              [''],
     set_as_default:           [false],
@@ -153,6 +160,8 @@ export class BottomLineImportComponent implements OnInit {
               unit_code_column:         preset.mapping_config.unit_code_column,
               bottom_line_price_column: preset.mapping_config.bottom_line_price_column,
               appraisal_price_column:   preset.mapping_config.appraisal_price_column,
+              standard_budget_column:   preset.mapping_config.standard_budget_column ?? '',
+              base_price_column:        preset.mapping_config.base_price_column ?? '',
               header_row:               preset.mapping_config.header_row,
               data_start_row:           preset.mapping_config.data_start_row,
               sheet_name:               preset.mapping_config.sheet_name,
@@ -180,15 +189,7 @@ export class BottomLineImportComponent implements OnInit {
     if (!r) return;
     this.previewing.set(true);
 
-    const mv = this.mappingForm.value;
-    const mapping: MappingConfig = {
-      unit_code_column:         mv.unit_code_column,
-      bottom_line_price_column: mv.bottom_line_price_column,
-      appraisal_price_column:   mv.appraisal_price_column,
-      header_row:               mv.header_row,
-      data_start_row:           mv.data_start_row,
-      sheet_name:               mv.sheet_name,
-    };
+    const mapping = this.buildMappingConfig();
 
     this.api.preview(r.temp_file, mapping).subscribe({
       next: preview => {
@@ -215,14 +216,7 @@ export class BottomLineImportComponent implements OnInit {
     this.importError.set(null);
 
     const mv = this.mappingForm.value;
-    const mapping: MappingConfig = {
-      unit_code_column:         mv.unit_code_column,
-      bottom_line_price_column: mv.bottom_line_price_column,
-      appraisal_price_column:   mv.appraisal_price_column,
-      header_row:               mv.header_row,
-      data_start_row:           mv.data_start_row,
-      sheet_name:               mv.sheet_name,
-    };
+    const mapping = this.buildMappingConfig();
 
     this.api.import({
       project_id:      this.projectId(),
@@ -264,6 +258,7 @@ export class BottomLineImportComponent implements OnInit {
     this.mappingForm.reset({
       header_row: 1, data_start_row: 2,
       unit_code_column: 'A', bottom_line_price_column: 'B', appraisal_price_column: 'C',
+      standard_budget_column: '', base_price_column: '',
     });
     this.noteControl.reset();
     this.stepper.reset();
@@ -281,6 +276,20 @@ export class BottomLineImportComponent implements OnInit {
       },
       error: () => this.snack.open('ดาวน์โหลดไม่สำเร็จ', 'ปิด', { duration: 3000 }),
     });
+  }
+
+  private buildMappingConfig(): MappingConfig {
+    const mv = this.mappingForm.value;
+    return {
+      unit_code_column:         mv.unit_code_column,
+      bottom_line_price_column: mv.bottom_line_price_column,
+      appraisal_price_column:   mv.appraisal_price_column,
+      standard_budget_column:   mv.standard_budget_column || undefined,
+      base_price_column:        mv.base_price_column || undefined,
+      header_row:               mv.header_row,
+      data_start_row:           mv.data_start_row,
+      sheet_name:               mv.sheet_name,
+    };
   }
 
   // ── Presets ──

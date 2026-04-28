@@ -6,6 +6,8 @@
 
 - **ราคา Bottom Line** — ราคาต้นทุนจริงของยูนิต ใช้คำนวณหาราคาขายและกำไร → อัปเดต `unit_cost` ใน `project_units`
 - **ราคาประเมินจากกรมที่ดิน** — ใช้คำนวณค่าใช้จ่ายโอนกรรมสิทธิ์ (ค่าธรรมเนียมโอน, ภาษี) → อัปเดต `appraisal_price` ใน `project_units`
+- **งบมาตรฐาน (Standard Budget)** — งบที่จัดสรรให้ยูนิต (ไม่บังคับ) → อัปเดต `standard_budget` ใน `project_units`
+- **ราคาฐาน (Base Price)** — ราคาขายยูนิต (ไม่บังคับ) → อัปเดต `base_price` ใน `project_units`
 
 ---
 
@@ -20,7 +22,7 @@
    4.2 สร้าง key ใหม่ (e.g., BL-20260312-001)
    4.3 สร้าง table ใหม่ชื่อ bottom_line_{key} เก็บข้อมูลดิบจาก Excel
    4.4 Insert record ใน table bottom_lines (ประวัติ import)
-   4.5 อัปเดต project_units — unit_cost, appraisal_price, bottom_line_key
+   4.5 อัปเดต project_units — unit_cost, appraisal_price, standard_budget (ถ้ามี), base_price (ถ้ามี), bottom_line_key
 5. แสดงผลลัพธ์ (สำเร็จ/ล้มเหลว จำนวน records)
 ```
 
@@ -53,17 +55,21 @@
 > Dynamic table — สร้างอัตโนมัติเมื่อ import โดยใช้ชื่อ `bottom_line_{import_key}`
 > ตัวอย่าง: `bottom_line_BL20260312001`
 
-| Column            | Type          | Description                                |
-|-------------------|---------------|--------------------------------------------|
-| id                | BIGINT PK     | Auto-increment                             |
-| row_number        | INT           | ลำดับแถวจาก Excel                           |
-| unit_code         | VARCHAR(50)   | เลขที่ยูนิตจาก Excel (e.g., `SRP-1`)       |
-| bottom_line_price | DECIMAL(15,2) | ราคา Bottom Line จาก Excel                 |
-| appraisal_price   | DECIMAL(15,2) | ราคาประเมินจากกรมที่ดินจาก Excel            |
-| matched_unit_id   | BIGINT NULL   | FK → `project_units.id` (NULL ถ้า match ไม่ได้) |
-| old_unit_cost     | DECIMAL(15,2) NULL | ค่า unit_cost เดิมก่อน import            |
-| old_appraisal     | DECIMAL(15,2) NULL | ค่า appraisal_price เดิมก่อน import     |
-| status            | ENUM          | `matched`, `unmatched`, `updated`, `skipped` |
+| Column              | Type          | Description                                |
+|---------------------|---------------|--------------------------------------------|
+| id                  | BIGINT PK     | Auto-increment                             |
+| row_number          | INT           | ลำดับแถวจาก Excel                           |
+| unit_code           | VARCHAR(50)   | เลขที่ยูนิตจาก Excel (e.g., `SRP-1`)       |
+| bottom_line_price   | DECIMAL(15,2) | ราคา Bottom Line จาก Excel                 |
+| appraisal_price     | DECIMAL(15,2) | ราคาประเมินจากกรมที่ดินจาก Excel            |
+| standard_budget     | DECIMAL(15,2) NULL | งบมาตรฐานจาก Excel (เฉพาะเมื่อ mapping ระบุ) |
+| base_price          | DECIMAL(15,2) NULL | ราคาฐานจาก Excel (เฉพาะเมื่อ mapping ระบุ) |
+| matched_unit_id     | BIGINT NULL   | FK → `project_units.id` (NULL ถ้า match ไม่ได้) |
+| old_unit_cost       | DECIMAL(15,2) NULL | ค่า unit_cost เดิมก่อน import            |
+| old_appraisal       | DECIMAL(15,2) NULL | ค่า appraisal_price เดิมก่อน import     |
+| old_standard_budget | DECIMAL(15,2) NULL | ค่า standard_budget เดิมก่อน import     |
+| old_base_price      | DECIMAL(15,2) NULL | ค่า base_price เดิมก่อน import          |
+| status              | ENUM          | `matched`, `unmatched`, `updated`, `skipped` |
 
 ### Table: `bottom_line_mappings` (บันทึกการตั้งค่า Column Mapping)
 
@@ -85,11 +91,15 @@
   "unit_code_column": "A",
   "bottom_line_price_column": "B",
   "appraisal_price_column": "C",
+  "standard_budget_column": "D",
+  "base_price_column": "E",
   "header_row": 1,
   "data_start_row": 2,
   "sheet_name": "Sheet1"
 }
 ```
+
+> `standard_budget_column` และ `base_price_column` เป็น optional — ถ้าไม่ระบุจะไม่ import column เหล่านี้
 
 ### เพิ่ม Fields ใน Table: `project_units`
 
@@ -109,6 +119,8 @@
 5. **อัปเดต fields ที่เกี่ยวข้อง:**
    - `unit_cost` ← ราคา Bottom Line
    - `appraisal_price` ← ราคาประเมินจากกรมที่ดิน
+   - `standard_budget` ← งบมาตรฐาน (เฉพาะเมื่อ mapping ระบุ standard_budget_column)
+   - `base_price` ← ราคาฐาน (เฉพาะเมื่อ mapping ระบุ base_price_column)
    - `bottom_line_key` ← key ของการ import ครั้งนี้
 6. **Column mapping บันทึกเป็น preset** — สามารถ save/load/set default ได้ ไม่ต้องตั้งค่าใหม่ทุกรอบ
 7. **Rollback** — สามารถ restore จาก backup table ได้ผ่านหน้าประวัติ import
@@ -149,8 +161,8 @@
   "file_name": "bottom_line_2026Q1.xlsx",
   "sheets": ["Sheet1", "ราคาต้นทุน"],
   "preview_rows": [
-    { "row": 2, "unit_code": "SRP-1", "bottom_line_price": 2500000, "appraisal_price": 2800000 },
-    { "row": 3, "unit_code": "SRP-2", "bottom_line_price": 2600000, "appraisal_price": 2900000 }
+    { "row": 2, "unit_code": "SRP-1", "bottom_line_price": 2500000, "appraisal_price": 2800000, "standard_budget": 150000, "base_price": 3200000 },
+    { "row": 3, "unit_code": "SRP-2", "bottom_line_price": 2600000, "appraisal_price": 2900000, "standard_budget": 160000, "base_price": 3400000 }
   ],
   "detected_columns": {
     "A": "SRP-1, SRP-2, SRP-3...",
@@ -176,6 +188,8 @@
     "unit_code_column": "A",
     "bottom_line_price_column": "B",
     "appraisal_price_column": "C",
+    "standard_budget_column": "D",
+    "base_price_column": "E",
     "header_row": 1,
     "data_start_row": 2,
     "sheet_name": "Sheet1"
@@ -220,16 +234,18 @@
 - Header row selector (`mat-form-field` + `matInput` type=number)
 - Data start row selector (`mat-form-field` + `matInput` type=number)
 - Column mapping dropdowns:
-  - เลขที่ยูนิต → เลือก column (A, B, C...)
-  - ราคา Bottom Line → เลือก column
-  - ราคาประเมินกรมที่ดิน → เลือก column
+  - เลขที่ยูนิต → เลือก column (A, B, C...) — บังคับ
+  - ราคา Bottom Line → เลือก column — บังคับ
+  - ราคาประเมินกรมที่ดิน → เลือก column — บังคับ
+  - งบมาตรฐาน (Standard Budget) → เลือก column — ไม่บังคับ
+  - ราคาฐาน (Base Price) → เลือก column — ไม่บังคับ
 - Preview table: แสดง 5 แถวแรกตาม mapping ที่เลือก (`mat-table`)
 - Checkbox: "บันทึก mapping นี้เป็น preset" + ช่องชื่อ preset
 - Checkbox: "ตั้งเป็น default สำหรับโครงการนี้"
 
 **Step 3 — Review ข้อมูล**
 - `mat-table` แสดงข้อมูลทั้งหมดพร้อมสถานะ:
-  - Columns: เลขที่ยูนิต, ราคา Bottom Line (ใหม่), ราคาประเมิน (ใหม่), Unit Cost (เดิม), Appraisal (เดิม), สถานะ
+  - Columns: เลขที่ยูนิต, ราคา Bottom Line (ใหม่), ราคาประเมิน (ใหม่), งบมาตรฐาน (ใหม่, ถ้ามี), ราคาฐาน (ใหม่, ถ้ามี), Unit Cost (เดิม), Appraisal (เดิม), สถานะ
   - Status chips (`MatChipsModule`):
     - `matched` = green — พร้อม import
     - `unmatched` = red — ไม่พบยูนิตนี้ในระบบ

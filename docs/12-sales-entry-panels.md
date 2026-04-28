@@ -9,7 +9,7 @@
 ## โครงสร้าง Sales Entry
 
 ```
-Section 1  — ข้อมูลยูนิต
+Section 1  — ข้อมูลยูนิต (ช่องยูนิตใช้ `mat-autocomplete` พิมพ์ค้นหาได้ทั้ง unit_code และ house_model_name)
 Section 2  — งบประมาณที่ใช้ได้ (รวม Inline Budget Allocation)
 Section 3A — รายการโปรโมชั่น Premium (งบยูนิต)
 Section 3B — รายการของแถมเพิ่มเติม (งบอื่น)

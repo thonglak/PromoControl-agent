@@ -132,6 +132,24 @@
                 }
               </mat-select>
             </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>งบมาตรฐาน (ไม่บังคับ)</mat-label>
+              <mat-select formControlName="standard_budget_column">
+                <mat-option [value]="''">— ไม่ระบุ —</mat-option>
+                @for (c of columns(); track c) {
+                  <mat-option [value]="c">{{ c }} — {{ columnSamples()[c] | slice:0:30 }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>ราคาฐาน (ไม่บังคับ)</mat-label>
+              <mat-select formControlName="base_price_column">
+                <mat-option [value]="''">— ไม่ระบุ —</mat-option>
+                @for (c of columns(); track c) {
+                  <mat-option [value]="c">{{ c }} — {{ columnSamples()[c] | slice:0:30 }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
           </div>
 
           <!-- ปุ่มอ่านใหม่ -->
@@ -167,8 +185,16 @@
                   <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคาประเมิน</th>
                   <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #0284C7">{{ formatCurrency(r.appraisal_price) }}</td>
                 </ng-container>
-                <tr mat-header-row *matHeaderRowDef="previewColumns" class="!bg-slate-50"></tr>
-                <tr mat-row *matRowDef="let row; columns: previewColumns;" class="hover:bg-slate-50"></tr>
+                <ng-container matColumnDef="standard_budget">
+                  <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">งบมาตรฐาน</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #7C3AED">{{ r.standard_budget != null ? formatCurrency(r.standard_budget) : '—' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="base_price">
+                  <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคาฐาน</th>
+                  <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #059669">{{ r.base_price != null ? formatCurrency(r.base_price) : '—' }}</td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="previewColumns()" class="!bg-slate-50"></tr>
+                <tr mat-row *matRowDef="let row; columns: previewColumns();" class="hover:bg-slate-50"></tr>
               </table>
             </div>
           }
@@ -212,7 +238,9 @@
             <p class="text-sm font-mono text-slate-700">
               Unit={{ mappingForm.get('unit_code_column')?.value }},
               BL={{ mappingForm.get('bottom_line_price_column')?.value }},
-              App={{ mappingForm.get('appraisal_price_column')?.value }}
+              App={{ mappingForm.get('appraisal_price_column')?.value }}<!--
+              -->@if (mappingForm.get('standard_budget_column')?.value) {, StdBgt={{ mappingForm.get('standard_budget_column')?.value }}}<!--
+              -->@if (mappingForm.get('base_price_column')?.value) {, Base={{ mappingForm.get('base_price_column')?.value }}}
               (แถว {{ mappingForm.get('data_start_row')?.value }}–{{ totalRows() + (mappingForm.get('data_start_row')?.value ?? 2) - 1 }})
             </p>
           </div>
@@ -238,8 +266,16 @@
                 <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคาประเมิน (ใหม่)</th>
                 <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #0284C7">{{ formatCurrency(r.appraisal_price) }}</td>
               </ng-container>
-              <tr mat-header-row *matHeaderRowDef="reviewColumns" class="!bg-slate-50"></tr>
-              <tr mat-row *matRowDef="let row; columns: reviewColumns;" class="hover:bg-slate-50"></tr>
+              <ng-container matColumnDef="standard_budget">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">งบมาตรฐาน (ใหม่)</th>
+                <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #7C3AED">{{ r.standard_budget != null ? formatCurrency(r.standard_budget) : '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="base_price">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-600">ราคาฐาน (ใหม่)</th>
+                <td mat-cell *matCellDef="let r" class="!text-sm" style="color: #059669">{{ r.base_price != null ? formatCurrency(r.base_price) : '—' }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="reviewColumns()" class="!bg-slate-50"></tr>
+              <tr mat-row *matRowDef="let row; columns: reviewColumns();" class="hover:bg-slate-50"></tr>
             </table>
           </div>
           <p class="text-xs text-slate-400 mb-4">

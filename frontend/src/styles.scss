@@ -50,7 +50,19 @@ html {
       tertiary: $gold-accent-palette,
       theme-type: light,
     ),
-    density: 0,
+    density: -3,
+  ));
+}
+
+// ── Dark M3 theme ──────────────────────────────────────────────────────────
+html.dark-theme {
+  @include mat.theme((
+    color: (
+      primary: $corporate-navy-palette,
+      tertiary: $gold-accent-palette,
+      theme-type: dark,
+    ),
+    density: -3,
   ));
 }
 
@@ -240,7 +252,7 @@ app-icon svg {
 
 // ── Tooltip ──
 .mat-mdc-tooltip .mdc-tooltip__surface {
-  background-color: var(--color-gray-900, #1F2937) !important;
+  background-color: #1F2937 !important;
   color: #FFFFFF !important;
   font-size: 12px;
   border-radius: var(--radius-sm) !important;
@@ -482,7 +494,21 @@ mat-error, .mat-mdc-form-field-error-wrapper {
   color: var(--color-error, #D32F2F) !important;
 }
 
-
+// เว้นระยะ error message จาก input (density -3 ทำให้แน่นเกินไป)
+.mat-mdc-form-field-subscript-wrapper {
+  margin-top: 4px !important;
+  padding: 0 4px !important;
+}
+.mat-mdc-form-field-error-wrapper {
+  padding: 0 !important;
+}
+.mat-mdc-form-field-bottom-align::before {
+  height: 4px !important;
+}
+.mat-mdc-form-field-hint-wrapper .mat-mdc-form-field-hint {
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+}
 
 // Snackbar สำหรับ validation error
 .snack-error {
@@ -514,3 +540,202 @@ mat-error, .mat-mdc-form-field-error-wrapper {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Dark Theme Overrides
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Topbar
+html.dark-theme .topbar {
+  background: var(--color-surface);
+  border-bottom-color: var(--color-border);
+}
+
+// Overlays
+html.dark-theme .mat-mdc-dialog-container .mdc-dialog__surface,
+html.dark-theme .mat-mdc-dialog-surface {
+  background-color: var(--color-surface) !important;
+}
+html.dark-theme [mat-dialog-title],
+html.dark-theme .mat-mdc-dialog-title {
+  color: var(--color-text-primary) !important;
+}
+html.dark-theme .mat-mdc-dialog-content {
+  color: var(--color-text-primary) !important;
+}
+html.dark-theme .mat-mdc-dialog-actions {
+  border-top-color: var(--color-border) !important;
+}
+html.dark-theme .mat-mdc-select-panel,
+html.dark-theme .mat-mdc-autocomplete-panel,
+html.dark-theme .mat-mdc-menu-panel {
+  background-color: var(--color-surface) !important;
+}
+html.dark-theme .mat-mdc-option {
+  background-color: var(--color-surface);
+}
+html.dark-theme .mat-mdc-option:hover:not(.mdc-list-item--disabled) {
+  background-color: var(--color-gray-200) !important;
+}
+html.dark-theme .mat-datepicker-content,
+html.dark-theme .mat-mdc-datepicker-content {
+  background-color: var(--color-surface) !important;
+}
+
+// Table
+html.dark-theme .mat-mdc-table {
+  background-color: var(--color-surface) !important;
+}
+html.dark-theme .mat-mdc-header-cell {
+  background-color: var(--color-gray-50) !important;
+  color: var(--color-gray-700) !important;
+}
+html.dark-theme .mat-mdc-cell {
+  color: var(--color-text-primary) !important;
+}
+html.dark-theme .mat-mdc-row:hover {
+  background-color: var(--color-gray-200) !important;
+}
+html.dark-theme .mat-mdc-no-data-row td {
+  color: var(--color-text-secondary) !important;
+}
+
+// Cards
+html.dark-theme .mat-mdc-card {
+  background-color: var(--color-surface) !important;
+}
+
+// Section card & bg-white
+html.dark-theme .section-card {
+  background: var(--color-surface);
+}
+html.dark-theme .bg-white {
+  background-color: var(--color-surface) !important;
+}
+html.dark-theme .bg-slate-50 {
+  background-color: var(--color-gray-50) !important;
+}
+
+// Form fields
+html.dark-theme .mat-mdc-form-field .mdc-text-field {
+  background-color: var(--color-gray-50) !important;
+}
+html.dark-theme .mat-mdc-form-field.readonly-field .mdc-text-field {
+  background-color: var(--color-gray-100) !important;
+}
+
+// Borders
+html.dark-theme .border-slate-200 {
+  border-color: var(--color-border) !important;
+}
+
+// Text overrides for Tailwind slate colors
+html.dark-theme .text-slate-800, html.dark-theme .text-slate-700 {
+  color: var(--color-text-primary) !important;
+}
+html.dark-theme .text-slate-600, html.dark-theme .text-slate-500 {
+  color: var(--color-text-secondary) !important;
+}
+
+// C1: Sidebar — ใช้สีคงที่ไม่พึ่ง design tokens
+html.dark-theme .sidebar {
+  background: linear-gradient(180deg, #0A1A2C 0%, #16324F 100%);
+}
+
+// C2: Loading overlay bg-white/70
+html.dark-theme .bg-white\/70 {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+}
+
+// M2: text-slate-400, text-slate-300
+html.dark-theme .text-slate-400 { color: var(--color-gray-500) !important; }
+html.dark-theme .text-slate-300 { color: var(--color-gray-300) !important; }
+
+// M3: bg-slate-100
+html.dark-theme .bg-slate-100, html.dark-theme .\!bg-slate-100 {
+  background-color: var(--color-gray-200) !important;
+}
+
+// M4: hover backgrounds
+html.dark-theme .hover\:bg-gray-50:hover,
+html.dark-theme .hover\:bg-slate-50:hover {
+  background-color: var(--color-gray-200) !important;
+}
+
+// M5: semantic light backgrounds
+html.dark-theme .bg-green-50  { background-color: #064E3B !important; }
+html.dark-theme .bg-red-50    { background-color: #7F1D1D !important; }
+html.dark-theme .bg-amber-50  { background-color: #78350F !important; }
+html.dark-theme .bg-blue-50   { background-color: #0C4A6E !important; }
+html.dark-theme .bg-green-100 { background-color: #065F46 !important; }
+html.dark-theme .bg-red-100   { background-color: #991B1B !important; }
+html.dark-theme .bg-amber-100 { background-color: #92400E !important; }
+html.dark-theme .bg-blue-100  { background-color: #0E4A6E !important; }
+
+// M8: border-gray-100, border-gray-200
+html.dark-theme .border-gray-100 { border-color: var(--color-border) !important; }
+html.dark-theme .border-gray-200 { border-color: var(--color-border) !important; }
+
+// M9: financial subtle classes
+html.dark-theme .bg-profit-subtle   { background-color: var(--color-success-subtle) !important; }
+html.dark-theme .bg-loss-subtle     { background-color: var(--color-error-subtle)   !important; }
+html.dark-theme .bg-discount-subtle { background-color: var(--color-warning-subtle) !important; }
+
+// m1: border-slate-300
+html.dark-theme .border-slate-300 { border-color: var(--color-gray-300) !important; }
+
+// m3: text-gray-* classes
+html.dark-theme .text-gray-700 { color: var(--color-text-primary)   !important; }
+html.dark-theme .text-gray-600 { color: var(--color-text-secondary) !important; }
+html.dark-theme .text-gray-500 { color: var(--color-text-secondary) !important; }
+html.dark-theme .text-gray-400 { color: var(--color-gray-500)       !important; }
+
+// m4: bg-gray-50, bg-gray-100 (รวม !important variants)
+html.dark-theme .bg-gray-50, html.dark-theme .\!bg-gray-50 {
+  background-color: var(--color-gray-50) !important;
+}
+html.dark-theme .bg-gray-100, html.dark-theme .\!bg-gray-100 {
+  background-color: var(--color-gray-100) !important;
+}
+html.dark-theme .bg-gray-900 {
+  background-color: #0F172A !important;
+}
+
+// Semantic colored text
+html.dark-theme .text-green-700  { color: #6EE7B7 !important; }
+html.dark-theme .text-green-600  { color: #6EE7B7 !important; }
+html.dark-theme .text-red-700    { color: #FCA5A5 !important; }
+html.dark-theme .text-red-600    { color: #FCA5A5 !important; }
+html.dark-theme .text-amber-700  { color: #FCD34D !important; }
+html.dark-theme .text-amber-600  { color: #FCD34D !important; }
+html.dark-theme .text-blue-700   { color: #93C5FD !important; }
+html.dark-theme .text-blue-600   { color: #93C5FD !important; }
+
+// Even row alternating
+html.dark-theme .even\:bg-slate-50\/40:nth-child(even) {
+  background-color: rgba(30, 41, 59, 0.4) !important;
+}
+
+// Input outline borders — ลดความสว่างให้สบายตา
+html.dark-theme .mat-mdc-form-field .mdc-notched-outline__leading,
+html.dark-theme .mat-mdc-form-field .mdc-notched-outline__notch,
+html.dark-theme .mat-mdc-form-field .mdc-notched-outline__trailing {
+  border-color: var(--color-gray-300) !important;
+}
+html.dark-theme .mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
+html.dark-theme .mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
+html.dark-theme .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
+  border-color: var(--color-primary-500) !important;
+}
+
+// Table borders
+html.dark-theme .mat-mdc-table {
+  border-color: var(--color-gray-300) !important;
+}
+html.dark-theme .mat-mdc-header-cell,
+html.dark-theme .mat-mdc-cell {
+  border-bottom-color: var(--color-gray-300) !important;
+}
+
+// Tailwind custom colors ใช้ CSS variables แล้ว — ไม่ต้อง override ที่นี่
+// (primary, profit, loss, discount-color, budget เปลี่ยนตาม dark/light อัตโนมัติ)

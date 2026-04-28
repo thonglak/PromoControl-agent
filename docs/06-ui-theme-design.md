@@ -4,7 +4,7 @@
 
 This document defines the UI/UX design system for the Promotion & Budget Management System.
 
-> **Updated:** 2026-03-18 — Redesigned to Corporate Navy theme
+> **Updated:** 2026-04-08 — เพิ่ม Dark Mode, Tailwind ใช้ CSS variables
 > **Full guideline:** See `docs/17-ui-guideline.md` for comprehensive design reference
 
 ## Technology Stack
@@ -157,8 +157,42 @@ Reference: `--color-*`, `--radius-*`, `--shadow-*`, `--space-*`, `--font-size-*`
 M3 theming with custom palettes:
 - Primary: Corporate Navy tonal palette (900=#16324F)
 - Tertiary: Gold Accent tonal palette (400=#C8A96B)
+- Density: -3 (minimum — compact form fields)
+- Dark mode: `html.dark-theme` block ใน `styles.scss` + `_design-tokens.scss`
 
 Defined in `src/styles.scss`.
+
+---
+
+# Dark Mode
+
+## การทำงาน
+- `ThemeService` (`core/services/theme.service.ts`) — toggle class `dark-theme` บน `<html>`
+- เก็บค่าใน `localStorage` key `promo_theme`
+- ปุ่ม toggle อยู่ที่ topbar (icon moon/sun)
+
+## สถาปัตยกรรม
+- **Tailwind config** ใช้ CSS variables (`var(--color-*)`) แทน hardcoded hex → สีเปลี่ยนตาม theme อัตโนมัติ
+- **Design tokens** (`_design-tokens.scss`) มี `html.dark-theme {}` block override ทุกตัวแปร
+- **styles.scss** มี dark overrides สำหรับ Tailwind utility classes ที่ไม่ได้ใช้ custom colors (เช่น `bg-white`, `text-slate-*`, `bg-green-50`)
+
+## Dark Color Palette
+
+| Token | Light | Dark |
+|-------|-------|------|
+| `--color-bg` | `#F6F8FB` | `#0F172A` |
+| `--color-surface` | `#FFFFFF` | `#1E293B` |
+| `--color-border` | `#E5E7EB` | `#334155` |
+| `--color-text-primary` | `#1F2937` | `#CBD5E1` |
+| `--color-text-secondary` | `#6B7280` | `#8896AB` |
+| `--color-profit` | `#2E7D32` | `#6EE7B7` |
+| `--color-loss` | `#D32F2F` | `#FCA5A5` |
+| `--color-discount` | `#ED6C02` | `#FCD34D` |
+| `--color-budget` | `#0288D1` | `#93C5FD` |
+
+## หมายเหตุ
+- Sidebar ใช้สีคงที่ (`#0A1A2C → #16324F`) ทั้ง light/dark เพราะเป็น dark gradient อยู่แล้ว
+- Tooltip ใช้ `#1F2937` คงที่ทั้ง 2 mode
 
 ---
 
@@ -166,7 +200,7 @@ Defined in `src/styles.scss`.
 
 - Sidebar: Navy gradient (#16324F -> #1F4B73), white text, Gold active bar
 - Topbar: White, shadow-sm, 64px height, Navy breadcrumb
-- Content: max-width 1440px, centered
+- Content: max-width 1440px, centered, ทุกหน้าต้องครอบด้วย `<div class="p-6" style="max-width: 1440px; margin: 0 auto;">`
 - Every page: `app-page-header` -> Filters -> `app-section-card` content
 
 ---

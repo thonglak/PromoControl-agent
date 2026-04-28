@@ -12,6 +12,26 @@
       <p class="text-sm mt-1" style="color: var(--color-gray-500)">ระบบจัดการโปรโมชั่นและงบประมาณ</p>
     </div>
 
+    <!-- Narai Connect SSO Button -->
+    <button mat-stroked-button type="button" class="w-full !font-semibold !text-base"
+            style="height: 48px; border-radius: var(--radius-md); border-color: var(--color-primary); color: var(--color-primary)"
+            (click)="loginWithNarai()">
+      <span class="flex items-center justify-center gap-2">
+        <!-- Narai icon placeholder — ใช้ building icon แทน -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 3L2 9v13h7v-7h6v7h7V9L12 3zm0 2.236L20 10v10h-3v-7H7v7H4V10l8-4.764z"/>
+        </svg>
+        เข้าสู่ระบบด้วย Narai Connect
+      </span>
+    </button>
+
+    <!-- Divider -->
+    <div class="flex items-center gap-3 my-1">
+      <div class="flex-1" style="height: 1px; background: var(--color-border)"></div>
+      <span class="text-xs" style="color: var(--color-gray-400)">หรือ</span>
+      <div class="flex-1" style="height: 1px; background: var(--color-border)"></div>
+    </div>
+
     <!-- Login Form -->
     <form [formGroup]="form" (ngSubmit)="onLogin()" class="flex flex-col gap-4">
 
@@ -50,7 +70,7 @@
         @if (loading()) {
           <mat-spinner diameter="22" />
         } @else {
-          เข้าสู่ระบบ
+          เข้าสู่ระบบด้วยอีเมล
         }
       </button>
 

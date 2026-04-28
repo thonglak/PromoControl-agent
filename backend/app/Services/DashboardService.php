@@ -2,472 +2,176 @@
 
 namespace App\Services;
 
+use App\Models\PhaseModel;
 use CodeIgniter\Database\BaseConnection;
 
 /**
- * DashboardService — สรุปข้อมูลภาพรวมของโครงการ
+ * DashboardService — สรุปยอดขายและ stock ของโครงการ (Sales-Focused Dashboard)
  *
  * กฎสำคัญ:
- * 1. sales_transactions มี status ENUM('draft','confirmed','active','cancelled')
- * 2. ห้ามนับ cancelled transactions ในยอดขาย/กำไร
- * 3. budget ทั้งหมด derive จาก SUM(movements WHERE status='approved')
- * 4. voided movements ไม่นับ
- * 5. pool_remaining ต้องรวม RETURN movements ด้วย
+ * 1. sales_transactions: นับเฉพาะ status = 'active' เท่านั้น
+ * 2. ยูนิตที่ "ขายได้" = status IN ('sold', 'transferred')
+ * 3. ยูนิตที่ "เหลือ" = status IN ('available', 'reserved')
+ * 4. มูลค่าโครงการที่อนุมัติ = SUM(base_price) ของทุก unit
+ * 5. ทุก query รองรับ filter ตาม phase_id (optional)
  */
 class DashboardService
 {
     private BaseConnection $db;
-
-    private const ALLOCATE_TYPES = ['ALLOCATE', 'SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE'];
-    private const USE_TYPES = ['USE', 'SPECIAL_BUDGET_USE'];
-    private const RETURN_TYPES = ['RETURN', 'SPECIAL_BUDGET_RETURN'];
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
     }
 
+    // ─── Phase ────────────────────────────────────────────────────────────
+
     /**
-     * getProjectSummary - สรุปภาพรวมยอดขายของโครงการ
+     * ดึงรายการ phase ของโครงการ
      */
-    public function getProjectSummary(int $projectId): array
+    public function getPhases(int $projectId): array
     {
-        // === Unit counts ===
-        $units = $this->db->table('project_units')
-            ->select('status, COUNT(*) AS cnt')
-            ->where('project_id', $projectId)
-            ->groupBy('status')
-            ->get()->getResultArray();
+        return (new PhaseModel())->getByProject($projectId);
+    }
 
-        $unitSummary = [
-            'total_units' => 0,
-            'units_available' => 0,
-            'units_reserved' => 0,
-            'units_sold' => 0,
-            'units_transferred' => 0,
-        ];
-        $statusToKey = [
-            'available' => 'units_available',
-            'reserved' => 'units_reserved',
-            'sold' => 'units_sold',
-            'transferred' => 'units_transferred',
-        ];
-        foreach ($units as $row) {
-            $unitSummary['total_units'] += (int) $row['cnt'];
-            if (isset($statusToKey[$row['status']])) {
-                $unitSummary[$statusToKey[$row['status']]] = (int) $row['cnt'];
-            }
-        }
+    // ─── Dashboard Summary ────────────────────────────────────────────────
 
-        // === Transaction counts (active + cancelled) ===
-        $activeCount = (int) $this->db->table('sales_transactions')
-            ->where('project_id', $projectId)
-            ->where('status', 'active')
-            ->countAllResults();
+    /**
+     * getSalesDashboard — ข้อมูลหลักของ Dashboard (Section 1-2)
+     */
+    public function getSalesDashboard(int $projectId, ?int $phaseId = null): array
+    {
+        // === จำนวนยูนิตแยกตามกลุ่ม ===
+        $soldUnits      = $this->countUnits($projectId, $phaseId, ['sold', 'transferred']);
+        $remainingUnits = $this->countUnits($projectId, $phaseId, ['available', 'reserved']);
+        $totalUnits     = $this->countUnits($projectId, $phaseId);
 
-        $cancelledCount = (int) $this->db->table('sales_transactions')
-            ->where('project_id', $projectId)
-            ->where('status', 'cancelled')
-            ->countAllResults();
+        // === มูลค่าขายสุทธิ (จาก active transactions) ===
+        $soldNetPrice = $this->sumSalesNetPrice($projectId, $phaseId);
 
-        // === Sales amounts from active transactions only ===
-        $sales = $this->db->table('sales_transactions')
-            ->select('
-                COALESCE(SUM(net_price), 0) AS total_sales_amount,
-                COALESCE(SUM(profit), 0) AS total_profit
-            ')
-            ->where('project_id', $projectId)
-            ->where('status', 'active')
-            ->get()->getRowArray();
+        // === มูลค่า stock ที่เหลือ (SUM base_price ของ unit ที่ยังไม่ขาย) ===
+        $stockValue = $this->sumBasePrice($projectId, $phaseId, ['available', 'reserved']);
 
-        // === Discount (effective_category='discount') from active transactions ===
-        $totalDiscount = (float) $this->db->table('sales_transaction_items sti')
-            ->select('COALESCE(SUM(sti.used_value), 0) AS total')
-            ->join('sales_transactions st', 'st.id = sti.sales_transaction_id')
-            ->where('st.project_id', $projectId)
-            ->where('st.status', 'active')
-            ->where('sti.effective_category', 'discount')
-            ->get()->getRowArray()['total'] ?? 0;
-
-        // === Promo cost (effective_category='premium') from active transactions ===
-        $totalPromoCost = (float) $this->db->table('sales_transaction_items sti')
-            ->select('COALESCE(SUM(sti.used_value), 0) AS total')
-            ->join('sales_transactions st', 'st.id = sti.sales_transaction_id')
-            ->where('st.project_id', $projectId)
-            ->where('st.status', 'active')
-            ->where('sti.effective_category', 'premium')
-            ->get()->getRowArray()['total'] ?? 0;
-
-        // === Expense support (effective_category='expense_support') from active transactions ===
-        $totalExpenseSupport = (float) $this->db->table('sales_transaction_items sti')
-            ->select('COALESCE(SUM(sti.used_value), 0) AS total')
-            ->join('sales_transactions st', 'st.id = sti.sales_transaction_id')
-            ->where('st.project_id', $projectId)
-            ->where('st.status', 'active')
-            ->where('sti.effective_category', 'expense_support')
-            ->get()->getRowArray()['total'] ?? 0;
-
-        $totalSalesAmount = (float) ($sales['total_sales_amount'] ?? 0);
-        $totalProfit = (float) ($sales['total_profit'] ?? 0);
-        $totalPromoBurden = $totalPromoCost + $totalExpenseSupport;
-
-        // === Calculate averages ===
-        $avgProfitPerUnit = $activeCount > 0 ? round($totalProfit / $activeCount, 2) : 0;
-        $avgDiscountPerUnit = $activeCount > 0 ? round($totalDiscount / $activeCount, 2) : 0;
+        // === มูลค่าโครงการที่อนุมัติ = SUM(base_price) ทุก unit ===
+        $approvedProjectValue = $this->sumBasePrice($projectId, $phaseId);
 
         return [
-            'total_units' => $unitSummary['total_units'],
-            'units_available' => $unitSummary['units_available'],
-            'units_reserved' => $unitSummary['units_reserved'],
-            'units_sold' => $unitSummary['units_sold'],
-            'units_transferred' => $unitSummary['units_transferred'],
-            'total_sales_amount' => $totalSalesAmount,
-            'total_discount' => $totalDiscount,
-            'total_promo_cost' => $totalPromoCost,
-            'total_expense_support' => $totalExpenseSupport,
-            'total_promo_burden' => $totalPromoBurden,
-            'total_profit' => $totalProfit,
-            'avg_profit_per_unit' => $avgProfitPerUnit,
-            'avg_discount_per_unit' => $avgDiscountPerUnit,
-            'total_transactions_active' => $activeCount,
-            'total_transactions_cancelled' => $cancelledCount,
+            'sold_units'              => $soldUnits,
+            'sold_net_price'          => $soldNetPrice,
+            'avg_price_sold'          => $soldUnits > 0 ? round($soldNetPrice / $soldUnits, 2) : 0,
+            'remaining_units'         => $remainingUnits,
+            'stock_value'             => $stockValue,
+            'avg_price_remaining'     => $remainingUnits > 0 ? round($stockValue / $remainingUnits, 2) : 0,
+            'total_units'             => $totalUnits,
+            'approved_project_value'  => $approvedProjectValue,
         ];
     }
 
+    // ─── Discount Calculation ─────────────────────────────────────────────
+
     /**
-     * getBudgetSummary - สรุปภาพรวมงบประมาณของโครงการ
+     * calculateDiscount — คำนวณส่วนลดประมาณการสำหรับยูนิตที่ยังไม่ขาย
      */
-    public function getBudgetSummary(int $projectId): array
+    public function calculateDiscount(int $projectId, ?int $phaseId, float $discount): array
     {
-        // === Pool Budget ===
-        $project = $this->db->table('projects')
-            ->select('pool_budget_amount')
-            ->where('id', $projectId)
-            ->get()->getRowArray();
-        $poolBudgetAmount = (float) ($project['pool_budget_amount'] ?? 0);
+        $dashboard = $this->getSalesDashboard($projectId, $phaseId);
 
-        // Pool allocated
-        $poolAllocated = (float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'PROJECT_POOL')
-            ->whereIn('movement_type', self::ALLOCATE_TYPES)
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0;
+        $remainingUnits       = $dashboard['remaining_units'];
+        $stockValue           = $dashboard['stock_value'];
+        $soldNetPrice         = $dashboard['sold_net_price'];
+        $totalUnits           = $dashboard['total_units'];
+        $approvedProjectValue = $dashboard['approved_project_value'];
 
-        // Pool used (USE + SPECIAL_BUDGET_USE)
-        $poolUsed = (float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'PROJECT_POOL')
-            ->whereIn('movement_type', self::USE_TYPES)
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0;
+        // คำนวณมูลค่าประมาณการหลังหักส่วนลด
+        $totalDiscountAmount = $remainingUnits * $discount;
+        $netAfterDiscount    = $stockValue - $totalDiscountAmount;
+        $avgAfterDiscount    = $remainingUnits > 0 ? round($netAfterDiscount / $remainingUnits, 2) : 0;
+        $discountPercent     = $stockValue > 0 ? round(($totalDiscountAmount / $stockValue) * 100, 2) : 0;
 
-        // Pool returned (RETURN + SPECIAL_BUDGET_RETURN from PROJECT_POOL + RETURN from UNIT_STANDARD)
-        $poolReturned = (float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'PROJECT_POOL')
-            ->whereIn('movement_type', self::RETURN_TYPES)
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0;
-
-        // RETURN from UNIT_STANDARD to Pool
-        $unitReturnedToPool = (float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'UNIT_STANDARD')
-            ->where('movement_type', 'RETURN')
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0;
-
-        $poolReturnedTotal = abs($poolReturned) + abs($unitReturnedToPool);
-        $poolRemaining = $poolBudgetAmount - abs($poolAllocated) + $poolReturnedTotal;
-
-        // === UNIT_STANDARD Budget ===
-        // Allocated = SUM(project_units.standard_budget)
-        $unitStandardAllocated = (float) $this->db->table('project_units')
-            ->selectSum('standard_budget', 'total')
-            ->where('project_id', $projectId)
-            ->get()->getRowArray()['total'] ?? 0;
-
-        // Used = abs(SUM(USE WHERE budget_source_type='UNIT_STANDARD'))
-        $unitStandardUsed = abs((float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'UNIT_STANDARD')
-            ->where('movement_type', 'USE')
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0);
-
-        // Returned = abs(SUM(RETURN WHERE budget_source_type='UNIT_STANDARD'))
-        $unitStandardReturned = abs((float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'UNIT_STANDARD')
-            ->where('movement_type', 'RETURN')
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0);
-
-        $unitStandardRemaining = $unitStandardAllocated - $unitStandardUsed - $unitStandardReturned;
-
-        // === MANAGEMENT_SPECIAL Budget ===
-        $mgmtAllocated = (float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
-            ->whereIn('movement_type', ['SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE'])
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0;
-
-        $mgmtUsed = abs((float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
-            ->where('movement_type', 'SPECIAL_BUDGET_USE')
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0);
-
-        $mgmtReturned = abs((float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
-            ->where('movement_type', 'SPECIAL_BUDGET_RETURN')
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0);
-
-        $mgmtRemaining = $mgmtAllocated - $mgmtUsed - $mgmtReturned;
-
-        $campaignAllocated = (float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type')
-            ->whereIn('movement_type', ['SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE'])
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0;
-
-        $campaignUsed = abs((float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type')
-            ->where('movement_type', 'SPECIAL_BUDGET_USE')
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0);
-
-        $campaignReturned = abs((float) $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('budget_source_type')
-            ->where('movement_type', 'SPECIAL_BUDGET_RETURN')
-            ->where('status', 'approved')
-            ->get()->getRowArray()['total'] ?? 0);
-
-        $campaignRemaining = $campaignAllocated - $campaignUsed - $campaignReturned;
-
-        // === Totals ===
-        $totalAllocated = $poolBudgetAmount + $unitStandardAllocated + $mgmtAllocated + $campaignAllocated;
-        $totalUsed = abs($poolUsed) + $unitStandardUsed + $mgmtUsed + $campaignUsed;
-        $totalRemaining = $poolRemaining + $unitStandardRemaining + $mgmtRemaining + $campaignRemaining;
-        $budgetUtilizationPercent = $totalAllocated > 0 ? round(($totalUsed / $totalAllocated) * 100, 1) : 0;
+        // สรุปทั้งโครงการ
+        $projectNetSales   = $soldNetPrice + $netAfterDiscount;
+        $avgPriceProject   = $totalUnits > 0 ? round($projectNetSales / $totalUnits, 2) : 0;
+        $valueAchieved     = $projectNetSales;
+        $valueDifference   = $valueAchieved - $approvedProjectValue;
+        $differencePercent = $approvedProjectValue > 0 ? round(($valueDifference / $approvedProjectValue) * 100, 2) : 0;
 
         return [
-            'pool_budget_amount' => $poolBudgetAmount,
-            'pool_used' => abs($poolUsed),
-            'pool_returned' => $poolReturnedTotal,
-            'pool_remaining' => $poolRemaining,
-            'total_unit_standard_allocated' => $unitStandardAllocated,
-            'total_unit_standard_used' => $unitStandardUsed,
-            'total_unit_standard_returned' => $unitStandardReturned,
-            'total_unit_standard_remaining' => $unitStandardRemaining,
-            'management_special_allocated' => $mgmtAllocated,
-            'management_special_used' => $mgmtUsed,
-            'management_special_remaining' => $mgmtRemaining,
-            'campaign_support_allocated' => $campaignAllocated,
-            'campaign_support_used' => $campaignUsed,
-            'campaign_support_remaining' => $campaignRemaining,
-            'total_budget_allocated' => $totalAllocated,
-            'total_budget_used' => $totalUsed,
-            'total_budget_remaining' => $totalRemaining,
-            'budget_utilization_percent' => $budgetUtilizationPercent,
+            // Section 3 ขวา — มูลค่าประมาณการ
+            'net_after_discount'      => round($netAfterDiscount, 2),
+            'avg_after_discount'      => $avgAfterDiscount,
+            'total_discount_amount'   => round($totalDiscountAmount, 2),
+            'discount_percent'        => $discountPercent,
+            // Section 4 — สรุปทั้งโครงการ
+            'project_net_sales'       => round($projectNetSales, 2),
+            'avg_price_project'       => $avgPriceProject,
+            'approved_project_value'  => $approvedProjectValue,
+            'value_achieved'          => round($valueAchieved, 2),
+            'value_difference'        => round($valueDifference, 2),
+            'difference_percent'      => $differencePercent,
+            // echo back สำหรับ frontend
+            'remaining_units'         => $remainingUnits,
+            'stock_value'             => $stockValue,
+            'sold_net_price'          => $soldNetPrice,
+            'total_units'             => $totalUnits,
         ];
     }
 
+    // ─── Private Helpers ──────────────────────────────────────────────────
+
     /**
-     * getRecentSales - รายการขายล่าสุด
-     * แสดงทั้ง active + cancelled (frontend แสดงสีต่างกัน)
+     * นับจำนวน unit ตาม status (ถ้าไม่ระบุ = นับทั้งหมด)
      */
-    public function getRecentSales(int $projectId, int $limit = 10): array
+    private function countUnits(int $projectId, ?int $phaseId, ?array $statuses = null): int
     {
-        $transactions = $this->db->table('sales_transactions st')
-            ->select('
-                st.id, st.sale_no, st.base_price, st.net_price, st.profit,
-                st.sale_date, st.created_at, st.status,
-                pu.unit_code, pu.status AS unit_status
-            ')
-            ->join('project_units pu', 'pu.id = st.unit_id')
+        $builder = $this->db->table('project_units')
+            ->where('project_id', $projectId);
+
+        if ($phaseId !== null) {
+            $builder->where('phase_id', $phaseId);
+        }
+
+        if ($statuses !== null) {
+            $builder->whereIn('status', $statuses);
+        }
+
+        return (int) $builder->countAllResults();
+    }
+
+    /**
+     * SUM(base_price) ของ unit ตาม status (ถ้าไม่ระบุ = ทุก unit)
+     */
+    private function sumBasePrice(int $projectId, ?int $phaseId, ?array $statuses = null): float
+    {
+        $builder = $this->db->table('project_units')
+            ->selectSum('base_price', 'total')
+            ->where('project_id', $projectId);
+
+        if ($phaseId !== null) {
+            $builder->where('phase_id', $phaseId);
+        }
+
+        if ($statuses !== null) {
+            $builder->whereIn('status', $statuses);
+        }
+
+        return (float) ($builder->get()->getRowArray()['total'] ?? 0);
+    }
+
+    /**
+     * SUM(net_price) จาก active sales_transactions (JOIN ผ่าน project_units เพื่อ filter phase)
+     */
+    private function sumSalesNetPrice(int $projectId, ?int $phaseId): float
+    {
+        $builder = $this->db->table('sales_transactions st')
+            ->select('COALESCE(SUM(st.net_price), 0) AS total')
             ->where('st.project_id', $projectId)
-            ->orderBy('st.created_at', 'DESC')
-            ->limit($limit)
-            ->get()->getResultArray();
+            ->where('st.status', 'active');
 
-        return array_map(function ($t) {
-            return [
-                'sale_no' => $t['sale_no'],
-                'unit_code' => $t['unit_code'],
-                'base_price' => (float) $t['base_price'],
-                'net_price' => (float) $t['net_price'],
-                'profit' => (float) $t['profit'],
-                'sale_date' => $t['sale_date'],
-                'created_at' => $t['created_at'],
-                'status' => $t['status'],
-                'unit_status' => $t['unit_status'],
-            ];
-        }, $transactions);
-    }
-
-    /**
-     * getUnitStatusChart - ข้อมูลสำหรับ donut/pie chart
-     */
-    public function getUnitStatusChart(int $projectId): array
-    {
-        $units = $this->db->table('project_units')
-            ->select('status, COUNT(*) AS count')
-            ->where('project_id', $projectId)
-            ->groupBy('status')
-            ->get()->getResultArray();
-
-        $statusMap = [
-            'available' => ['label' => 'ว่าง', 'color' => '#16A34A'],
-            'reserved' => ['label' => 'จอง', 'color' => '#F59E0B'],
-            'sold' => ['label' => 'ขายแล้ว', 'color' => '#2563EB'],
-            'transferred' => ['label' => 'โอนแล้ว', 'color' => '#64748B'],
-        ];
-
-        $result = [];
-        foreach ($statusMap as $status => $info) {
-            $count = 0;
-            foreach ($units as $u) {
-                if ($u['status'] === $status) {
-                    $count = (int) $u['count'];
-                    break;
-                }
-            }
-            $result[] = [
-                'status' => $status,
-                'label' => $info['label'],
-                'count' => $count,
-                'color' => $info['color'],
-            ];
+        if ($phaseId !== null) {
+            $builder->join('project_units pu', 'pu.id = st.unit_id')
+                    ->where('pu.phase_id', $phaseId);
         }
 
-        return $result;
-    }
-
-    /**
-     * getBudgetUsageBySource - ข้อมูลสำหรับ bar chart
-     */
-    public function getBudgetUsageBySource(int $projectId): array
-    {
-        $sources = [
-            'UNIT_STANDARD' => 'งบมาตรฐาน',
-            'PROJECT_POOL' => 'งบ Pool',
-            'MANAGEMENT_SPECIAL' => 'งบผู้บริหาร',
-        ];
-
-        $result = [];
-
-        foreach ($sources as $source => $label) {
-            // Allocated
-            if ($source === 'UNIT_STANDARD') {
-                $allocated = (float) $this->db->table('project_units')
-                    ->selectSum('standard_budget', 'total')
-                    ->where('project_id', $projectId)
-                    ->get()->getRowArray()['total'] ?? 0;
-            } else {
-                $allocated = (float) $this->db->table('budget_movements')
-                    ->selectSum('amount', 'total')
-                    ->where('project_id', $projectId)
-                    ->where('budget_source_type', $source)
-                    ->whereIn('movement_type', ['SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE'])
-                    ->where('status', 'approved')
-                    ->get()->getRowArray()['total'] ?? 0;
-            }
-
-            // Used
-            if ($source === 'UNIT_STANDARD') {
-                $usedMovementType = 'USE';
-            } elseif ($source === 'PROJECT_POOL') {
-                $usedMovementType = ['USE', 'SPECIAL_BUDGET_USE'];
-            } else {
-                $usedMovementType = 'SPECIAL_BUDGET_USE';
-            }
-
-            if (is_array($usedMovementType)) {
-                $used = abs((float) $this->db->table('budget_movements')
-                    ->selectSum('amount', 'total')
-                    ->where('project_id', $projectId)
-                    ->where('budget_source_type', $source)
-                    ->whereIn('movement_type', $usedMovementType)
-                    ->where('status', 'approved')
-                    ->get()->getRowArray()['total'] ?? 0);
-            } else {
-                $used = abs((float) $this->db->table('budget_movements')
-                    ->selectSum('amount', 'total')
-                    ->where('project_id', $projectId)
-                    ->where('budget_source_type', $source)
-                    ->where('movement_type', $usedMovementType)
-                    ->where('status', 'approved')
-                    ->get()->getRowArray()['total'] ?? 0);
-            }
-
-            // Returned
-            if ($source === 'UNIT_STANDARD') {
-                $returnMovementType = 'RETURN';
-            } elseif ($source === 'PROJECT_POOL') {
-                $returnMovementType = ['RETURN', 'SPECIAL_BUDGET_RETURN'];
-            } else {
-                $returnMovementType = 'SPECIAL_BUDGET_RETURN';
-            }
-
-            if (is_array($returnMovementType)) {
-                $returned = abs((float) $this->db->table('budget_movements')
-                    ->selectSum('amount', 'total')
-                    ->where('project_id', $projectId)
-                    ->where('budget_source_type', $source)
-                    ->whereIn('movement_type', $returnMovementType)
-                    ->where('status', 'approved')
-                    ->get()->getRowArray()['total'] ?? 0);
-            } else {
-                $returned = abs((float) $this->db->table('budget_movements')
-                    ->selectSum('amount', 'total')
-                    ->where('project_id', $projectId)
-                    ->where('budget_source_type', $source)
-                    ->where('movement_type', $returnMovementType)
-                    ->where('status', 'approved')
-                    ->get()->getRowArray()['total'] ?? 0);
-            }
-
-            // For PROJECT_POOL, also include RETURN from UNIT_STANDARD
-            if ($source === 'PROJECT_POOL') {
-                $returned += abs((float) $this->db->table('budget_movements')
-                    ->selectSum('amount', 'total')
-                    ->where('project_id', $projectId)
-                    ->where('budget_source_type', 'UNIT_STANDARD')
-                    ->where('movement_type', 'RETURN')
-                    ->where('status', 'approved')
-                    ->get()->getRowArray()['total'] ?? 0);
-            }
-
-            $result[] = [
-                'source' => $source,
-                'label' => $label,
-                'allocated' => $allocated,
-                'used' => $used,
-                'returned' => $returned,
-            ];
-        }
-
-        return $result;
+        return (float) ($builder->get()->getRowArray()['total'] ?? 0);
     }
 }

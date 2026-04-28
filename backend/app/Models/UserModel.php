@@ -16,6 +16,7 @@ class UserModel extends Model
     protected $allowedFields = [
         'email', 'password_hash', 'name', 'role',
         'phone', 'avatar_url', 'is_active',
+        'narai_id', 'sso_provider', 'narai_access_token',
         'last_login_at', 'failed_attempts', 'locked_until',
         'created_at', 'updated_at',
     ];

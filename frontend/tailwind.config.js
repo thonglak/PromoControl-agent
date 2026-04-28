@@ -4,30 +4,30 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary
+        // Primary — ใช้ CSS variables เพื่อรองรับ dark/light mode
         'primary': {
-          DEFAULT: '#16324F',
-          900: '#16324F',
-          700: '#1F4B73',
-          500: '#2F6EA3',
-          300: '#6FA3D4',
-          100: '#DCEAF6',
+          DEFAULT: 'var(--color-primary)',
+          900: 'var(--color-primary-900)',
+          700: 'var(--color-primary-700)',
+          500: 'var(--color-primary-500)',
+          300: 'var(--color-primary-300)',
+          100: 'var(--color-primary-100)',
         },
         // Accent Gold
         'accent': {
-          DEFAULT: '#C8A96B',
-          warm: '#B88A44',
-          light: '#F4E9D7',
+          DEFAULT: 'var(--color-accent)',
+          warm: 'var(--color-accent-warm)',
+          light: 'var(--color-accent-light)',
         },
         // Financial
-        'profit': '#2E7D32',
-        'loss': '#D32F2F',
-        'discount-color': '#ED6C02',
-        'budget': '#0288D1',
+        'profit': 'var(--color-profit)',
+        'loss': 'var(--color-loss)',
+        'discount-color': 'var(--color-discount)',
+        'budget': 'var(--color-budget)',
         // Surfaces
-        'surface': '#FFFFFF',
-        'section': '#FAFBFC',
-        'app-bg': '#F6F8FB',
+        'surface': 'var(--color-surface)',
+        'section': 'var(--color-section)',
+        'app-bg': 'var(--color-bg)',
       },
       borderRadius: {
         'sm': '6px',
@@ -37,9 +37,9 @@ module.exports = {
         'full': '999px',
       },
       boxShadow: {
-        'card': '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        'card-hover': '0 4px 12px rgba(0,0,0,0.08)',
-        'dialog': '0 8px 24px rgba(0,0,0,0.1)',
+        'card': 'var(--shadow-sm)',
+        'card-hover': 'var(--shadow-md)',
+        'dialog': 'var(--shadow-lg)',
       },
       fontFamily: {
         'sans': ['Inter', 'Noto Sans Thai', 'system-ui', 'sans-serif'],
