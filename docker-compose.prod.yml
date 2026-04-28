@@ -1,0 +1,94 @@
+# ─────────────────────────────────────────────────────────────
+# Production stack — CentOS 7 + Docker
+#  ใช้คู่กับ deploy/.env.production (ดู deploy/.env.production.example)
+#  Run: docker compose -f docker-compose.prod.yml --env-file deploy/.env.production up -d
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  # MySQL 8 — Production
+  promo_mysql_prod:
+    image: mysql:8
+    container_name: promo_mysql_prod
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_prod_data:/var/lib/mysql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # ไม่ expose port ออกนอก container — เข้าผ่าน internal network เท่านั้น
+    networks:
+      - promo_prod_network
+
+  # PHP-FPM — CodeIgniter 4 backend (production build)
+  promo_php_prod:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.prod
+    image: promo_php:prod
+    container_name: promo_php_prod
+    restart: unless-stopped
+    volumes:
+      # Production .env (mount จาก host, read-only)
+      - ./deploy/.env.production:/var/www/backend/.env:ro
+      # Writable folders ต้องเขียนได้ — ใช้ named volume เพื่อ persist
+      - php_prod_writable:/var/www/backend/writable
+    depends_on:
+      promo_mysql_prod:
+        condition: service_healthy
+    networks:
+      - promo_prod_network
+
+  # phpMyAdmin — Production GUI สำหรับจัดการ MySQL
+  # หมายเหตุ security: ไม่แนะนำ expose ออก public — ควรอยู่หลัง VPN หรือ
+  # firewall whitelist IP, หรือ comment service นี้ออกถ้าไม่ใช้
+  promo_phpmyadmin_prod:
+    image: phpmyadmin/phpmyadmin
+    container_name: promo_phpmyadmin_prod
+    restart: unless-stopped
+    ports:
+      - "${PMA_PORT:-8581}:80"
+    environment:
+      PMA_HOST: promo_mysql_prod
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      UPLOAD_LIMIT: 50M
+    depends_on:
+      promo_mysql_prod:
+        condition: service_healthy
+    networks:
+      - promo_prod_network
+
+  # Nginx + Angular static (multi-stage build)
+  promo_nginx_prod:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile.prod
+    image: promo_nginx:prod
+    container_name: promo_nginx_prod
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8580}:80"
+    depends_on:
+      - promo_php_prod
+    networks:
+      - promo_prod_network
+
+networks:
+  promo_prod_network:
+    driver: bridge
+
+volumes:
+  mysql_prod_data:
+  php_prod_writable:

@@ -1,0 +1,96 @@
+# ─────────────────────────────────────────────────────────────
+# Production PHP-FPM image — CodeIgniter 4 backend
+#  - copy backend code เข้า image (ไม่ mount จาก host)
+#  - composer install --no-dev --optimize-autoloader
+#  - เปิด opcache เร่งความเร็ว production
+# ─────────────────────────────────────────────────────────────
+
+FROM php:8.2-fpm-alpine AS builder
+
+RUN apk add --no-cache \
+        git \
+        unzip \
+        icu-dev \
+        libzip-dev \
+        oniguruma-dev \
+    && docker-php-ext-install -j$(nproc) \
+        pdo_mysql \
+        mysqli \
+        mbstring \
+        zip \
+        bcmath \
+        intl \
+        opcache
+
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/backend
+
+# ติดตั้ง dependency ก่อน copy source ทั้งหมด เพื่อใช้ Docker cache
+COPY backend/composer.json backend/composer.lock* ./
+RUN composer install \
+        --no-dev \
+        --no-interaction \
+        --no-scripts \
+        --prefer-dist \
+        --optimize-autoloader \
+    && rm -rf /root/.composer
+
+# Copy source ทั้งหมด
+COPY backend/ ./
+
+# Generate optimized autoload หลัง copy เสร็จ
+RUN composer dump-autoload --optimize --no-dev
+
+# ─────────────────────────────────────────────────────────────
+# Final image — ลด size, ไม่มี git/composer/build tools
+# ─────────────────────────────────────────────────────────────
+FROM php:8.2-fpm-alpine
+
+RUN apk add --no-cache \
+        icu \
+        libzip \
+        oniguruma \
+    && docker-php-ext-install -j$(nproc) \
+        pdo_mysql \
+        mysqli \
+        mbstring \
+        zip \
+        bcmath \
+        intl \
+        opcache
+
+# Production opcache config
+RUN { \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.enable_cli=0'; \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=16'; \
+        echo 'opcache.max_accelerated_files=10000'; \
+        echo 'opcache.validate_timestamps=0'; \
+        echo 'opcache.revalidate_freq=0'; \
+        echo 'opcache.fast_shutdown=1'; \
+    } > /usr/local/etc/php/conf.d/opcache-prod.ini
+
+# Production php.ini overrides
+RUN { \
+        echo 'expose_php=Off'; \
+        echo 'memory_limit=256M'; \
+        echo 'post_max_size=50M'; \
+        echo 'upload_max_filesize=50M'; \
+        echo 'date.timezone=Asia/Bangkok'; \
+    } > /usr/local/etc/php/conf.d/zz-prod.ini
+
+WORKDIR /var/www/backend
+
+# Copy built code จาก builder stage
+COPY --from=builder /var/www/backend /var/www/backend
+
+# ตั้งสิทธิ์ writable folders ให้ www-data
+RUN chown -R www-data:www-data /var/www/backend/writable \
+    && chmod -R 775 /var/www/backend/writable
+
+USER www-data
+
+EXPOSE 9000
+CMD ["php-fpm"]
