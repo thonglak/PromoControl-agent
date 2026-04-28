@@ -29,7 +29,10 @@ class NaraiSsoService
     private const AUTHORIZATION_URL = 'https://apps.naraiproperty.com/connect/oauth/authorize';
     private const TOKEN_URL          = 'https://apps.naraiproperty.com/connect/oauth/authorize/token';
     private const RESOURCE_URL       = 'https://apps.naraiproperty.com/connect/oauth/resource';
-    private const SCOPE              = 'email';
+
+    // scope ตั้งค่าผ่าน .env (OAUTH2_SCOPE) — ถ้าไม่ตั้งใช้ default ที่กว้างพอ
+    // เพื่อเรียก /resource และ /projects ได้
+    private const DEFAULT_SCOPE      = 'email read.projects';
 
     private UserModel  $userModel;
     private AuthService $authService;
@@ -60,7 +63,7 @@ class NaraiSsoService
             'response_type' => 'code',
             'client_id'     => $clientId,
             'redirect_uri'  => $redirectUri,
-            'scope'         => self::SCOPE,
+            'scope'         => env('OAUTH2_SCOPE', self::DEFAULT_SCOPE),
             'state'         => $state,
         ]);
     }
@@ -148,7 +151,8 @@ class NaraiSsoService
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $postData,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
+            // Narai Connect ตอบช้า ~15s ต้องเผื่อให้พอ
+            CURLOPT_TIMEOUT        => 30,
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/x-www-form-urlencoded',
                 'Accept: application/json',
@@ -195,7 +199,8 @@ class NaraiSsoService
             CURLOPT_POST           => true,  // Narai resource endpoint ใช้ POST
             CURLOPT_POSTFIELDS     => '',
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
+            // Narai Connect /resource ตอบช้า ~15s ต้องเผื่อให้พอ
+            CURLOPT_TIMEOUT        => 30,
             CURLOPT_HTTPHEADER     => [
                 'Authorization: Bearer ' . $accessToken,
                 'Accept: application/json',
