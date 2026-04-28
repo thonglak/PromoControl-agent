@@ -83,7 +83,7 @@ import { ThaiDatePipe } from '../../../shared/pipes/thai-date.pipe';
 
     <!-- Summary cards -->
     @if (report()) {
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
         <!-- ยอดขายรวม -->
         <div class="section-card">
           <p class="text-xs text-slate-500 mb-1">ยอดขายรวม</p>
@@ -121,6 +121,15 @@ import { ThaiDatePipe } from '../../../shared/pipes/thai-date.pipe';
             {{ '\u0E3F' }}{{ report()!.summary.total_profit | number:'1.0-0' }}
           </p>
           <p class="text-xs text-slate-400 mt-1">เฉลี่ย {{ report()!.summary.avg_profit_margin_percent | number:'1.1-1' }}%</p>
+        </div>
+        <!-- งบผู้บริหารคงเหลือ -->
+        <div class="section-card">
+          <p class="text-xs text-slate-500 mb-1">งบผู้บริหารคงเหลือ</p>
+          <p class="text-xl font-bold"
+             [style.color]="report()!.summary.management_budget_remaining > 0 ? 'var(--color-primary)' : 'var(--color-loss)'">
+            {{ '฿' }}{{ report()!.summary.management_budget_remaining | number:'1.0-0' }}
+          </p>
+          <p class="text-xs text-slate-400 mt-1">ยอด ณ ปัจจุบัน</p>
         </div>
       </div>
     }

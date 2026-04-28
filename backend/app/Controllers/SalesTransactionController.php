@@ -79,8 +79,6 @@ class SalesTransactionController extends BaseController
         if ($search = trim($this->request->getGet('search') ?? '')) {
             $builder->groupStart()
                 ->like('st.sale_no', $search)
-                ->orLike('st.customer_name', $search)
-                ->orLike('st.salesperson', $search)
                 ->orLike('pu.unit_code', $search)
                 ->groupEnd();
         }
@@ -160,9 +158,11 @@ class SalesTransactionController extends BaseController
             'page' => $page,
             'per_page' => $perPage,
             'summary' => [
-                'total_budget_remaining' => $projectTotals['total_remaining'],
-                'total_budget_allocated' => $projectTotals['total_allocated'],
-                'total_budget_used'      => $projectTotals['total_used'],
+                'total_budget_remaining'      => $projectTotals['total_remaining'],
+                'total_budget_allocated'      => $projectTotals['total_allocated'],
+                'total_budget_used'           => $projectTotals['total_used'],
+                // งบผู้บริหารคงเหลือ — project-wide (ไม่ filter ตาม unit ที่มี active transaction)
+                'management_budget_remaining' => $this->budgetSvc->getManagementBudgetRemaining($pid),
             ],
         ]);
     }

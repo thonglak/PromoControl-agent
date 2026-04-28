@@ -138,6 +138,44 @@ class BudgetMovementService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // 3a. getManagementBudgetRemaining — งบผู้บริหารคงเหลือทั้งโครงการ
+    //     คำนวณจาก movements ของ MANAGEMENT_SPECIAL (status=approved):
+    //     remaining = allocated - used - returned + transferred_in - transferred_out
+    //     หมายเหตุ: ใช้สูตรเดียวกับ getProjectBudgetTotals เพื่อความสอดคล้อง
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function getManagementBudgetRemaining(int $projectId): float
+    {
+        $rows = $this->db->table('budget_movements')
+            ->select('movement_type, SUM(amount) as total_amt')
+            ->where('project_id', $projectId)
+            ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
+            ->where('status', 'approved')
+            ->groupBy('movement_type')
+            ->get()->getResultArray();
+
+        $sum = [];
+        foreach ($rows as $r) {
+            $sum[$r['movement_type']] = (float) $r['total_amt'];
+        }
+
+        $allocated = 0;
+        foreach (self::ALLOCATE_TYPES as $t) $allocated += ($sum[$t] ?? 0);
+
+        $used = 0;
+        foreach (self::USE_TYPES as $t) $used += abs($sum[$t] ?? 0);
+
+        $returned = 0;
+        foreach (self::RETURN_TYPES as $t) $returned += abs($sum[$t] ?? 0);
+
+        $transferredIn  = $sum['SPECIAL_BUDGET_TRANSFER_IN']  ?? 0;
+        $transferredOut = abs($sum['SPECIAL_BUDGET_TRANSFER_OUT'] ?? 0);
+        $adjusted       = $sum['ADJUST'] ?? 0;
+
+        return round($allocated + $transferredIn - $used - $transferredOut - $returned + $adjusted, 2);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // 3b. getProjectBudgetTotals — aggregate ยอดรวมทั้งโครงการ (1 query)
     //     ใช้สำหรับ footer row ในหน้า list ไม่ต้อง loop ทีละ unit
     // ═══════════════════════════════════════════════════════════════════════

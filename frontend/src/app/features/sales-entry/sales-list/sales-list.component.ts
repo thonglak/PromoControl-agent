@@ -31,7 +31,6 @@ const TABLE_ID = 'sales-list';
 const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: 'sale_no',       label: 'เลขที่ขาย',  visible: true },
   { key: 'unit_code',     label: 'ยูนิต',      visible: true },
-  { key: 'customer_name', label: 'ลูกค้า',     visible: true },
   { key: 'sale_date',     label: 'วันที่ขาย',  visible: true },
   { key: 'net_price',     label: 'ราคาสุทธิ',  visible: true },
   { key: 'profit',        label: 'กำไร',       visible: true },
@@ -75,6 +74,37 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
           }
         </div>
       </app-page-header>
+
+      <!-- Summary cards -->
+      @if (summary()) {
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div class="bg-white rounded-lg border border-slate-200 p-4">
+            <p class="text-xs text-slate-500 mb-1">งบจัดสรรรวม</p>
+            <p class="text-xl font-bold text-slate-700 tabular-nums">฿{{ summary()!.total_budget_allocated | number:'1.0-0' }}</p>
+          </div>
+          <div class="bg-white rounded-lg border border-slate-200 p-4">
+            <p class="text-xs text-slate-500 mb-1">งบที่ใช้แล้ว</p>
+            <p class="text-xl font-bold text-amber-600 tabular-nums">฿{{ summary()!.total_budget_used | number:'1.0-0' }}</p>
+          </div>
+          <div class="bg-white rounded-lg border border-slate-200 p-4">
+            <p class="text-xs text-slate-500 mb-1">งบคงเหลือรวม</p>
+            <p class="text-xl font-bold tabular-nums"
+               [class.text-primary-700]="summary()!.total_budget_remaining >= 0"
+               [class.text-loss]="summary()!.total_budget_remaining < 0">
+              ฿{{ summary()!.total_budget_remaining | number:'1.0-0' }}
+            </p>
+          </div>
+          <div class="bg-white rounded-lg border border-slate-200 p-4">
+            <p class="text-xs text-slate-500 mb-1">งบผู้บริหารคงเหลือ</p>
+            <p class="text-xl font-bold tabular-nums"
+               [class.text-primary-700]="(summary()!.management_budget_remaining ?? 0) > 0"
+               [class.text-loss]="(summary()!.management_budget_remaining ?? 0) <= 0">
+              ฿{{ summary()!.management_budget_remaining | number:'1.0-0' }}
+            </p>
+            <p class="text-xs text-slate-400 mt-1">ยอด ณ ปัจจุบัน</p>
+          </div>
+        </div>
+      }
 
       <!-- Filter bar -->
       <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
@@ -138,12 +168,6 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               <ng-container matColumnDef="unit_code">
                 <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">ยูนิต</th>
                 <td mat-cell *matCellDef="let row" class="!text-sm !font-medium !text-slate-800">{{ row.unit_code }}</td>
-              </ng-container>
-
-              <!-- ลูกค้า -->
-              <ng-container matColumnDef="customer_name">
-                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">ลูกค้า</th>
-                <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-800">{{ row.customer_name }}</td>
               </ng-container>
 
               <!-- วันที่ขาย -->
@@ -304,7 +328,7 @@ export class SalesListComponent implements OnInit {
   readonly sortField = signal('st.sale_date');
   readonly sortDir = signal<'ASC' | 'DESC'>('DESC');
   readonly statusFilter = signal('');
-  readonly summary = signal<{ total_budget_remaining: number; total_budget_allocated: number; total_budget_used: number } | null>(null);
+  readonly summary = signal<{ total_budget_remaining: number; total_budget_allocated: number; total_budget_used: number; management_budget_remaining: number } | null>(null);
 
   searchControl = this.fb.control('');
 
@@ -448,7 +472,6 @@ export class SalesListComponent implements OnInit {
         id: row.id,
         sale_no: row.sale_no,
         unit_code: row.unit_code,
-        customer_name: row.customer_name,
         net_price: row.net_price,
         sale_date: row.sale_date,
       },

@@ -73,8 +73,6 @@ export interface SalesTransaction {
   total_promo_burden: number;
   total_cost: number;
   profit: number;
-  customer_name: string;
-  salesperson: string;
   sale_date: string;
   status: 'active' | 'cancelled';
   cancelled_at?: string;
@@ -118,7 +116,7 @@ export class SalesEntryService {
       .pipe(map(r => r.data));
   }
 
-  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { total_budget_remaining: number; total_budget_allocated: number; total_budget_used: number } }> {
+  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { total_budget_remaining: number; total_budget_allocated: number; total_budget_used: number; management_budget_remaining: number } }> {
     let p = new HttpParams();
     Object.entries(params).forEach(([k, v]) => { if (v != null && v !== '') p = p.set(k, v); });
     return this.http.get<any>('/api/sales-transactions', { params: p });

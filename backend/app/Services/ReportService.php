@@ -139,8 +139,11 @@ class ReportService
             'total_cost'                   => (float) ($agg['total_cost'] ?? 0),
             'total_profit'                 => $totalProfit,
             'avg_profit_margin_percent'    => $avgProfitMargin,
+            // งบผู้บริหารคงเหลือ — derive จาก movements approved (ไม่ขึ้นกับ date filter เพราะเป็น balance ปัจจุบัน)
+            'management_budget_remaining'  => (new BudgetMovementService())->getManagementBudgetRemaining($projectId),
         ];
     }
+
 
     /**
      * buildSalesItemsQuery — build query for items (respects all filters including transaction_status)

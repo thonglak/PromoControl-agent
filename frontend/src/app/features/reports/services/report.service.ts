@@ -58,6 +58,7 @@ export interface SalesSummary {
   total_cost: number;
   total_profit: number;
   avg_profit_margin_percent: number;
+  management_budget_remaining: number;
 }
 
 export interface SalesReport {
