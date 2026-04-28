@@ -99,7 +99,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
           <div class="left-col">
 
             <!-- ข้อมูลยูนิต -->
-            <app-section-card title="ข้อมูลยูนิตและลูกค้า" icon="building-office" class="mb-8">
+            <app-section-card title="ข้อมูลยูนิต" icon="building-office" class="mb-8">
               <div class="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                 <div class="detail-field">
                   <span class="detail-label">โครงการ</span>
@@ -112,14 +112,6 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                 <div class="detail-field">
                   <span class="detail-label">วันที่ขาย</span>
                   <span class="detail-value">{{ tx().sale_date | thaiDate:'auto' }}</span>
-                </div>
-                <div class="detail-field">
-                  <span class="detail-label">ชื่อลูกค้า</span>
-                  <span class="detail-value">{{ tx().customer_name }}</span>
-                </div>
-                <div class="detail-field">
-                  <span class="detail-label">พนักงานขาย</span>
-                  <span class="detail-value">{{ tx().salesperson }}</span>
                 </div>
                 <div class="detail-field">
                   <span class="detail-label">ราคาขาย</span>
@@ -273,7 +265,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
           <div class="right-col">
             <div class="sticky-sidebar">
 
-              <!-- สรุปการขาย -->
+              <!-- สรุปการขาย — เน้นเฉพาะ sales metrics (ไม่ซ้อนกับ panel งบประมาณด้านล่าง) -->
               <div class="section-card summary-box">
                 <h3 class="font-semibold mb-4" style="font-size: var(--font-size-card-title); color: var(--color-text-primary)">สรุปการขาย</h3>
 
@@ -286,7 +278,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
 
                   <!-- ส่วนลดทั้งหมด -->
                   <div class="s-row">
-                    <span class="s-label">ส่วนลดทั้งหมด (Total Discount)</span>
+                    <span class="s-label">ส่วนลดทั้งหมด</span>
                     <span class="s-value tabular-nums text-discount">
                       @if (n(tx().total_discount) > 0) { - }{{ n(tx().total_discount) | number:'1.0-0' }}
                     </span>
@@ -302,35 +294,29 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
 
                   <!-- ต้นทุนของแถม -->
                   <div class="s-row">
-                    <span class="s-label">ต้นทุนของแถม (Promo Cost)</span>
+                    <span class="s-label">ต้นทุนของแถม</span>
                     <span class="s-value tabular-nums">{{ n(tx().total_promo_cost) | number:'1.0-0' }}</span>
                   </div>
 
                   <!-- ค่าใช้จ่ายอุดหนุน -->
                   <div class="s-row">
-                    <span class="s-label">ค่าใช้จ่ายอุดหนุน (Expense Support)</span>
+                    <span class="s-label">ค่าใช้จ่ายอุดหนุน</span>
                     <span class="s-value tabular-nums">{{ n(tx().total_expense_support) | number:'1.0-0' }}</span>
                   </div>
 
-                  <!-- ต้นทุนจากของแถม -->
-                  <div class="s-row text-xs" style="color: var(--color-gray-500)">
-                    <span>ต้นทุนจากของแถม (Promo Cost + Expense)</span>
-                    <span class="tabular-nums">{{ n(tx().total_promo_burden) | number:'1.0-0' }}</span>
-                  </div>
-
-                  <!-- สุทธิ -->
+                  <!-- สุทธิหลังของแถม (subtotal) -->
                   <div class="s-row font-semibold" style="border-top: 1px solid var(--color-gray-200); padding-top: 8px; color: var(--color-text-primary)">
-                    <span>สุทธิ</span>
+                    <span>สุทธิหลังของแถม</span>
                     <span class="tabular-nums">{{ netAfterPromo() | number:'1.0-0' }}</span>
                   </div>
 
-                  <div class="s-sep"></div>
-
                   <!-- ต้นทุนยูนิต -->
                   <div class="s-row">
-                    <span class="s-label">ต้นทุนยูนิต (Unit Cost)</span>
+                    <span class="s-label">ต้นทุนยูนิต</span>
                     <span class="s-value tabular-nums">{{ n(tx().unit_cost) | number:'1.0-0' }}</span>
                   </div>
+
+                  <div class="s-sep"></div>
 
                   <!-- กำไร -->
                   <div class="s-row s-row--profit"
@@ -339,43 +325,125 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                     <span class="text-base font-bold">กำไร (Profit)</span>
                     <span class="tabular-nums text-base font-bold">{{ n(tx().profit) | number:'1.0-0' }}</span>
                   </div>
+                </div>
+              </div>
 
-                  <div class="s-sep"></div>
+              <!-- สรุปการใช้งบประมาณ — สถานะงบของยูนิตและการใช้ในรายการนี้ -->
+              <div class="section-card summary-box mt-4">
+                <h3 class="font-semibold mb-1" style="font-size: var(--font-size-card-title); color: var(--color-text-primary)">สรุปการใช้งบประมาณ</h3>
+                <p class="text-xs mb-4" style="color: var(--color-text-secondary)">สถานะงบของยูนิตและการใช้ในรายการนี้</p>
 
-                  <!-- งบยูนิตใช้ไป / งบยูนิตเหลือ -->
-                  <div class="flex justify-between py-1 text-xs" style="color: var(--color-gray-500)">
-                    <div class="flex gap-3">
-                      <span>งบยูนิตใช้ไป: <span class="tabular-nums font-medium" style="color: var(--color-text-primary)">{{ n(bs().unit_budget_used) | number:'1.0-0' }}</span></span>
-                      <span style="color: var(--color-gray-300)">|</span>
-                      <span>งบยูนิตเหลือ:
-                        <span class="tabular-nums font-medium"
-                          [class.text-loss]="n(bs().unit_budget_remaining) < 0"
-                          [class.text-profit]="n(bs().unit_budget_remaining) > 0">
-                          {{ n(bs().unit_budget_remaining) | number:'1.0-0' }}
-                        </span>
+                <!-- ── ส่วนที่ 1: สถานะงบของยูนิต (3 buckets) ─────────── -->
+                <p class="bg-section-label">สถานะงบของยูนิต</p>
+                <div class="space-y-2 text-sm">
+                  <!-- งบมาตรฐาน (UNIT_STANDARD) -->
+                  <div class="bg-bucket">
+                    <div class="bg-bucket__head">
+                      <span class="bg-bucket__name">
+                        <span class="bg-dot" style="background: var(--color-primary)"></span>
+                        งบมาตรฐาน (Unit)
+                      </span>
+                      <span class="tabular-nums font-medium">฿{{ n(bs().unit_budget) | number:'1.0-0' }}</span>
+                    </div>
+                    <div class="bg-bucket__row">
+                      <span class="s-label">ใช้ไปแล้ว</span>
+                      <span class="tabular-nums text-discount">{{ n(bs().unit_budget_used) | number:'1.0-0' }}</span>
+                    </div>
+                    <div class="bg-bucket__row">
+                      <span class="s-label">คงเหลือ</span>
+                      <span class="tabular-nums font-semibold"
+                        [class.text-loss]="n(bs().unit_budget_remaining) < 0"
+                        [class.text-profit]="n(bs().unit_budget_remaining) >= 0">
+                        {{ n(bs().unit_budget_remaining) | number:'1.0-0' }}
                       </span>
                     </div>
                   </div>
 
-                  <!-- งบคงเหลือรวม -->
-                  <div class="s-row">
-                    <span class="s-label">งบคงเหลือรวม</span>
-                    <span class="s-value tabular-nums font-medium"
-                      [class.text-loss]="n(bs().total_remaining) < 0"
-                      [class.text-profit]="n(bs().total_remaining) > 0">
-                      {{ n(bs().total_remaining) | number:'1.0-0' }}
-                    </span>
+                  <!-- งบ Pool -->
+                  <div class="bg-bucket">
+                    <div class="bg-bucket__head">
+                      <span class="bg-bucket__name">
+                        <span class="bg-dot" style="background: var(--color-info)"></span>
+                        งบ Pool (โครงการ)
+                      </span>
+                      <span class="tabular-nums font-medium">฿{{ n(bs().pool_budget) | number:'1.0-0' }}</span>
+                    </div>
+                    <div class="bg-bucket__row">
+                      <span class="s-label">ใช้ไปแล้ว</span>
+                      <span class="tabular-nums text-discount">{{ n(bs().pool_budget_used) | number:'1.0-0' }}</span>
+                    </div>
+                    <div class="bg-bucket__row">
+                      <span class="s-label">คงเหลือ</span>
+                      <span class="tabular-nums font-semibold"
+                        [class.text-loss]="n(bs().pool_budget_remaining) < 0"
+                        [class.text-profit]="n(bs().pool_budget_remaining) >= 0">
+                        {{ n(bs().pool_budget_remaining) | number:'1.0-0' }}
+                      </span>
+                    </div>
                   </div>
 
-                  <!-- งบนอกสุทธิที่ใช้ -->
+                  <!-- งบผู้บริหาร (MANAGEMENT_SPECIAL) -->
+                  <div class="bg-bucket">
+                    <div class="bg-bucket__head">
+                      <span class="bg-bucket__name">
+                        <span class="bg-dot" style="background: var(--color-warning)"></span>
+                        งบผู้บริหาร
+                      </span>
+                      <span class="tabular-nums font-medium">฿{{ n(bs().mgmt_budget) | number:'1.0-0' }}</span>
+                    </div>
+                    <div class="bg-bucket__row">
+                      <span class="s-label">ใช้ไปแล้ว</span>
+                      <span class="tabular-nums text-discount">{{ n(bs().mgmt_budget_used) | number:'1.0-0' }}</span>
+                    </div>
+                    <div class="bg-bucket__row">
+                      <span class="s-label">คงเหลือ</span>
+                      <span class="tabular-nums font-semibold"
+                        [class.text-loss]="n(bs().mgmt_budget_remaining) < 0"
+                        [class.text-profit]="n(bs().mgmt_budget_remaining) >= 0">
+                        {{ n(bs().mgmt_budget_remaining) | number:'1.0-0' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="s-sep"></div>
+
+                <!-- ── ส่วนที่ 2: การใช้ในรายการขายนี้ ─────────────── -->
+                <p class="bg-section-label">การใช้ในรายการขายนี้</p>
+                <div class="space-y-1 text-sm">
                   <div class="s-row">
-                    <span class="s-label">งบนอกสุทธิที่ใช้</span>
-                    <span class="s-value tabular-nums font-medium"
+                    <span class="s-label">งบยูนิต</span>
+                    <span class="s-value tabular-nums">{{ unitTotal() | number:'1.0-0' }}</span>
+                  </div>
+                  <div class="s-row">
+                    <span class="s-label">งบนอก (Pool + ผู้บริหาร)</span>
+                    <span class="s-value tabular-nums">{{ otherTotal() | number:'1.0-0' }}</span>
+                  </div>
+                  <div class="s-row font-semibold" style="border-top: 1px solid var(--color-gray-200); padding-top: 6px; color: var(--color-text-primary)">
+                    <span>รวมที่ใช้</span>
+                    <span class="tabular-nums">{{ allItemsTotal() | number:'1.0-0' }}</span>
+                  </div>
+                  <div class="s-row text-xs" style="color: var(--color-gray-500)">
+                    <span>งบนอกสุทธิที่ใช้
+                      <span matTooltip="งบอื่นที่ใช้ในรายการนี้ - งบยูนิตคงเหลือ" class="cursor-help">ⓘ</span>
+                    </span>
+                    <span class="tabular-nums font-medium"
                       [class.text-discount]="netExtraBudgetUsed() > 0"
                       [class.text-profit]="netExtraBudgetUsed() <= 0">
                       {{ netExtraBudgetUsed() | number:'1.0-0' }}
                     </span>
                   </div>
+                </div>
+
+                <div class="s-sep"></div>
+
+                <!-- งบรวมคงเหลือ (highlight) -->
+                <div class="s-row s-row--highlight">
+                  <span class="font-bold">งบรวมคงเหลือทั้งยูนิต</span>
+                  <span class="tabular-nums text-base font-bold"
+                    [class.text-loss]="n(bs().total_remaining) < 0">
+                    {{ n(bs().total_remaining) | number:'1.0-0' }}
+                  </span>
                 </div>
               </div>
 
@@ -562,6 +630,54 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
       border-top: 2px solid var(--color-gray-300);
       margin: 2px 0;
     }
+
+    /* ── Budget section label ── */
+    .bg-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 0 0 8px 0;
+    }
+
+    /* ── Budget Bucket (สรุปการใช้งบประมาณ) ── */
+    .bg-bucket {
+      padding: 10px 12px;
+      border: 1px solid var(--color-gray-200);
+      border-radius: var(--radius-sm);
+      background: var(--color-gray-50);
+    }
+    .bg-bucket__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid var(--color-gray-200);
+      font-size: 13px;
+      color: var(--color-text-primary);
+    }
+    .bg-bucket__name {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    .bg-bucket__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      font-size: 12px;
+    }
+    .bg-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: inline-block;
+    }
   `],
 })
 export class SalesDetailComponent implements OnInit {
@@ -664,7 +780,7 @@ export class SalesDetailComponent implements OnInit {
   openTransferDialog(): void {
     const ref = this.dialog.open(TransferDialogComponent, {
       width: '450px',
-      data: { transaction: { id: this.tx().id, sale_no: this.tx().sale_no, unit_code: this.tx().unit_code, customer_name: this.tx().customer_name, net_price: this.tx().net_price } }
+      data: { transaction: { id: this.tx().id, sale_no: this.tx().sale_no, unit_code: this.tx().unit_code, net_price: this.tx().net_price } }
     });
     ref.afterClosed().subscribe(result => {
       if (result?.success) {
@@ -677,7 +793,7 @@ export class SalesDetailComponent implements OnInit {
   openCancelDialog(): void {
     const ref = this.dialog.open(CancelSaleDialogComponent, {
       width: '520px',
-      data: { id: this.tx().id, sale_no: this.tx().sale_no, unit_code: this.tx().unit_code, customer_name: this.tx().customer_name, net_price: this.tx().net_price, sale_date: this.tx().sale_date }
+      data: { id: this.tx().id, sale_no: this.tx().sale_no, unit_code: this.tx().unit_code, net_price: this.tx().net_price, sale_date: this.tx().sale_date }
     });
     ref.afterClosed().subscribe(result => {
       if (result?.success) {
