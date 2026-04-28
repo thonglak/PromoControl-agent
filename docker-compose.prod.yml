@@ -7,8 +7,11 @@
 services:
 
   # MySQL 8 — Production
+  # pin minor version: mysql:8.0 ยัง support default-authentication-plugin
+  # ถ้าจะใช้ mysql:8.4+ ต้องตัด flag --default-authentication-plugin ออก
+  # (8.4 ใช้ caching_sha2_password เป็น default ตายตัว)
   promo_mysql_prod:
-    image: mysql:8
+    image: mysql:8.0
     container_name: promo_mysql_prod
     restart: unless-stopped
     environment:
