@@ -1,12 +1,13 @@
 # ─────────────────────────────────────────────────────────────
 # Production PHP-FPM image — CodeIgniter 4 backend
-#  - copy backend code เข้า image (ไม่ mount จาก host)
-#  - composer install --no-dev --optimize-autoloader
-#  - เปิด opcache เร่งความเร็ว production
+#  - Stage 1 (builder): compile extensions + composer install --no-dev
+#  - Stage 2 (final):   runtime libs + copy compiled extensions
+#  - opcache validate_timestamps=0 (deploy → restart container)
 # ─────────────────────────────────────────────────────────────
 
 FROM php:8.2-fpm-alpine AS builder
 
+# Build deps (รวม -dev headers สำหรับ compile PHP extensions)
 RUN apk add --no-cache \
         git \
         unzip \
@@ -43,22 +44,20 @@ COPY backend/ ./
 RUN composer dump-autoload --optimize --no-dev
 
 # ─────────────────────────────────────────────────────────────
-# Final image — ลด size, ไม่มี git/composer/build tools
+# Final image — runtime libs + extension binaries จาก builder
+#  ไม่มี git/composer/dev tools เพื่อลด attack surface และ size
 # ─────────────────────────────────────────────────────────────
 FROM php:8.2-fpm-alpine
 
+# ติดตั้งเฉพาะ runtime libraries (ไม่มี -dev)
 RUN apk add --no-cache \
-        icu \
+        icu-libs \
         libzip \
-        oniguruma \
-    && docker-php-ext-install -j$(nproc) \
-        pdo_mysql \
-        mysqli \
-        mbstring \
-        zip \
-        bcmath \
-        intl \
-        opcache
+        oniguruma
+
+# Copy compiled extension binaries (.so) + ไฟล์ config ที่โหลด extension
+COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
 # Production opcache config
 RUN { \
