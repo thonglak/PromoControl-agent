@@ -7,8 +7,15 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { forkJoin, from, of } from 'rxjs';
+import { catchError, concatMap, map, toArray } from 'rxjs/operators';
 
-import { SyncFromApiService, MappingPreset } from '../sync-from-api.service';
+import {
+  SyncFromApiService,
+  MappingPreset,
+  MappingColumn,
+  MappingPresetDetail,
+} from '../sync-from-api.service';
 import { ProjectService } from '../../../core/services/project.service';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
 import { SectionCardComponent } from '../../../shared/components/section-card/section-card.component';
@@ -16,6 +23,25 @@ import {
   MappingPresetFormDialogComponent,
   MappingPresetFormDialogData,
 } from './dialogs/mapping-preset-form-dialog.component';
+
+interface MappingPresetJson {
+  name: string;
+  target_table: string;
+  upsert_key: string;
+  project_id_mode: 'from_snapshot' | 'from_field' | 'none';
+  project_id_field: string | null;
+  is_default: boolean;
+  columns: Omit<MappingColumn, 'id' | 'preset_id'>[];
+}
+
+interface MappingPresetBundle {
+  format: 'mapping-presets.bundle.v1';
+  exported_at: string;
+  source_project_id?: number;
+  source_project_name?: string;
+  count: number;
+  items: MappingPresetJson[];
+}
 
 @Component({
   selector: 'app-api-field-mapping-list',
@@ -44,11 +70,29 @@ import {
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <button mat-stroked-button (click)="fileInput.click()" class="flex items-center gap-2">
-            <app-icon name="arrow-up-tray" class="w-4 h-4" />
+          <button mat-stroked-button (click)="exportAll()"
+                  [disabled]="exporting() || presets().length === 0"
+                  matTooltip="ส่งออกทุก preset ของโครงการเป็นไฟล์ JSON เดียว"
+                  class="flex items-center gap-2">
+            @if (exporting()) {
+              <mat-spinner diameter="16" class="!inline-block" />
+            } @else {
+              <app-icon name="arrow-down-tray" class="w-4 h-4" />
+            }
+            Export ทั้งหมด
+          </button>
+          <button mat-stroked-button (click)="fileInput.click()"
+                  [disabled]="importing()"
+                  matTooltip="นำเข้าไฟล์ JSON (รองรับทั้ง preset เดียวและ bundle หลายตัว)"
+                  class="flex items-center gap-2">
+            @if (importing()) {
+              <mat-spinner diameter="16" class="!inline-block" />
+            } @else {
+              <app-icon name="arrow-up-tray" class="w-4 h-4" />
+            }
             Import
           </button>
-          <input #fileInput type="file" accept=".json" hidden (change)="onImportFile($event)" />
+          <input #fileInput type="file" accept=".json,application/json" hidden (change)="onImportFile($event)" />
           <button mat-flat-button color="primary" (click)="openCreate()" class="flex items-center gap-2">
             <app-icon name="plus" class="w-4 h-4" />
             สร้าง Preset ใหม่
@@ -212,9 +256,11 @@ export class ApiFieldMappingListComponent implements OnInit {
 
   readonly Number = Number;
 
-  loading  = signal(false);
-  presets  = signal<MappingPreset[]>([]);
-  columns  = ['name', 'target_table', 'project_id_mode', 'columns_count', 'is_default', 'created_at', 'actions'];
+  loading   = signal(false);
+  exporting = signal(false);
+  importing = signal(false);
+  presets   = signal<MappingPreset[]>([]);
+  columns   = ['name', 'target_table', 'project_id_mode', 'columns_count', 'is_default', 'created_at', 'actions'];
 
   readonly projectId = computed(() => Number(this.project.selectedProject()?.id ?? 0));
 
@@ -266,21 +312,205 @@ export class ApiFieldMappingListComponent implements OnInit {
     });
   }
 
+  /** Export ทุก preset ของโครงการเป็นไฟล์ bundle เดียว */
+  exportAll(): void {
+    const list = this.presets();
+    if (list.length === 0) {
+      this.snack.open('ไม่มี preset ให้ส่งออก', 'ปิด', { duration: 3000 });
+      return;
+    }
+
+    this.exporting.set(true);
+    forkJoin(list.map(p => this.api.getMappingPreset(p.id))).subscribe({
+      next: details => {
+        const project = this.project.selectedProject();
+        const payload: MappingPresetBundle = {
+          format:              'mapping-presets.bundle.v1',
+          exported_at:         new Date().toISOString(),
+          source_project_id:   project ? Number(project.id) : undefined,
+          source_project_name: project?.name,
+          count:               details.length,
+          items:               details.map(d => this.toJson(d)),
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        const ts   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const safe = (project?.name ?? 'project').replace(/[^a-zA-Z0-9ก-๙_-]+/g, '_').slice(0, 60);
+        a.href     = url;
+        a.download = `mapping-presets_${safe}_${ts}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.exporting.set(false);
+        this.snack.open(`ส่งออก ${details.length} preset สำเร็จ`, 'ปิด', { duration: 3000 });
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.snack.open('Export ไม่สำเร็จ', 'ปิด', { duration: 3000 });
+      },
+    });
+  }
+
   onImportFile(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file) return;
+    if (!file) {
+      input.value = '';
+      return;
+    }
 
+    // อ่านไฟล์ก่อนเพื่อตรวจ format — bundle หรือ single preset
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? ''));
+
+        // Bundle format → import ฝั่ง client (loop create)
+        if (parsed?.format === 'mapping-presets.bundle.v1' && Array.isArray(parsed.items)) {
+          this.confirmImportBundle(parsed.items as unknown[]);
+        } else {
+          // Single preset format → ส่งไฟล์ตรงเข้า backend (endpoint เดิม)
+          this.importSinglePreset(file);
+        }
+      } catch {
+        this.snack.open('ไฟล์ JSON ไม่ถูกต้อง', 'ปิด', { duration: 3000 });
+      } finally {
+        input.value = '';
+      }
+    };
+    reader.onerror = () => {
+      this.snack.open('อ่านไฟล์ไม่สำเร็จ', 'ปิด', { duration: 3000 });
+      input.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  private importSinglePreset(file: File): void {
+    this.importing.set(true);
     this.api.importMappingPreset(this.projectId(), file).subscribe({
       next: () => {
+        this.importing.set(false);
         this.snack.open('Import สำเร็จ', 'ปิด', { duration: 3000 });
         this.loadPresets();
       },
-      error: err => this.snack.open(err.error?.error ?? 'Import ไม่สำเร็จ', 'ปิด', { duration: 4000 }),
+      error: err => {
+        this.importing.set(false);
+        this.snack.open(err.error?.error ?? 'Import ไม่สำเร็จ', 'ปิด', { duration: 4000 });
+      },
     });
+  }
 
-    // Reset input เพื่อให้เลือกไฟล์เดิมซ้ำได้
-    input.value = '';
+  private confirmImportBundle(rawItems: unknown[]): void {
+    const items = rawItems
+      .map(r => this.normalizePreset(r))
+      .filter((r): r is MappingPresetJson => r !== null);
+
+    if (items.length === 0) {
+      this.snack.open('ไฟล์ไม่มี preset ที่นำเข้าได้', 'ปิด', { duration: 3000 });
+      return;
+    }
+
+    if (!confirm(`ต้องการนำเข้า ${items.length} preset เข้าโครงการนี้?\n\nหมายเหตุ: ชื่อที่ซ้ำกับของเดิมจะถูกต่อท้าย (copy)`)) return;
+
+    const projectId  = this.projectId();
+    const usedNames  = new Set(this.presets().map(p => p.name));
+
+    this.importing.set(true);
+    from(items).pipe(
+      concatMap(item => {
+        const finalName = this.uniqueName(item.name, usedNames);
+        usedNames.add(finalName);
+
+        return this.api.createMappingPreset({
+          project_id:       projectId,
+          name:             finalName,
+          target_table:     item.target_table,
+          upsert_key:       item.upsert_key,
+          project_id_mode:  item.project_id_mode,
+          project_id_field: item.project_id_field,
+          is_default:       false, // import ไม่ตั้ง default
+          columns:          item.columns.map((c, i) => ({
+            source_field:    c.source_field,
+            target_field:    c.target_field,
+            transform_type:  c.transform_type,
+            transform_value: c.transform_value ?? null,
+            sort_order:      Number(c.sort_order ?? i),
+          })),
+        }).pipe(
+          map(()  => ({ ok: true,  name: finalName })),
+          catchError(err => of({ ok: false, name: finalName, error: err?.error?.error ?? 'สร้างไม่สำเร็จ' })),
+        );
+      }),
+      toArray(),
+    ).subscribe(results => {
+      this.importing.set(false);
+      const success = results.filter(r => r.ok).length;
+      const failed  = results.length - success;
+      const msg = failed === 0
+        ? `นำเข้าสำเร็จ ${success} preset`
+        : `นำเข้าสำเร็จ ${success} preset ผิดพลาด ${failed} preset`;
+      this.snack.open(msg, 'ปิด', { duration: 4000 });
+      this.loadPresets();
+    });
+  }
+
+  private toJson(d: MappingPresetDetail): MappingPresetJson {
+    return {
+      name:             d.name,
+      target_table:     d.target_table,
+      upsert_key:       d.upsert_key,
+      project_id_mode:  d.project_id_mode,
+      project_id_field: d.project_id_field,
+      is_default:       !!Number(d.is_default),
+      columns: (d.columns ?? []).map(c => ({
+        source_field:    c.source_field,
+        target_field:    c.target_field,
+        transform_type:  c.transform_type,
+        transform_value: c.transform_value ?? null,
+        sort_order:      Number(c.sort_order ?? 0),
+      })),
+    };
+  }
+
+  private normalizePreset(row: unknown): MappingPresetJson | null {
+    const r        = row as Record<string, unknown>;
+    const name     = String(r?.['name'] ?? '').trim();
+    const columns  = Array.isArray(r?.['columns']) ? (r['columns'] as unknown[]) : null;
+    if (!name || !columns || columns.length === 0) return null;
+
+    const mode = String(r['project_id_mode'] ?? 'from_snapshot');
+    const validMode: MappingPresetJson['project_id_mode'] =
+      mode === 'from_field' || mode === 'none' ? mode : 'from_snapshot';
+
+    return {
+      name,
+      target_table:     String(r['target_table'] ?? 'project_units'),
+      upsert_key:       String(r['upsert_key'] ?? 'unit_code'),
+      project_id_mode:  validMode,
+      project_id_field: r['project_id_field'] ? String(r['project_id_field']) : null,
+      is_default:       false,
+      columns: columns.map((c) => {
+        const cc = c as Record<string, unknown>;
+        return {
+          source_field:    String(cc['source_field'] ?? ''),
+          target_field:    String(cc['target_field'] ?? ''),
+          transform_type:  (cc['transform_type'] ?? 'none') as MappingColumn['transform_type'],
+          transform_value: cc['transform_value'] != null ? String(cc['transform_value']) : null,
+          sort_order:      Number(cc['sort_order'] ?? 0),
+        };
+      }).filter(c => c.source_field && c.target_field),
+    };
+  }
+
+  private uniqueName(base: string, used: Set<string>): string {
+    if (!used.has(base)) return base;
+    let i = 1;
+    while (used.has(`${base} (copy${i === 1 ? '' : ' ' + i})`)) i++;
+    return `${base} (copy${i === 1 ? '' : ' ' + i})`;
   }
 
   confirmDelete(preset: MappingPreset): void {
