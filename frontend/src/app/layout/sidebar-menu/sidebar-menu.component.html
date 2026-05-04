@@ -14,7 +14,10 @@
       <!-- Expanded: show project name, badge, change button -->
       <div class="flex items-start gap-2">
         <div class="flex-1 min-w-0">
-          <p class="text-[10px] text-white/40 uppercase tracking-wide mb-0.5 font-medium">PromoControl</p>
+          <p class="text-[10px] text-white/40 uppercase tracking-wide mb-0.5 font-medium">
+            PromoControl
+            <span class="ml-1 normal-case tracking-normal text-white/30">v{{ appVersion }}</span>
+          </p>
           <p class="text-sm font-semibold text-white truncate leading-tight">
             {{ selectedProject()?.name ?? '—' }}
           </p>

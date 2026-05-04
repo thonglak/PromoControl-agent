@@ -10,6 +10,7 @@ import { Subscription, filter } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ProjectService } from '../../core/services/project.service';
 import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
+import { environment } from '../../../environments/environment';
 
 // ── Menu type definitions ────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ export class SidebarMenuComponent implements OnInit, OnDestroy {
 
   readonly selectedProject = this.projectService.selectedProject;
   readonly currentUser     = this.auth.currentUser;
+  readonly appVersion      = environment.version;
 
   /** กลุ่มที่ expand อยู่ */
   readonly expandedGroups = signal(new Set<string>());
