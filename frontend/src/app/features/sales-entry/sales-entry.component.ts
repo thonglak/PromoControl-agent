@@ -17,6 +17,7 @@ import { SummarySectionComponent, BudgetSummary } from './summary-section/summar
 import { ConfirmSaleDialogComponent, ConfirmSaleDialogData } from './confirm-sale-dialog.component';
 import { Unit } from '../master-data/units/unit-api.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
 
 /** แปลง Date หรือ Moment → YYYY-MM-DD string */
 function toISODateStr(d: any): string {
@@ -31,7 +32,7 @@ function toISODateStr(d: any): string {
   selector: 'app-sales-entry',
   standalone: true,
   imports: [
-    PageHeaderComponent,
+    PageHeaderComponent, SvgIconComponent,
     CommonModule, MatSnackBarModule, MatButtonModule, MatProgressSpinnerModule, MatDialogModule,
     UnitInfoSectionComponent, BudgetOverviewSectionComponent,
     PremiumPromotionPanelComponent, AdditionalPromotionPanelComponent,
@@ -39,7 +40,15 @@ function toISODateStr(d: any): string {
   ],
   template: `
     <div class="p-6" style="max-width: 1440px; margin: 0 auto;">
-      <app-page-header [title]="editMode() ? 'แก้ไขรายการขาย' : 'บันทึกรายการขาย'" [subtitle]="editMode() ? '#' + editTransaction()?.sales_transaction?.sale_no : 'บันทึกข้อมูลการขายและโปรโมชั่น'" />
+      <app-page-header [title]="editMode() ? 'แก้ไขรายการขาย' : 'บันทึกรายการขาย'" [subtitle]="editMode() ? '#' + editTransaction()?.sales_transaction?.sale_no : 'บันทึกข้อมูลการขายและโปรโมชั่น'">
+        @if (editMode()) {
+          <div actions class="flex items-center gap-2">
+            <button mat-stroked-button (click)="goBack()">
+              <app-icon name="arrow-left" class="w-4 h-4 mr-1" /> ย้อนกลับ
+            </button>
+          </div>
+        }
+      </app-page-header>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- ── Left column: form sections (2/3) ── -->
@@ -321,6 +330,11 @@ export class SalesEntryComponent implements OnInit {
       };
     });
   });
+
+  goBack(): void {
+    const id = this.editTxId();
+    this.router.navigate(id > 0 ? ['/sales', id] : ['/sales/list']);
+  }
 
   // ─── Event Handlers ──────────────────────────────────────────────────
 
