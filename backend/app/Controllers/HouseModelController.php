@@ -177,16 +177,42 @@ class HouseModelController extends BaseController
             return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์ลบแบบบ้านในโครงการนี้']);
         }
 
-        // ตรวจว่ามี units อ้างอิงอยู่ (sold/transferred ห้ามลบ, available/reserved ต้องลบทิ้งก่อน)
-        $db = \Config\Database::connect();
-        $soldCount = $db->table('project_units')
+        // ตรวจว่ามี units อ้างอิงอยู่:
+        //   sold/transferred → ห้ามลบเด็ดขาด (ขาย/โอนแล้วมีประวัติ ห้ามแตะ)
+        //   available/reserved → user ต้องตั้งใจลบยูนิตก่อน (กัน accident cascade)
+        $db    = \Config\Database::connect();
+        $units = $db->table('project_units')
+            ->select('unit_code, status')
             ->where('house_model_id', $id)
-            ->countAllResults();
+            ->orderBy('status', 'ASC')
+            ->orderBy('unit_code', 'ASC')
+            ->get()
+            ->getResultArray();
 
-        if ($soldCount > 0) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'error' => 'ไม่สามารถลบแบบบ้านที่มียูนิตขายแล้วได้',
-            ]);
+        if (! empty($units)) {
+            $sold       = array_values(array_filter($units, fn($u) => in_array($u['status'], ['sold', 'transferred'], true)));
+            $editable   = array_values(array_filter($units, fn($u) => in_array($u['status'], ['available', 'reserved'], true)));
+
+            // กรณี 1: มียูนิตที่ขาย/โอนแล้ว → block ถาวร
+            if (! empty($sold)) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'error' => 'ไม่สามารถลบแบบบ้านได้ เนื่องจากมียูนิตที่ขายหรือโอนแล้ว ' . count($sold) . ' ยูนิต',
+                    'units' => $sold,
+                ]);
+            }
+
+            // กรณี 2: มียูนิตที่ยังว่าง/จอง → ขอให้ user ลบยูนิตเอง พร้อมแจ้งรหัส
+            if (! empty($editable)) {
+                $codes   = array_column($editable, 'unit_code');
+                $preview = implode(', ', array_slice($codes, 0, 5));
+                if (count($codes) > 5) {
+                    $preview .= ' …และอีก ' . (count($codes) - 5) . ' ยูนิต';
+                }
+                return $this->response->setStatusCode(400)->setJSON([
+                    'error' => 'กรุณาลบยูนิต ' . count($editable) . ' ยูนิต (' . $preview . ') ก่อนลบแบบบ้านนี้',
+                    'units' => $editable,
+                ]);
+            }
         }
 
         $this->model->delete($id);
