@@ -110,10 +110,12 @@ class NumberSeriesService
                 [$projectId, $documentType]
             )->getRowArray();
 
-            // ─── 2. ถ้าไม่พบ → ใช้ fallback default pattern ──────────
+            // ─── 2. ถ้าไม่พบ → auto-provision series row จาก default config ──
+            //     (เลี่ยง generateFallback เก่าที่คืนเลขซ้ำเสมอ → duplicate key)
             if (!$series) {
-                $this->db->transCommit();
-                return $this->generateFallback($documentType);
+                $this->db->transRollback();
+                $this->autoProvisionSeries($projectId, $documentType);
+                return $this->generate($projectId, $documentType, $referenceId, $referenceTable, $generatedBy);
             }
 
             $now   = date('Y-m-d');
@@ -441,16 +443,49 @@ class NumberSeriesService
     }
 
     // =====================================================================
-    //  Private helper: Fallback default pattern
+    //  Private helper: Auto-provision missing series
     // =====================================================================
 
     /**
-     * Fallback: ถ้าไม่พบ series ที่ active → ใช้ pattern default
-     * รูปแบบ: {TYPE}{YYYYMMDD}{0001}
+     * สร้าง number_series row อัตโนมัติเมื่อโครงการไม่มี series ของ document_type นี้
+     * (เกิดจากโครงการเก่าที่สร้างก่อนระบบ number series หรือถูกลบทิ้ง)
+     *
+     * ใช้ INSERT IGNORE — ถ้า race condition ทำให้อีก request สร้างไปก่อนแล้ว
+     * (UNIQUE KEY project_id+document_type) ก็จะ no-op และให้ผู้เรียก recurse
      */
-    private function generateFallback(string $documentType): string
+    private function autoProvisionSeries(int $projectId, string $documentType): void
     {
-        return $documentType . date('Ymd') . '0001';
+        $config = null;
+        foreach (self::DEFAULT_SERIES as $c) {
+            if ($c['document_type'] === $documentType) { $config = $c; break; }
+        }
+        if (!$config) {
+            throw new RuntimeException("ไม่พบ default config สำหรับ document_type: {$documentType}");
+        }
+
+        $now    = date('Y-m-d H:i:s');
+        $sample = $this->buildNumber($config, 1, date('Y-m-d'));
+
+        $this->db->query(
+            'INSERT IGNORE INTO number_series
+             (project_id, document_type, prefix, separator, year_format, year_separator,
+              running_digits, reset_cycle, next_number, last_reset_date, sample_output,
+              is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, 1, ?, ?)',
+            [
+                $projectId,
+                $config['document_type'],
+                $config['prefix'],
+                $config['separator'],
+                $config['year_format'],
+                $config['year_separator'],
+                $config['running_digits'],
+                $config['reset_cycle'],
+                $sample,
+                $now,
+                $now,
+            ]
+        );
     }
 
     // =====================================================================
