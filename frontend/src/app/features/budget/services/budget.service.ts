@@ -114,6 +114,35 @@ export interface ReturnHistoryItem {
 export interface PaginatedReturnHistory {
   data: ReturnHistoryItem[]; total: number; page: number; per_page: number;
 }
+
+export interface UnitBudgetSettingItem {
+  id: number;
+  code: string;
+  name: string;
+  value: number;
+}
+
+export interface UnitBudgetSettingRow {
+  unit_id: number;
+  unit_code: string;
+  house_model_id: number | null;
+  house_model_name: string | null;
+  current_budget: number;
+  calculated_budget: number;
+  diff: number;
+  item_count: number;
+  items: UnitBudgetSettingItem[];
+}
+
+export interface UnitBudgetSettingsPreviewResponse {
+  data: UnitBudgetSettingRow[];
+  meta: { project_id: number; count: number };
+}
+
+export interface UnitBudgetSettingsApplyResponse {
+  message: string;
+  data: { updated: number };
+}
 @Injectable({ providedIn: 'root' })
 export class BudgetService {
   private http = inject(HttpClient);
@@ -207,5 +236,19 @@ export class BudgetService {
       "/api/budget-movements/return-history",
       { params: { project_id: projectId, page } }
     );
+  }
+
+  // ── Unit Budget Settings (คำนวณงบยูนิตจากรายการโปรโมชั่นมาตรฐาน) ──
+  previewUnitBudgetSettings(projectId: number): Observable<UnitBudgetSettingsPreviewResponse> {
+    return this.http.get<UnitBudgetSettingsPreviewResponse>(
+      '/api/unit-budget-settings/preview',
+      { params: { project_id: projectId } }
+    );
+  }
+
+  applyUnitBudgetSettings(projectId: number, unitIds?: number[]): Observable<UnitBudgetSettingsApplyResponse> {
+    const body: any = { project_id: projectId };
+    if (unitIds && unitIds.length > 0) body.unit_ids = unitIds;
+    return this.http.post<UnitBudgetSettingsApplyResponse>('/api/unit-budget-settings/apply', body);
   }
 }

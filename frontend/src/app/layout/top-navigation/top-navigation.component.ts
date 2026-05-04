@@ -25,6 +25,8 @@ const ROUTE_LABELS: Record<string, string> = {
   transfer:           'โอนงบประมาณ',
   movements:          'รายการเคลื่อนไหว',
   special:            'งบพิเศษ',
+  'unit-return-pool': 'คืนงบยูนิตเข้า Pool',
+  'unit-settings':    'ตั้งค่างบประมาณยูนิต',
   'bottom-line':      'ราคาต้นทุน',
   import:             'Import ราคาต้นทุน',
   history:            'ประวัติ Import',

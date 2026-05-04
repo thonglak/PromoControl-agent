@@ -76,6 +76,7 @@ const MENU: MenuItem[] = [
     label: 'งบประมาณ', icon: 'banknotes',
     roles: ['admin', 'manager'],
     children: [
+      { label: 'ตั้งค่างบประมาณยูนิต', path: '/budget/unit-settings' },
       { label: 'โอนงบประมาณ',    path: '/budget/transfer' },
       { label: 'รายการเคลื่อนไหว', path: '/budget/movements' },
       { label: 'งบพิเศษ',        path: '/budget/special' },

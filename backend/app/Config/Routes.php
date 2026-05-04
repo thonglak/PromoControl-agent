@@ -158,6 +158,12 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->post('batch-return-to-pool',   'BudgetMovementController::batchReturnUnitBudgetToPool');
     });
 
+    // Unit Budget Settings (ตั้งค่างบประมาณยูนิต — คำนวณ standard_budget จาก promotion items มาตรฐาน)
+    $routes->group('unit-budget-settings', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
+        $routes->get('preview',  'UnitBudgetSettingsController::preview');
+        $routes->post('apply',   'UnitBudgetSettingsController::apply');
+    });
+
     // Unit Budget Allocations (ตั้งงบผูกยูนิต)
     $routes->group('unit-budget-allocations', static function (RouteCollection $routes): void {
         $routes->get('(:num)',               'UnitBudgetAllocationController::show/$1');
