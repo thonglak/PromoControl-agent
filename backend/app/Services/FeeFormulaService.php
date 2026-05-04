@@ -276,6 +276,225 @@ class FeeFormulaService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // Export / Import JSON
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * รวบรวมสูตร + policies ของโครงการเพื่อ export เป็น JSON
+     * Key สำหรับ map ข้ามโครงการคือ promotion_item.code (ไม่ใช่ id)
+     */
+    public function exportForProject(int $projectId): array
+    {
+        $formulas = $this->db->table('fee_formulas f')
+            ->select('f.*, p.code AS promotion_item_code, p.name AS promotion_item_name')
+            ->join('promotion_item_master p', 'p.id = f.promotion_item_id', 'inner')
+            ->where('p.project_id', $projectId)
+            ->orderBy('p.sort_order', 'ASC')
+            ->get()->getResultArray();
+
+        if (!$formulas) return [];
+
+        $ids = array_map(static fn($r) => (int) $r['id'], $formulas);
+        $policies = $this->db->table('fee_rate_policies')
+            ->whereIn('fee_formula_id', $ids)
+            ->orderBy('priority', 'DESC')
+            ->get()->getResultArray();
+
+        // group policies by formula id
+        $byFormula = [];
+        foreach ($policies as $p) {
+            $byFormula[(int) $p['fee_formula_id']][] = [
+                'policy_name'          => $p['policy_name'],
+                'override_rate'        => (float) $p['override_rate'],
+                'override_buyer_share' => $p['override_buyer_share'] !== null ? (float) $p['override_buyer_share'] : null,
+                'override_expression'  => $p['override_expression'],
+                'condition_expression' => $p['condition_expression'],
+                'conditions'           => $this->decodeConditions($p['conditions']),
+                'effective_from'       => $p['effective_from'],
+                'effective_to'         => $p['effective_to'],
+                'is_active'            => (bool) $p['is_active'],
+                'priority'             => (int) $p['priority'],
+            ];
+        }
+
+        return array_map(function (array $f) use ($byFormula): array {
+            return [
+                'promotion_item_code' => $f['promotion_item_code'],
+                'promotion_item_name' => $f['promotion_item_name'],
+                'base_field'          => $f['base_field'],
+                'manual_input_label'  => $f['manual_input_label'],
+                'formula_expression'  => $f['formula_expression'],
+                'default_rate'        => (float) $f['default_rate'],
+                'buyer_share'         => (float) $f['buyer_share'],
+                'description'         => $f['description'],
+                'policies'            => $byFormula[(int) $f['id']] ?? [],
+            ];
+        }, $formulas);
+    }
+
+    /**
+     * Import สูตรจากไฟล์ JSON — resolve promotion_item_code → id ในโครงการปลายทาง
+     * - ข้ามถ้าไม่พบ item, item ไม่ใช่ value_mode='calculated', หรือมีสูตรอยู่แล้ว
+     * - สร้าง formula + policies ภายใน transaction ต่อรายการ
+     */
+    public function importJson(int $projectId, array $items): array
+    {
+        $codeMap = [];
+        foreach ($this->db->table('promotion_item_master')->select('id, code, value_mode')->where('project_id', $projectId)->get()->getResultArray() as $row) {
+            $codeMap[(string) $row['code']] = $row;
+        }
+        // formulas ที่มีอยู่แล้วในโครงการ (key = promotion_item_id)
+        $existingFormulaItemIds = [];
+        $existingRows = $this->db->table('fee_formulas f')
+            ->select('f.promotion_item_id')
+            ->join('promotion_item_master p', 'p.id = f.promotion_item_id', 'inner')
+            ->where('p.project_id', $projectId)
+            ->get()->getResultArray();
+        foreach ($existingRows as $row) {
+            $existingFormulaItemIds[(int) $row['promotion_item_id']] = true;
+        }
+
+        $created    = 0;
+        $createdPol = 0;
+        $skipped    = [];
+        $errors     = [];
+
+        foreach ($items as $idx => $raw) {
+            $code = trim((string) ($raw['promotion_item_code'] ?? ''));
+            $name = (string) ($raw['promotion_item_name'] ?? '');
+            $ref  = $code !== '' ? $code : ('#' . ($idx + 1) . ' ' . $name);
+
+            try {
+                if ($code === '') {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'ไม่มี promotion_item_code'];
+                    continue;
+                }
+                if (!isset($codeMap[$code])) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'ไม่พบรหัสรายการในโครงการนี้'];
+                    continue;
+                }
+                $item = $codeMap[$code];
+                $itemId = (int) $item['id'];
+
+                if ($item['value_mode'] !== 'calculated') {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'รายการนี้ไม่ใช่โหมด "คำนวณอัตโนมัติ"'];
+                    continue;
+                }
+                if (isset($existingFormulaItemIds[$itemId])) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'มีสูตรผูกอยู่แล้ว'];
+                    continue;
+                }
+
+                $baseField = (string) ($raw['base_field'] ?? '');
+                if (!in_array($baseField, ['appraisal_price', 'base_price', 'net_price', 'manual_input', 'expression'], true)) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'base_field ไม่ถูกต้อง'];
+                    continue;
+                }
+                if ($baseField === 'manual_input' && empty($raw['manual_input_label'])) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'ไม่มี manual_input_label'];
+                    continue;
+                }
+
+                $formulaExpr = null;
+                if ($baseField === 'expression') {
+                    $formulaExpr = trim((string) ($raw['formula_expression'] ?? ''));
+                    $check = $this->evaluator->validate($formulaExpr);
+                    if (!$check['valid']) {
+                        $errors[] = ['ref' => $ref, 'reason' => 'สูตรไม่ถูกต้อง: ' . $check['error']];
+                        continue;
+                    }
+                }
+
+                $this->db->transBegin();
+
+                $now = date('Y-m-d H:i:s');
+                $this->db->table('fee_formulas')->insert([
+                    'promotion_item_id'  => $itemId,
+                    'base_field'         => $baseField,
+                    'manual_input_label' => $raw['manual_input_label'] ?? null,
+                    'formula_expression' => $formulaExpr,
+                    'default_rate'       => (float) ($raw['default_rate'] ?? 0),
+                    'buyer_share'        => (float) ($raw['buyer_share'] ?? 1),
+                    'description'        => $raw['description'] ?? null,
+                    'created_at'         => $now,
+                    'updated_at'         => $now,
+                ]);
+                $newFormulaId = (int) $this->db->insertID();
+
+                // create policies
+                $policies = is_array($raw['policies'] ?? null) ? $raw['policies'] : [];
+                foreach ($policies as $pol) {
+                    $polName = trim((string) ($pol['policy_name'] ?? ''));
+                    if ($polName === '') continue;
+
+                    $polOverrideExpr  = isset($pol['override_expression'])  ? trim((string) $pol['override_expression'])  : '';
+                    $polConditionExpr = isset($pol['condition_expression']) ? trim((string) $pol['condition_expression']) : '';
+
+                    if ($polOverrideExpr !== '') {
+                        $check = $this->evaluator->validate($polOverrideExpr);
+                        if (!$check['valid']) {
+                            // ถ้า policy expression เพี้ยน — rollback ทั้ง formula
+                            throw new RuntimeException('policy "' . $polName . '" override_expression: ' . $check['error']);
+                        }
+                    }
+                    if ($polConditionExpr !== '') {
+                        $check = $this->evaluator->validateBoolean($polConditionExpr);
+                        if (!$check['valid']) {
+                            throw new RuntimeException('policy "' . $polName . '" condition_expression: ' . $check['error']);
+                        }
+                    }
+
+                    $this->db->table('fee_rate_policies')->insert([
+                        'fee_formula_id'       => $newFormulaId,
+                        'policy_name'          => $polName,
+                        'override_rate'        => (float) ($pol['override_rate'] ?? 0),
+                        'override_buyer_share' => isset($pol['override_buyer_share']) && $pol['override_buyer_share'] !== null ? (float) $pol['override_buyer_share'] : null,
+                        'override_expression'  => $polOverrideExpr !== '' ? $polOverrideExpr : null,
+                        'condition_expression' => $polConditionExpr !== '' ? $polConditionExpr : null,
+                        'conditions'           => json_encode($pol['conditions'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE),
+                        'effective_from'       => $pol['effective_from'] ?? null,
+                        'effective_to'         => $pol['effective_to'] ?? null,
+                        'is_active'            => !empty($pol['is_active']) ? 1 : 0,
+                        'priority'             => (int) ($pol['priority'] ?? 0),
+                        'created_at'           => $now,
+                        'updated_at'           => $now,
+                    ]);
+                    $createdPol++;
+                }
+
+                if ($this->db->transStatus() === false) {
+                    $this->db->transRollback();
+                    $errors[] = ['ref' => $ref, 'reason' => 'บันทึกไม่สำเร็จ'];
+                    continue;
+                }
+                $this->db->transCommit();
+
+                $existingFormulaItemIds[$itemId] = true; // กันการสร้างซ้ำในล่อตเดียวกัน
+                $created++;
+            } catch (\Throwable $e) {
+                if ($this->db->transStatus() !== null) {
+                    $this->db->transRollback();
+                }
+                $errors[] = ['ref' => $ref, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return [
+            'created'          => $created,
+            'created_policies' => $createdPol,
+            'skipped'          => $skipped,
+            'errors'           => $errors,
+        ];
+    }
+
+    private function decodeConditions(?string $raw): array
+    {
+        if ($raw === null || $raw === '') return [];
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // Test (single unit)
     // ═══════════════════════════════════════════════════════════════════════
 

@@ -79,6 +79,7 @@ $routes->group('api', static function (RouteCollection $routes): void {
     $routes->group('fee-formulas', static function (RouteCollection $routes): void {
         $routes->get('/',          'FeeFormulaController::index');
         $routes->get('variables',  'FeeFormulaController::variables');
+        $routes->get('export-json', 'FeeFormulaController::exportJson');
         $routes->post('validate-expression', 'FeeFormulaController::validateExpression');
         $routes->post('validate-boolean-expression', 'FeeFormulaController::validateBooleanExpression');
         $routes->get('(:num)',     'FeeFormulaController::show/$1');
@@ -89,6 +90,7 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->delete('(:num)',  'FeeFormulaController::delete/$1');
         $routes->post('test',      'FeeFormulaController::test');
         $routes->post('test-batch', 'FeeFormulaController::testBatch');
+        $routes->post('import-json', 'FeeFormulaController::importJsonAction');
         $routes->post('calculate-for-entry', 'FeeFormulaController::calculateForEntry');
     });
 

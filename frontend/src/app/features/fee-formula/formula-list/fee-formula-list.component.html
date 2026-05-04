@@ -10,11 +10,37 @@
       <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700">
         <app-icon name="adjustments-horizontal" class="w-5 h-5" />
       </button>
+      <button mat-stroked-button (click)="exportJson()"
+              [disabled]="exporting()"
+              matTooltip="ส่งออกสูตรทั้งโครงการเป็นไฟล์ JSON (รวม policies)"
+              class="flex items-center gap-2">
+        @if (exporting()) {
+          <mat-spinner diameter="16" class="!inline-block" />
+        } @else {
+          <app-icon name="arrow-down-tray" class="w-4 h-4" />
+        }
+        ส่งออก JSON
+      </button>
       @if (canWrite()) {
+        <button mat-stroked-button (click)="triggerImport()"
+                [disabled]="importing()"
+                matTooltip="นำเข้าสูตรจากไฟล์ JSON"
+                class="flex items-center gap-2">
+          @if (importing()) {
+            <mat-spinner diameter="16" class="!inline-block" />
+          } @else {
+            <app-icon name="arrow-up-tray" class="w-4 h-4" />
+          }
+          นำเข้า JSON
+        </button>
         <button mat-flat-button color="primary" (click)="openCreate()" class="flex items-center gap-2">
           <app-icon name="plus" class="w-4 h-4" /> สร้างสูตร
         </button>
       }
+
+      <!-- Hidden file input สำหรับนำเข้า JSON -->
+      <input #importInput type="file" accept="application/json,.json"
+             class="hidden" (change)="onImportFileSelected($event)" />
     </div>
   </div>
 

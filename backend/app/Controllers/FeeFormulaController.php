@@ -115,6 +115,50 @@ class FeeFormulaController extends BaseController
         }
     }
 
+    // GET /api/fee-formulas/export-json — export ทั้งโครงการเป็นไฟล์ JSON (รวม policies)
+    public function exportJson(): ResponseInterface
+    {
+        $projectId = (int) ($this->request->getGet('project_id') ?? 0);
+        if ($projectId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        }
+        $items = $this->svc->exportForProject($projectId);
+        return $this->response->setStatusCode(200)->setJSON([
+            'count' => count($items),
+            'items' => $items,
+        ]);
+    }
+
+    // POST /api/fee-formulas/import-json — นำเข้าจากไฟล์ JSON
+    public function importJsonAction(): ResponseInterface
+    {
+        if (!$this->canWrite()) return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์']);
+
+        $body      = $this->request->getJSON(true) ?? [];
+        $projectId = (int) ($body['project_id'] ?? 0);
+        $items     = $body['items'] ?? [];
+
+        if ($projectId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        }
+        if (!is_array($items) || empty($items)) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'ไม่พบรายการในไฟล์']);
+        }
+        if (count($items) > 500) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'นำเข้าได้สูงสุดครั้งละ 500 รายการ']);
+        }
+
+        try {
+            $result = $this->svc->importJson($projectId, $items);
+            return $this->response->setStatusCode(200)->setJSON([
+                'message' => 'นำเข้าสำเร็จ',
+                'data'    => $result,
+            ]);
+        } catch (RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
+        }
+    }
+
     public function calculateForEntry(): ResponseInterface
     {
         $body   = $this->request->getJSON(true) ?? [];

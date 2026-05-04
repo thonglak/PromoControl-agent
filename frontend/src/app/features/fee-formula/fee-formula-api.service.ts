@@ -140,4 +140,60 @@ export class FeeFormulaApiService {
   testBatch(params: any): Observable<{ results: BatchResultItem[] }> {
     return this.http.post<{ results: BatchResultItem[] }>('/api/fee-formulas/test-batch', params);
   }
+
+  // ── Export / Import JSON ──
+  exportJson(projectId: number): Observable<{ count: number; items: FeeFormulaJson[] }> {
+    return this.http.get<{ count: number; items: FeeFormulaJson[] }>('/api/fee-formulas/export-json', {
+      params: { project_id: projectId },
+    });
+  }
+
+  importJson(payload: { project_id: number; items: FeeFormulaJson[] }): Observable<ImportFormulaResult> {
+    return this.http
+      .post<{ message: string; data: ImportFormulaResult }>('/api/fee-formulas/import-json', payload)
+      .pipe(map(r => r.data));
+  }
+}
+
+// ── Export / Import JSON types ────────────────────────────────────────────
+
+export interface FeeRatePolicyJson {
+  policy_name: string;
+  override_rate: number;
+  override_buyer_share: number | null;
+  override_expression: string | null;
+  condition_expression: string | null;
+  conditions: Record<string, any>;
+  effective_from: string | null;
+  effective_to: string | null;
+  is_active: boolean;
+  priority: number;
+}
+
+export interface FeeFormulaJson {
+  promotion_item_code: string;
+  promotion_item_name?: string;
+  base_field: 'appraisal_price' | 'base_price' | 'net_price' | 'manual_input' | 'expression';
+  manual_input_label: string | null;
+  formula_expression: string | null;
+  default_rate: number;
+  buyer_share: number;
+  description: string | null;
+  policies: FeeRatePolicyJson[];
+}
+
+export interface FeeFormulaExportFile {
+  format: 'fee-formulas.v1';
+  exported_at: string;
+  source_project_id?: number;
+  source_project_name?: string;
+  count: number;
+  items: FeeFormulaJson[];
+}
+
+export interface ImportFormulaResult {
+  created: number;
+  created_policies: number;
+  skipped: { ref: string; reason: string }[];
+  errors:  { ref: string; reason: string }[];
 }

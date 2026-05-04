@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
@@ -10,7 +10,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
-import { FeeFormulaApiService, FeeFormula } from '../fee-formula-api.service';
+import {
+  FeeFormulaApiService, FeeFormula,
+  FeeFormulaJson, FeeFormulaExportFile,
+} from '../fee-formula-api.service';
 import { FeeFormulaFormDialogComponent } from './dialogs/fee-formula-form-dialog.component';
 import { ProjectService } from '../../../core/services/project.service';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
@@ -69,9 +72,13 @@ export class FeeFormulaListComponent implements OnInit {
 
   dataSource = new MatTableDataSource<FeeFormula>([]);
   loading    = signal(false);
+  exporting  = signal(false);
+  importing  = signal(false);
 
   canWrite = computed(() => this.project.canEdit());
   projectId = computed(() => Number(this.project.selectedProject()?.id ?? 0));
+
+  @ViewChild('importInput') importInput!: ElementRef<HTMLInputElement>;
 
   ngOnInit(): void {
     this.loadData();
@@ -155,5 +162,137 @@ export class FeeFormulaListComponent implements OnInit {
 
   formatShare(decimal: number): string {
     return Math.round(decimal * 100) + '%';
+  }
+
+  // ── Export / Import JSON ───────────────────────────────────────────────
+
+  /** ส่งออกสูตรทั้งโครงการเป็นไฟล์ JSON (รวม policies) */
+  exportJson(): void {
+    const pid = this.projectId();
+    if (pid <= 0) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+    this.exporting.set(true);
+    this.api.exportJson(pid).subscribe({
+      next: res => {
+        this.exporting.set(false);
+        if (!res.items || res.items.length === 0) {
+          this.snack.open('ไม่มีสูตรให้ส่งออก', 'ปิด', { duration: 3000 });
+          return;
+        }
+        const project = this.project.selectedProject();
+        const payload: FeeFormulaExportFile = {
+          format:              'fee-formulas.v1',
+          exported_at:         new Date().toISOString(),
+          source_project_id:   project ? Number(project.id) : undefined,
+          source_project_name: project?.name,
+          count:               res.items.length,
+          items:               res.items,
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        const ts   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const safe = (project?.name ?? 'project').replace(/[^a-zA-Z0-9ก-๙_-]+/g, '_').slice(0, 60);
+        a.href     = url;
+        a.download = `fee-formulas_${safe}_${ts}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.snack.open(`ส่งออก ${res.items.length} สูตรสำเร็จ`, 'ปิด', { duration: 3000 });
+      },
+      error: err => {
+        this.exporting.set(false);
+        this.snack.open(err?.error?.error ?? 'ส่งออกไม่สำเร็จ', 'ปิด', { duration: 4000 });
+      },
+    });
+  }
+
+  /** เปิดตัวเลือกไฟล์เพื่อนำเข้า JSON */
+  triggerImport(): void {
+    if (this.projectId() <= 0) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+    this.importInput.nativeElement.value = '';
+    this.importInput.nativeElement.click();
+  }
+
+  onImportFileSelected(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const file  = input.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? ''));
+        const items  = this.normalizeImport(parsed);
+        if (items.length === 0) {
+          this.snack.open('ไฟล์ไม่มีรายการที่นำเข้าได้', 'ปิด', { duration: 3000 });
+          return;
+        }
+        this.confirmAndImport(items);
+      } catch {
+        this.snack.open('ไฟล์ JSON ไม่ถูกต้อง', 'ปิด', { duration: 3000 });
+      }
+    };
+    reader.onerror = () => this.snack.open('อ่านไฟล์ไม่สำเร็จ', 'ปิด', { duration: 3000 });
+    reader.readAsText(file);
+  }
+
+  /** รองรับทั้ง wrapper format (`{format, items}`) และ array ดิบ */
+  private normalizeImport(parsed: unknown): FeeFormulaJson[] {
+    const raw = Array.isArray(parsed)
+      ? parsed
+      : (parsed as FeeFormulaExportFile)?.items;
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((row): FeeFormulaJson | null => {
+        const code = String((row as any)?.promotion_item_code ?? '').trim();
+        const baseField = String((row as any)?.base_field ?? '');
+        if (!code || !baseField) return null;
+        const policies = Array.isArray((row as any)?.policies) ? (row as any).policies : [];
+        return {
+          promotion_item_code: code,
+          promotion_item_name: (row as any)?.promotion_item_name,
+          base_field:          baseField as FeeFormulaJson['base_field'],
+          manual_input_label:  (row as any)?.manual_input_label ?? null,
+          formula_expression:  (row as any)?.formula_expression ?? null,
+          default_rate:        Number((row as any)?.default_rate ?? 0),
+          buyer_share:         Number((row as any)?.buyer_share ?? 1),
+          description:         (row as any)?.description ?? null,
+          policies,
+        };
+      })
+      .filter((r): r is FeeFormulaJson => r !== null);
+  }
+
+  private confirmAndImport(items: FeeFormulaJson[]): void {
+    const polTotal = items.reduce((sum, it) => sum + (it.policies?.length ?? 0), 0);
+    if (!confirm(`ต้องการนำเข้า ${items.length} สูตร (พร้อม ${polTotal} policies) เข้าโครงการนี้?\n\nหมายเหตุ: รายการที่ซ้ำกับสูตรเดิมจะถูกข้าม`)) return;
+
+    this.importing.set(true);
+    this.api.importJson({ project_id: this.projectId(), items }).subscribe({
+      next: res => {
+        this.importing.set(false);
+        const skipped = res.skipped?.length ?? 0;
+        const errors  = res.errors?.length ?? 0;
+        const parts   = [`สร้างสูตร ${res.created} รายการ`, `policies ${res.created_policies} รายการ`];
+        if (skipped > 0) parts.push(`ข้าม ${skipped}`);
+        if (errors > 0)  parts.push(`ผิดพลาด ${errors}`);
+        this.snack.open(parts.join(' · '), 'ปิด', { duration: 6000 });
+        this.loadData();
+      },
+      error: err => {
+        this.importing.set(false);
+        this.snack.open(err?.error?.error ?? 'นำเข้าไม่สำเร็จ', 'ปิด', { duration: 5000 });
+      },
+    });
   }
 }
