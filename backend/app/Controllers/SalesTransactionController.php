@@ -222,14 +222,18 @@ class SalesTransactionController extends BaseController
         $pool = $summary['PROJECT_POOL']        ?? ['allocated' => 0, 'used' => 0, 'remaining' => 0];
         $mgmt = $summary['MANAGEMENT_SPECIAL']  ?? ['allocated' => 0, 'used' => 0, 'remaining' => 0];
 
+        // Header bucket แสดง "ยอดที่ใช้ได้จริงบนยูนิตตอนนี้" = used + remaining
+        // - UNIT_STANDARD: ใช้ standard_budget เป็น cap (ค่าคงที่จาก master) — ไม่หัก returned เพื่อให้ดูเป็นเพดานยูนิต
+        // - PROJECT_POOL / MANAGEMENT_SPECIAL: ALLOCATE เข้ายูนิตแล้ว RETURN กลับ Pool ได้ → ต้องหักส่วนที่คืนแล้ว
+        //   มิฉะนั้น header จะแสดงยอดสะสมตลอดประวัติที่ไม่สะท้อนงบที่ใช้ได้จริง
         $budgetSummary = [
             'unit_budget'           => $us['allocated'],
             'unit_budget_used'      => $us['used'],
             'unit_budget_remaining' => $us['remaining'],
-            'pool_budget'           => $pool['allocated'],
+            'pool_budget'           => $pool['used'] + $pool['remaining'],
             'pool_budget_used'      => $pool['used'],
             'pool_budget_remaining' => $pool['remaining'],
-            'mgmt_budget'           => $mgmt['allocated'],
+            'mgmt_budget'           => $mgmt['used'] + $mgmt['remaining'],
             'mgmt_budget_used'      => $mgmt['used'],
             'mgmt_budget_remaining' => $mgmt['remaining'],
             'total_remaining'       => ($summary['total_remaining'] ?? ($us['remaining'] + $pool['remaining'] + $mgmt['remaining'])),
