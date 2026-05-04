@@ -27,6 +27,9 @@ frontend/.env
 mysql_data/
 docker/mysql/data/
 
+# ─── DB backups (สร้างโดย deploy.sh ก่อน migrate) ───
+deploy/backups/
+
 # ─── Claude Code agent runtime state ───
 .claude/projects/
 .claude/worktrees/
