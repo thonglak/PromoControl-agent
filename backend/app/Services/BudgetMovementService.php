@@ -30,6 +30,30 @@ class BudgetMovementService
         $this->numberSeriesSvc = new NumberSeriesService();
     }
 
+    /**
+     * Insert แล้วดึง row กลับ — รวม error handling เป็นจุดเดียว
+     * ป้องกันกรณี insert silent fail หรือ insertID() คืน 0
+     * @throws RuntimeException ถ้า insert ล้มเหลว / อ่าน row กลับไม่ได้
+     */
+    private function insertAndFetch(string $table, array $payload): array
+    {
+        $ok = $this->db->table($table)->insert($payload);
+        $insertId = (int) $this->db->insertID();
+
+        if ($ok === false || $insertId <= 0) {
+            $err = $this->db->error();
+            $msg = $err['message'] ?? 'unknown DB error';
+            throw new RuntimeException("บันทึก {$table} ไม่สำเร็จ: {$msg}");
+        }
+
+        $row = $this->db->table($table)->where('id', $insertId)->get()->getRowArray();
+        if ($row === null) {
+            throw new RuntimeException("บันทึก {$table} id={$insertId} แล้วแต่อ่านข้อมูลกลับไม่ได้");
+        }
+
+        return $row;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // 1. getBalance — derive จาก SUM(movements)
     // ═══════════════════════════════════════════════════════════════════════
@@ -356,7 +380,7 @@ class BudgetMovementService
         // ปรับ: ใช้ค่าบวกทั้งหมด — derive direction จาก movement_type
         $dbAmount = abs($amount);
 
-        $this->db->table('budget_movements')->insert([
+        return $this->insertAndFetch('budget_movements', [
             'movement_no'        => $movementNo,
             'project_id'         => $projectId,
             'unit_id'            => $unitId,
@@ -372,9 +396,6 @@ class BudgetMovementService
             'approved_at'        => $status === 'approved' ? $now : null,
             'created_at'         => $now,
         ]);
-
-        return $this->db->table('budget_movements')
-            ->where('id', $this->db->insertID())->get()->getRowArray();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1029,9 +1050,8 @@ class BudgetMovementService
 
         // 5a. สร้าง RETURN movement สำหรับ UNIT_STANDARD (ถ้ามี)
         if ($returnUnit > 0) {
-            $movementNo = $this->generateMovementNo($projectId);
-            $this->db->table('budget_movements')->insert([
-                'movement_no'        => $movementNo,
+            $movements[] = $this->insertAndFetch('budget_movements', [
+                'movement_no'        => $this->generateMovementNo($projectId),
                 'project_id'         => $projectId,
                 'unit_id'            => $unitId,
                 'movement_type'      => 'RETURN',
@@ -1044,15 +1064,12 @@ class BudgetMovementService
                 'approved_at'        => $now,
                 'created_at'         => $now,
             ]);
-            $movements[] = $this->db->table('budget_movements')
-                ->where('id', $this->db->insertID())->get()->getRowArray();
         }
 
         // 5b. สร้าง RETURN movement สำหรับ PROJECT_POOL (ถ้ามี)
         if ($returnPool > 0) {
-            $movementNo = $this->generateMovementNo($projectId);
-            $this->db->table('budget_movements')->insert([
-                'movement_no'        => $movementNo,
+            $movements[] = $this->insertAndFetch('budget_movements', [
+                'movement_no'        => $this->generateMovementNo($projectId),
                 'project_id'         => $projectId,
                 'unit_id'            => $unitId,
                 'movement_type'      => 'RETURN',
@@ -1065,15 +1082,12 @@ class BudgetMovementService
                 'approved_at'        => $now,
                 'created_at'         => $now,
             ]);
-            $movements[] = $this->db->table('budget_movements')
-                ->where('id', $this->db->insertID())->get()->getRowArray();
         }
 
         // 5c. สร้าง RETURN movement สำหรับ MANAGEMENT_SPECIAL (ถ้ามี)
         if ($returnMgmt > 0) {
-            $movementNo = $this->generateMovementNo($projectId);
-            $this->db->table('budget_movements')->insert([
-                'movement_no'        => $movementNo,
+            $movements[] = $this->insertAndFetch('budget_movements', [
+                'movement_no'        => $this->generateMovementNo($projectId),
                 'project_id'         => $projectId,
                 'unit_id'            => $unitId,
                 'movement_type'      => 'RETURN',
@@ -1086,8 +1100,6 @@ class BudgetMovementService
                 'approved_at'        => $now,
                 'created_at'         => $now,
             ]);
-            $movements[] = $this->db->table('budget_movements')
-                ->where('id', $this->db->insertID())->get()->getRowArray();
         }
 
         $updatedSummary = $this->getUnitBudgetSummary($projectId, $unitId);
