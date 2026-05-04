@@ -1,0 +1,166 @@
+<div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-200">
+  <h2 class="text-lg font-semibold text-slate-800 m-0">เพิ่มผู้ใช้จาก Portal</h2>
+  <button mat-icon-button (click)="cancel()" class="!text-slate-400 hover:!text-slate-600">
+    <app-icon name="x-mark" class="w-5 h-5" />
+  </button>
+</div>
+
+<!-- Filter row -->
+<div class="px-6 py-4 bg-slate-50/60 border-b border-slate-200 flex flex-wrap gap-3 items-end">
+  <mat-form-field appearance="outline" class="flex-1 min-w-[260px]" subscriptSizing="dynamic">
+    <mat-label>ค้นหา</mat-label>
+    <input matInput [formControl]="searchCtrl" placeholder="ชื่อ / ชื่อเล่น / username / email / รหัสพนักงาน / มือถือ" />
+    <app-icon matSuffix name="magnifying-glass" class="w-4 h-4 text-slate-400 mr-2" />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="w-56" subscriptSizing="dynamic">
+    <mat-label>กำหนดบทบาท</mat-label>
+    <mat-select [formControl]="roleCtrl">
+      @for (r of roles; track r.value) {
+        <mat-option [value]="r.value">{{ r.label }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</div>
+
+<!-- Selection summary -->
+<div class="px-6 py-2 flex items-center justify-between bg-blue-50/50 border-b border-blue-100 text-sm">
+  <div class="flex items-center gap-3 text-slate-700">
+    <span>พบ <span class="font-semibold text-slate-900">{{ total() }}</span> รายการ</span>
+    @if (selectedCount() > 0) {
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-600 text-white text-xs font-medium">
+        เลือกแล้ว {{ selectedCount() }}
+      </span>
+      <button type="button" (click)="clearSelection()"
+              class="text-xs text-red-600 hover:underline">ล้างที่เลือก</button>
+    }
+  </div>
+</div>
+
+<!-- Table -->
+<div class="relative" style="min-height: 380px; max-height: 60vh; overflow: auto;">
+  @if (loading()) {
+    <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+      <mat-spinner diameter="32" />
+    </div>
+  }
+
+  <table mat-table [dataSource]="rows()" [trackBy]="trackByUseId" class="w-full">
+
+    <!-- Select -->
+    <ng-container matColumnDef="select">
+      <th mat-header-cell *matHeaderCellDef class="!w-12 !bg-slate-50 !text-xs !font-semibold !text-slate-500 !uppercase">
+        <mat-checkbox
+          [checked]="allInPageSelected()"
+          [indeterminate]="somePageSelected()"
+          (change)="togglePage()"
+          [disabled]="selectableRows().length === 0">
+        </mat-checkbox>
+      </th>
+      <td mat-cell *matCellDef="let row" class="!w-12" (click)="$event.stopPropagation()">
+        @if (row.already_added) {
+          <span class="text-xs text-slate-400" matTooltip="มีในระบบแล้ว">
+            <app-icon name="check-circle" class="w-5 h-5 text-green-500" />
+          </span>
+        } @else {
+          <mat-checkbox [checked]="isSelected(row.use_id)" (change)="toggleRow(row)"></mat-checkbox>
+        }
+      </td>
+    </ng-container>
+
+    <!-- Name -->
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef class="!bg-slate-50 !text-xs !font-semibold !text-slate-500 !uppercase">ชื่อ</th>
+      <td mat-cell *matCellDef="let row" class="!text-sm">
+        <div class="font-medium text-slate-800">
+          {{ row.name }}
+          @if (row.nickname) {
+            <span class="text-xs text-slate-500 font-normal">({{ row.nickname }})</span>
+          }
+        </div>
+        @if (row.already_added) {
+          <span class="text-xs text-green-700">เพิ่มแล้ว</span>
+        }
+      </td>
+    </ng-container>
+
+    <!-- Username -->
+    <ng-container matColumnDef="username">
+      <th mat-header-cell *matHeaderCellDef class="!bg-slate-50 !text-xs !font-semibold !text-slate-500 !uppercase">Username</th>
+      <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-600">
+        {{ row.use_username }}
+        @if (row.code) {
+          <span class="text-xs text-slate-400 ml-1">({{ row.code }})</span>
+        }
+      </td>
+    </ng-container>
+
+    <!-- Email -->
+    <ng-container matColumnDef="email">
+      <th mat-header-cell *matHeaderCellDef class="!bg-slate-50 !text-xs !font-semibold !text-slate-500 !uppercase">Email</th>
+      <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-600">
+        @if (row.email) {
+          {{ row.email }}
+        } @else {
+          <span class="text-xs text-amber-600" matTooltip="ระบบจะ generate {{ '{username}@narai.local' }}">
+            (ไม่มี → auto-gen)
+          </span>
+        }
+      </td>
+    </ng-container>
+
+    <!-- Department -->
+    <ng-container matColumnDef="department">
+      <th mat-header-cell *matHeaderCellDef class="!bg-slate-50 !text-xs !font-semibold !text-slate-500 !uppercase">แผนก</th>
+      <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-600">{{ row.department || '—' }}</td>
+    </ng-container>
+
+    <!-- Position -->
+    <ng-container matColumnDef="position">
+      <th mat-header-cell *matHeaderCellDef class="!bg-slate-50 !text-xs !font-semibold !text-slate-500 !uppercase">ตำแหน่ง</th>
+      <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-600">{{ row.position || '—' }}</td>
+    </ng-container>
+
+    <!-- Company -->
+    <ng-container matColumnDef="company">
+      <th mat-header-cell *matHeaderCellDef class="!bg-slate-50 !text-xs !font-semibold !text-slate-500 !uppercase">บริษัท</th>
+      <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-600">{{ row.company || '—' }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+        (click)="toggleRow(row)"
+        [class.opacity-60]="row.already_added"
+        [class.cursor-pointer]="!row.already_added"
+        [class.bg-blue-50]="isSelected(row.use_id)"
+        class="hover:bg-slate-50 transition-colors"></tr>
+
+    <tr class="mat-row" *matNoDataRow>
+      <td class="mat-cell text-center py-12 text-slate-400" [attr.colspan]="displayedColumns.length">
+        <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+        <p>ไม่พบรายการ</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<mat-paginator
+  [length]="total()"
+  [pageIndex]="page() - 1"
+  [pageSize]="perPage()"
+  [pageSizeOptions]="[10, 20, 50, 100]"
+  (page)="onPageChange($event)"
+  showFirstLastButtons>
+</mat-paginator>
+
+<div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 bg-white">
+  <button mat-stroked-button (click)="cancel()" [disabled]="saving()">ยกเลิก</button>
+  <button mat-flat-button color="primary"
+          (click)="submit()"
+          [disabled]="selectedCount() === 0 || saving()">
+    @if (saving()) {
+      <mat-spinner diameter="18" class="inline-block mr-2"></mat-spinner>
+    }
+    เพิ่ม {{ selectedCount() }} คน
+  </button>
+</div>

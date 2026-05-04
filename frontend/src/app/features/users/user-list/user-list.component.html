@@ -11,6 +11,10 @@
               class="!text-slate-500 hover:!text-slate-700">
         <app-icon name="adjustments-horizontal" class="w-5 h-5" />
       </button>
+      <button mat-stroked-button color="primary" (click)="openBrowsePortalDialog()" class="flex items-center gap-2">
+        <app-icon name="users" class="w-4 h-4" />
+        เพิ่มจาก Portal
+      </button>
       <button mat-flat-button color="primary" (click)="openCreateDialog()" class="flex items-center gap-2">
         <app-icon name="plus" class="w-4 h-4" />
         เพิ่มผู้ใช้

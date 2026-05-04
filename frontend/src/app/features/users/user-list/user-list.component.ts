@@ -19,6 +19,7 @@ import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.c
 import { UserFormDialogComponent, UserFormDialogData } from '../dialogs/user-form-dialog.component';
 import { AssignProjectsDialogComponent, AssignProjectsDialogData } from '../dialogs/assign-projects-dialog.component';
 import { ResetPasswordDialogComponent, ResetPasswordDialogData } from '../dialogs/reset-password-dialog.component';
+import { BrowsePorUsersDialogComponent } from '../dialogs/browse-por-users-dialog.component';
 import { TableConfigService, ColumnDef } from '../../../shared/services/table-config.service';
 import { TableSettingsDialogComponent } from '../../../shared/components/table-settings/table-settings-dialog.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
@@ -198,6 +199,13 @@ export class UserListComponent implements OnInit {
     this.dialog.open(UserFormDialogComponent, {
       width: '520px', maxHeight: '90vh', disableClose: true,
       data: { mode: 'create' } satisfies UserFormDialogData,
+    }).afterClosed().subscribe(saved => { if (saved) this.loadUsers(); });
+  }
+
+  openBrowsePortalDialog(): void {
+    this.dialog.open(BrowsePorUsersDialogComponent, {
+      width: '960px', maxWidth: '95vw', maxHeight: '90vh', disableClose: true,
+      panelClass: 'browse-por-users-dialog',
     }).afterClosed().subscribe(saved => { if (saved) this.loadUsers(); });
   }
 

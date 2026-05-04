@@ -26,6 +26,8 @@ $routes->group('api', static function (RouteCollection $routes): void {
     $routes->group('users', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
         $routes->get('/',                      'UserController::index');
         $routes->post('/',                     'UserController::create');
+        $routes->get('browse-source',          'UserController::browseSource');
+        $routes->post('bulk-import',           'UserController::bulkImport');
         $routes->get('(:num)',                 'UserController::show/$1');
         $routes->put('(:num)',                 'UserController::update/$1');
         $routes->delete('(:num)',              'UserController::delete/$1');

@@ -90,6 +90,8 @@ PUT    /api/users/{id}
 DELETE /api/users/{id}
 PUT    /api/users/{id}/projects
 PUT    /api/users/{id}/reset-password
+GET    /api/users/browse-source                  # ค้นรายชื่อจาก back.por_users (q, page, per_page)
+POST   /api/users/bulk-import                    # นำเข้าทีละหลายคนจาก por_users (default_role, use_ids[])
 
 ## Projects
 GET /api/projects
