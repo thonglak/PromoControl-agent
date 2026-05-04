@@ -37,6 +37,9 @@ services:
         condition: service_healthy
     networks:
       - promo_network
+      - back_db_network    # เชื่อม external DB: back_db
+      - front_db_network   # เชื่อม external DB: front_db
+      - mariadb_network    # เชื่อม external DB: db (mariadb)
 
   # Angular 21 Frontend (dev server ผ่าน container เท่านั้น — host มี Node 15)
   promo_frontend:
@@ -108,6 +111,14 @@ services:
 networks:
   promo_network:
     driver: bridge
+
+  # External networks ของ DB ภายนอก — สร้างไว้แล้วโดย stack อื่น
+  back_db_network:
+    external: true
+  front_db_network:
+    external: true
+  mariadb_network:
+    external: true
 
 volumes:
   mysql_data:

@@ -52,6 +52,9 @@ services:
         condition: service_healthy
     networks:
       - promo_prod_network
+      - back_db_network    # เชื่อม external DB: back_db
+      - front_db_network   # เชื่อม external DB: front_db
+      - mariadb_network    # เชื่อม external DB: db (mariadb)
 
   # phpMyAdmin — Production GUI สำหรับจัดการ MySQL
   # หมายเหตุ security: ไม่แนะนำ expose ออก public — ควรอยู่หลัง VPN หรือ
@@ -91,6 +94,15 @@ services:
 networks:
   promo_prod_network:
     driver: bridge
+
+  # External networks ของ DB ภายนอก — สร้างไว้แล้วโดย stack อื่นบน server
+  # ⚠️ network ต้องมีอยู่ก่อน compose up ไม่งั้น fail
+  back_db_network:
+    external: true
+  front_db_network:
+    external: true
+  mariadb_network:
+    external: true
 
 volumes:
   mysql_prod_data:
