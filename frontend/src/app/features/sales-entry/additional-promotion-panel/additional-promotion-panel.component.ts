@@ -453,6 +453,8 @@ export class AdditionalPromotionPanelComponent implements OnInit {
   isFundingDisabled(key: string): boolean {
     const src = this.budgetSources().find(s => s.key === key);
     if (!src) return true;
+    // งบผู้บริหาร (MANAGEMENT_SPECIAL) ใช้ได้เสมอ — ทีมการตลาดบริหารจัดการเอง อนุญาตติดลบ
+    if (key === 'MANAGEMENT_SPECIAL') return false;
     if (src.allocated <= 0) return true;
     // ตรวจงบเหลือ: allocated - already_used_by_movements - pending_from_panel_b
     const pendingUsed = this.usedBySource()[key] ?? 0;
@@ -460,6 +462,8 @@ export class AdditionalPromotionPanelComponent implements OnInit {
   }
 
   getFundingDisabledReason(key: string): string {
+    // งบผู้บริหารใช้ได้เสมอ ไม่ต้องแสดงเหตุผล disable
+    if (key === 'MANAGEMENT_SPECIAL') return '';
     const src = this.budgetSources().find(s => s.key === key);
     if (!src || src.allocated <= 0) return ' (ยังไม่ได้ตั้งงบ)';
     const pendingUsed = this.usedBySource()[key] ?? 0;

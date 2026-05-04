@@ -310,6 +310,7 @@ Step 3: ALLOCATE to another unit → from pool
 4. `SPECIAL_BUDGET_TRANSFER_OUT` + `SPECIAL_BUDGET_TRANSFER_IN` ใช้โอนงบพิเศษระหว่าง unit ภายในโครงการเดียวกัน — สร้างเป็นคู่ใน 1 transaction, งบรวมไม่เปลี่ยน, ไม่ผ่าน pool
 5. `getPoolBalance()` ต้อง derive จาก movements เท่านั้น: SUM(POOL_INIT + ADJUST + RETURN) - SUM(ALLOCATE) WHERE status='approved' — ห้ามอ่าน `pool_budget_amount` จาก projects table โดยตรง
 6. `budgetUnitRemain = standard_budget - totalPanelAUsed - totalUnitBudgetReturned` — ต้องหักจำนวนที่คืนเข้า Pool ด้วย
+7. **`MANAGEMENT_SPECIAL` อนุญาตให้ติดลบได้** — ทีมการตลาดเป็นผู้บริหารจัดการเอง ระบบจะไม่ block การบันทึกขายหรือ movement แม้งบคงเหลือเป็น 0/ติดลบ (ต่างจาก `UNIT_STANDARD`, `PROJECT_POOL`, `CAMPAIGN_SUPPORT` ที่ยังคงตรวจคงเหลือตามปกติ)
 
 ### การโอนงบพิเศษ (Transfer Special Budget)
 

@@ -338,6 +338,10 @@ class SalesTransactionService
         }
 
         foreach ($sourceTotals as $source => $total) {
+            // งบผู้บริหาร (MANAGEMENT_SPECIAL) อนุญาตให้ติดลบได้ — ทีมการตลาดบริหารจัดการเอง
+            if ($source === 'MANAGEMENT_SPECIAL') {
+                continue;
+            }
             $remaining = $unitSummary[$source]['remaining'] ?? 0;
             if ($total > $remaining) {
                 throw new RuntimeException("งบ {$source} คงเหลือไม่พอ (คงเหลือ: " . number_format($remaining, 2) . " บาท)");

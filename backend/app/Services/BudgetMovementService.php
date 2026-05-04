@@ -310,8 +310,9 @@ class BudgetMovementService
             ->where('id', $projectId)->get()->getRowArray();
         $allowOver = !empty($projectRow['allow_over_budget']);
 
-        // Validate balances (ข้ามถ้า allow_over_budget = true)
-        if (!$allowOver && in_array($moveType, self::USE_TYPES, true)) {
+        // Validate balances (ข้ามถ้า allow_over_budget = true หรือเป็นงบผู้บริหาร)
+        // MANAGEMENT_SPECIAL อนุญาตให้ติดลบได้ — ทีมการตลาดบริหารจัดการเอง
+        if (!$allowOver && $sourceType !== 'MANAGEMENT_SPECIAL' && in_array($moveType, self::USE_TYPES, true)) {
             $summary = $this->getUnitBudgetSummary($projectId, $unitId);
             $remaining = $summary[$sourceType]['remaining'] ?? 0;
             if ($remaining < $amount) {
@@ -395,7 +396,8 @@ class BudgetMovementService
         $projectId  = (int) $movement['project_id'];
         $unitId     = (int) $movement['unit_id'];
 
-        if (in_array($moveType, self::USE_TYPES, true)) {
+        // MANAGEMENT_SPECIAL อนุญาตให้ติดลบได้ — ทีมการตลาดบริหารจัดการเอง (ข้าม validation)
+        if ($sourceType !== 'MANAGEMENT_SPECIAL' && in_array($moveType, self::USE_TYPES, true)) {
             $summary   = $this->getUnitBudgetSummary($projectId, $unitId);
             $remaining = $summary[$sourceType]['remaining'] ?? 0;
             if ($remaining < $amount) {
@@ -458,10 +460,13 @@ class BudgetMovementService
         if ($amount <= 0) throw new RuntimeException('จำนวนเงินต้องมากกว่า 0');
 
         // ตรวจ remaining ของ from_unit
-        $fromSummary = $this->getUnitBudgetSummary($projectId, $fromUnitId);
-        $remaining   = $fromSummary[$sourceType]['remaining'] ?? 0;
-        if ($remaining < $amount) {
-            throw new RuntimeException("ยูนิตต้นทางมีงบคงเหลือไม่พอ (คงเหลือ: " . number_format($remaining, 2) . " บาท)");
+        // MANAGEMENT_SPECIAL อนุญาตให้ติดลบได้ — ทีมการตลาดบริหารจัดการเอง
+        if ($sourceType !== 'MANAGEMENT_SPECIAL') {
+            $fromSummary = $this->getUnitBudgetSummary($projectId, $fromUnitId);
+            $remaining   = $fromSummary[$sourceType]['remaining'] ?? 0;
+            if ($remaining < $amount) {
+                throw new RuntimeException("ยูนิตต้นทางมีงบคงเหลือไม่พอ (คงเหลือ: " . number_format($remaining, 2) . " บาท)");
+            }
         }
 
         $this->db->transBegin();
