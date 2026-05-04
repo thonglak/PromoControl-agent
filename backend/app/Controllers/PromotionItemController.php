@@ -386,6 +386,166 @@ class PromotionItemController extends BaseController
         ]);
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // POST /api/promotion-items/import-json
+    // ─── นำเข้ารายการโปรโมชั่นจากไฟล์ JSON ที่ export มา (ข้ามโครงการได้)
+    //     resolve eligible_house_model_names / eligible_unit_codes → ids
+    //     ของโครงการปลายทาง (ถ้าไม่พบจะข้ามเฉพาะส่วนเงื่อนไขนั้น)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function importJson(): ResponseInterface
+    {
+        if (!$this->canWrite()) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์นำเข้ารายการ']);
+        }
+
+        $body         = $this->request->getJSON(true) ?? [];
+        $projectId    = (int) ($body['project_id'] ?? 0);
+        $items        = $body['items'] ?? [];
+
+        if ($projectId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        }
+        if (!$this->canAccessProject($projectId)) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
+        }
+        if (!is_array($items) || empty($items)) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'ไม่พบรายการในไฟล์']);
+        }
+        if (count($items) > 500) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'นำเข้าได้สูงสุดครั้งละ 500 รายการ']);
+        }
+
+        $db = \Config\Database::connect();
+
+        // โหลด house_models / project_units ของโครงการปลายทาง สำหรับ resolve ชื่อ → id
+        $houseModelMap = [];
+        foreach ($db->table('house_models')->select('id, name')->where('project_id', $projectId)->get()->getResultArray() as $hm) {
+            $houseModelMap[mb_strtolower(trim((string) $hm['name']))] = (int) $hm['id'];
+        }
+        $unitMap = [];
+        foreach ($db->table('project_units')->select('id, unit_code')->where('project_id', $projectId)->get()->getResultArray() as $u) {
+            $unitMap[mb_strtolower(trim((string) $u['unit_code']))] = (int) $u['id'];
+        }
+
+        // โหลดรหัสที่มีอยู่แล้วในโครงการปลายทาง — ใช้ตรวจซ้ำตอน insert
+        $existingCodes = array_flip(array_column(
+            $db->table('promotion_item_master')->select('code')->where('project_id', $projectId)->get()->getResultArray(),
+            'code'
+        ));
+
+        $now      = date('Y-m-d H:i:s');
+        $created  = 0;
+        $skipped  = [];
+        $errors   = [];
+
+        $validCategories = ['discount', 'premium', 'expense_support'];
+        $validValueModes = ['fixed', 'actual', 'manual', 'calculated'];
+
+        foreach ($items as $idx => $raw) {
+            $name = trim((string) ($raw['name'] ?? ''));
+            $code = trim((string) ($raw['code'] ?? ''));
+            $ref  = $code !== '' ? $code : ('#' . ($idx + 1) . ' ' . $name);
+
+            try {
+                if ($name === '') {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'ไม่มีชื่อรายการ'];
+                    continue;
+                }
+                $category = (string) ($raw['category'] ?? '');
+                if (!in_array($category, $validCategories, true)) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'หมวดไม่ถูกต้อง'];
+                    continue;
+                }
+                $valueMode = (string) ($raw['value_mode'] ?? 'fixed');
+                if (!in_array($valueMode, $validValueModes, true)) {
+                    $valueMode = 'fixed';
+                }
+
+                // ถ้ามี code ในไฟล์ และ code นั้นมีในโครงการแล้ว → ข้าม
+                if ($code !== '' && isset($existingCodes[$code])) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'รหัสมีในโครงการนี้แล้ว'];
+                    continue;
+                }
+
+                // ถ้าไม่ระบุ code → generate ใหม่
+                $useCode = $code !== '' ? $code : $this->generateNextCode($existingCodes);
+
+                $db->transBegin();
+
+                $db->table('promotion_item_master')->insert([
+                    'project_id'             => $projectId,
+                    'code'                   => $useCode,
+                    'name'                   => $name,
+                    'category'               => $category,
+                    'default_value'          => isset($raw['default_value']) ? (float) $raw['default_value'] : 0,
+                    'max_value'              => isset($raw['max_value']) && $raw['max_value'] !== null && $raw['max_value'] !== '' ? (float) $raw['max_value'] : null,
+                    'default_used_value'     => isset($raw['default_used_value']) && $raw['default_used_value'] !== null && $raw['default_used_value'] !== '' ? (float) $raw['default_used_value'] : null,
+                    'discount_convert_value' => isset($raw['discount_convert_value']) && $raw['discount_convert_value'] !== null && $raw['discount_convert_value'] !== '' ? (float) $raw['discount_convert_value'] : null,
+                    'value_mode'             => $valueMode,
+                    'is_unit_standard'       => !empty($raw['is_unit_standard']) ? 1 : 0,
+                    'is_active'              => isset($raw['is_active']) ? ($raw['is_active'] ? 1 : 0) : 1,
+                    'sort_order'             => (int) ($raw['sort_order'] ?? 0),
+                    'eligible_start_date'    => $raw['eligible_start_date'] ?? null,
+                    'eligible_end_date'      => $raw['eligible_end_date'] ?? null,
+                    'created_at'             => $now,
+                    'updated_at'             => $now,
+                ]);
+                $newId = (int) $db->insertID();
+
+                // resolve eligible_house_model_names → ids (จับคู่ไม่สนตัวพิมพ์)
+                $hmNames = (array) ($raw['eligible_house_model_names'] ?? []);
+                foreach ($hmNames as $n) {
+                    $key = mb_strtolower(trim((string) $n));
+                    if ($key === '' || !isset($houseModelMap[$key])) continue;
+                    $db->table('promotion_item_house_models')->insert([
+                        'promotion_item_id' => $newId,
+                        'house_model_id'    => $houseModelMap[$key],
+                    ]);
+                }
+
+                // resolve eligible_unit_codes → ids
+                $uCodes = (array) ($raw['eligible_unit_codes'] ?? []);
+                foreach ($uCodes as $c) {
+                    $key = mb_strtolower(trim((string) $c));
+                    if ($key === '' || !isset($unitMap[$key])) continue;
+                    $db->table('promotion_item_units')->insert([
+                        'promotion_item_id' => $newId,
+                        'unit_id'           => $unitMap[$key],
+                    ]);
+                }
+
+                $db->transCommit();
+                $existingCodes[$useCode] = true;
+                $created++;
+            } catch (\Throwable $e) {
+                $db->transRollback();
+                $errors[] = ['ref' => $ref, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return $this->response->setStatusCode(200)->setJSON([
+            'message' => "นำเข้าสำเร็จ {$created} รายการ",
+            'data'    => [
+                'created' => $created,
+                'skipped' => $skipped,
+                'errors'  => $errors,
+            ],
+        ]);
+    }
+
+    /** generate code ถัดไปแบบ in-memory ตามรหัสที่ใช้ไปแล้ว */
+    private function generateNextCode(array &$existingCodes): string
+    {
+        $max = 0;
+        foreach (array_keys($existingCodes) as $c) {
+            if (preg_match('/^PI-(\d+)$/', (string) $c, $m)) {
+                $max = max($max, (int) $m[1]);
+            }
+        }
+        return 'PI-' . str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
+    }
+
     /**
      * แปลง fre_calculation_type/fre_formula ของ freebies → value_mode ของระบบเรา
      * - fixed                              → fixed
@@ -415,6 +575,9 @@ class PromotionItemController extends BaseController
         $contractPriceParam = $this->request->getGet('contract_price');
         $contractPrice = ($contractPriceParam !== null && $contractPriceParam !== '')
             ? (float) $contractPriceParam : null;
+        $netPriceParam = $this->request->getGet('net_price');
+        $netPrice = ($netPriceParam !== null && $netPriceParam !== '')
+            ? (float) $netPriceParam : null;
 
         if ($projectId <= 0) return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
         if ($unitId <= 0)    return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ unit_id']);
@@ -424,7 +587,7 @@ class PromotionItemController extends BaseController
 
         try {
             $eligibleSvc = new EligiblePromotionService();
-            $result = $eligibleSvc->getEligibleItems($projectId, $unitId, $saleDate, $contractPrice);
+            $result = $eligibleSvc->getEligibleItems($projectId, $unitId, $saleDate, $contractPrice, $netPrice);
             return $this->response->setStatusCode(200)->setJSON(['data' => $result]);
         } catch (RuntimeException $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);

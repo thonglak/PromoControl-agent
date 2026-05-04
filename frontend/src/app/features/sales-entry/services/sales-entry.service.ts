@@ -107,13 +107,16 @@ export interface TransferResponse {
 export class SalesEntryService {
   private http = inject(HttpClient);
 
-  getEligibleItems(projectId: number, unitId: number, saleDate: string, contractPrice?: number | null): Observable<EligibleResponse> {
+  getEligibleItems(projectId: number, unitId: number, saleDate: string, contractPrice?: number | null, netPrice?: number | null): Observable<EligibleResponse> {
     let params = new HttpParams()
       .set('project_id', projectId)
       .set('unit_id', unitId)
       .set('sale_date', saleDate);
     if (contractPrice != null && contractPrice > 0) {
       params = params.set('contract_price', contractPrice);
+    }
+    if (netPrice != null && netPrice > 0) {
+      params = params.set('net_price', netPrice);
     }
     return this.http
       .get<{ data: EligibleResponse }>('/api/promotion-items/eligible', { params })

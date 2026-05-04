@@ -1,5 +1,5 @@
 import {
-  Component, input, signal, computed, output, effect, OnInit,
+  Component, input, signal, computed, output, effect, untracked, OnInit,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -287,18 +287,49 @@ export class AdditionalPromotionPanelComponent implements OnInit {
     });
   });
 
-  // ─── Effect: reset rows เมื่อ eligibleItems เปลี่ยน ──────────────────
+  // ─── Effect: sync rows เมื่อ eligibleItems เปลี่ยน ──────────────────
+  // - First load (rows ว่าง): edit mode → ใช้ initialRows; ปกติ → ว่าง
+  // - Subsequent (recalc จาก parent): preserve rows ที่ user กรอก แต่ refresh fee_formula
+  //   ของแถวที่อ้างถึง item ที่ค่าเปลี่ยน (calculated_value/formula_display/warnings)
   private resetEffect = effect(() => {
-    const _items = this.eligibleItems();
+    const items = this.eligibleItems();
     const init = this.initialRows();
-    // edit mode: ใช้ initialRows แทน reset
-    if (init.length > 0) {
-      this.rows.set(init);
-      this.emitChanges(init);
-    } else {
-      this.rows.set([]);
-      this.emitChanges([]);
+    const inFlight = untracked(() => this.rows());
+
+    // first load
+    if (inFlight.length === 0) {
+      if (init.length > 0) {
+        this.rows.set(init);
+        this.emitChanges(init);
+      } else {
+        this.rows.set([]);
+        this.emitChanges([]);
+      }
+      return;
     }
+
+    // subsequent: refresh server-derived fields แต่คงค่า user
+    const itemMap = new Map(items.map(it => [it.id, it]));
+    const updated = inFlight.map(row => {
+      if (row.promotion_item_id == null) return row;
+      const item = itemMap.get(row.promotion_item_id);
+      if (!item) return row; // item ไม่อยู่ในรายการ eligible แล้ว — คงค่าเดิม
+      return {
+        ...row,
+        // server-derived
+        max_value:             item.max_value,
+        formula_display:       item.formula_display,
+        fee_formula:           item.fee_formula,
+        effective_rate:        item.effective_rate,
+        effective_buyer_share: item.effective_buyer_share,
+        warnings:              item.warnings ?? [],
+        // ถ้าเป็น calculated → ใช้ค่าใหม่; ถ้าไม่ใช่ → คงค่า user
+        calculated_value:      item.value_mode === 'calculated' ? (item.calculated_value ?? null) : row.calculated_value,
+        used_value:            item.value_mode === 'calculated' ? (item.calculated_value ?? 0) : row.used_value,
+      };
+    });
+    this.rows.set(updated);
+    this.emitChanges(updated);
   });
 
   ngOnInit(): void {}

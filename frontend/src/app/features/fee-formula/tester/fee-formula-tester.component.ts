@@ -53,18 +53,19 @@ export class FeeFormulaTesterComponent implements OnInit {
 
   // ── Single Test ──
   singleForm = this.fb.group({
-    formulaId:     [null as number | null],
+    formulaId:     [null as number | null, Validators.required],
     unitId:        [null as number | null, Validators.required],
     saleDate:      [new Date() as Date | null, Validators.required],
     manualInput:   [null as number | null],
     contractPrice: [null as number | null],
+    netPrice:      [null as number | null],
   });
   testResult  = signal<TestResult | null>(null);
   calculating = signal(false);
 
   // ── Batch Test ──
   batchForm = this.fb.group({
-    formulaId: [null as number | null],
+    formulaId: [null as number | null, Validators.required],
     saleDate:  [new Date() as Date | null, Validators.required],
   });
   batchResults   = signal<BatchResultItem[]>([]);
@@ -95,6 +96,18 @@ export class FeeFormulaTesterComponent implements OnInit {
     );
   });
 
+  /** ตรวจว่าต้องการ net_price ไหม — ใช้กับ base_field='net_price' หรือ expression ที่ใช้ตัวแปร net_price */
+  needsNetPrice = computed(() => {
+    const fid = this.singleForm.get('formulaId')?.value;
+    const formulas = fid
+      ? this.formulas().filter(f => f.id === fid)
+      : this.formulas();
+    return formulas.some(f =>
+      f.base_field === 'net_price' ||
+      (f.base_field === 'expression' && (f.formula_expression ?? '').includes('net_price'))
+    );
+  });
+
   get projectId(): number { return Number(this.project.selectedProject()?.id ?? 0); }
 
   ngOnInit(): void {
@@ -118,6 +131,7 @@ export class FeeFormulaTesterComponent implements OnInit {
     if (v.formulaId) params.formula_id = v.formulaId;
     if (v.manualInput) params.manual_input = v.manualInput;
     if (v.contractPrice) params.contract_price = v.contractPrice;
+    if (v.netPrice)      params.net_price      = v.netPrice;
 
     this.api.test(params).subscribe({
       next: result => { this.testResult.set(result); this.calculating.set(false); },

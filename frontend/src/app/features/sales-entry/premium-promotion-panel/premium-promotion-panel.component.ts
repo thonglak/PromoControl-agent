@@ -1,5 +1,5 @@
 import {
-  Component, input, signal, computed, output, effect, OnInit,
+  Component, input, signal, computed, output, effect, untracked, OnInit,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -198,6 +198,9 @@ export class PremiumPromotionPanelComponent implements OnInit {
   readonly budgetExceeded = computed(() => this.unitBudgetRemaining() < 0);
 
   // ─── Effects: rebuild rows เมื่อ eligible items เปลี่ยน ──────────────
+  // หมายเหตุ: เมื่อ parent ทำ recalc (เช่น contract_price/net_price เปลี่ยน) eligibleItems จะถูก
+  // โหลดใหม่ — เราต้องคงค่าที่ user กรอกไว้ (used_value ของ manual/fixed, convert_to_discount, remark)
+  // แต่ปรับ calculated_value/formula_display/warnings ให้ตรงกับ BE ใหม่
   private rebuildEffect = effect(() => {
     const items = this.eligibleItems();
     const initRows = this.initialRows();
@@ -205,20 +208,36 @@ export class PremiumPromotionPanelComponent implements OnInit {
       this.rows.set([]);
       return;
     }
-    // สร้าง map จาก initialRows เพื่อ merge ค่าที่บันทึกไว้ (edit mode)
-    const savedMap = new Map(initRows.map(r => [r.promotion_item_id, r]));
+    // อ่าน rows ปัจจุบันแบบไม่ติดตาม (กัน infinite loop)
+    const inFlight = untracked(() => this.rows());
+
+    // ลำดับความสำคัญของค่าที่จะ merge:
+    // 1) initialRows (edit mode — มีก็ต่อเมื่อโหลดรายการเดิมเข้ามา)
+    // 2) inFlight (ค่าที่ user กำลังกรอกอยู่)
+    const savedMap = new Map<number, PanelARow>();
+    for (const r of inFlight) {
+      if (r.promotion_item_id) savedMap.set(r.promotion_item_id, r);
+    }
+    for (const r of initRows) {
+      savedMap.set(r.promotion_item_id, r);
+    }
 
     const newRows = items.map(item => {
       const saved = savedMap.get(item.id);
-      if (saved) {
-        // edit mode: ใช้ค่าที่บันทึกไว้ (รวมถึง used_value = 0)
-        return { ...this.buildRow(item), ...saved };
+      const fresh = this.buildRow(item);
+      if (!saved) {
+        // ไม่มีค่าเดิม — edit mode ใหม่ใส่ used_value=0; ปกติใช้ default จาก buildRow
+        return initRows.length > 0 ? { ...fresh, used_value: 0 } : fresh;
       }
-      // ไม่มีค่าเดิม: ถ้า edit mode ให้ default = 0 (ไม่เคยใช้)
-      if (initRows.length > 0) {
-        return { ...this.buildRow(item), used_value: 0 };
-      }
-      return this.buildRow(item);
+      // มีค่าเดิม — preserve user input + อัปเดต server-derived fields
+      return {
+        ...fresh,
+        // value_mode='calculated' → ใช้ค่าใหม่จาก BE; โหมดอื่น → คงค่าที่ user กรอก
+        used_value:           item.value_mode === 'calculated' ? fresh.used_value : saved.used_value,
+        convert_to_discount:  saved.convert_to_discount,
+        remark:               saved.remark,
+        manual_input_value:   saved.manual_input_value,
+      };
     });
     this.rows.set(newRows);
     this.emitChanges(newRows);

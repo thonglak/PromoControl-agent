@@ -10,14 +10,14 @@
         <div class="section-card mb-4">
           <form [formGroup]="singleForm" class="flex flex-wrap gap-4 items-end">
 
-            <mat-form-field appearance="outline" class="w-56">
-              <mat-label>สูตร (ทั้งหมด = ว่าง)</mat-label>
+            <mat-form-field appearance="outline" class="w-64">
+              <mat-label>สูตร</mat-label>
               <mat-select formControlName="formulaId">
-                <mat-option [value]="null">ทั้งหมด</mat-option>
                 @for (f of formulas(); track f.id) {
                   <mat-option [value]="f.id">{{ f.promotion_item_name }}</mat-option>
                 }
               </mat-select>
+              @if (singleForm.get('formulaId')?.hasError('required')) { <mat-error>กรุณาเลือกสูตร</mat-error> }
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="w-48">
@@ -51,6 +51,15 @@
                 <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
                 <input matInput currencyMask formControlName="contractPrice" />
                 <mat-hint class="!text-xs">สำหรับสูตร expression ที่ใช้ตัวแปรนี้</mat-hint>
+              </mat-form-field>
+            }
+
+            @if (needsNetPrice()) {
+              <mat-form-field appearance="outline" class="w-48">
+                <mat-label>ราคาสุทธิ (net_price)</mat-label>
+                <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+                <input matInput currencyMask formControlName="netPrice" />
+                <mat-hint class="!text-xs">ปล่อยว่าง = ใช้ base_price แทน</mat-hint>
               </mat-form-field>
             }
 
@@ -167,14 +176,14 @@
         <div class="section-card mb-4">
           <form [formGroup]="batchForm" class="flex flex-wrap gap-4 items-end">
 
-            <mat-form-field appearance="outline" class="w-56">
-              <mat-label>สูตร (ทั้งหมด = ว่าง)</mat-label>
+            <mat-form-field appearance="outline" class="w-64">
+              <mat-label>สูตร</mat-label>
               <mat-select formControlName="formulaId">
-                <mat-option [value]="null">ทั้งหมด</mat-option>
                 @for (f of formulas(); track f.id) {
                   <mat-option [value]="f.id">{{ f.promotion_item_name }}</mat-option>
                 }
               </mat-select>
+              @if (batchForm.get('formulaId')?.hasError('required')) { <mat-error>กรุณาเลือกสูตร</mat-error> }
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="w-44">

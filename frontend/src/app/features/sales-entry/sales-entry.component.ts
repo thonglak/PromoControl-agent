@@ -144,6 +144,9 @@ export class SalesEntryComponent implements OnInit {
   readonly loadingEligible = signal(false);
   readonly saving = signal(false);
   private contractPriceRecalcTimer: any = null;
+  private netPriceRecalcTimer: any = null;
+  /** net_price ล่าสุดที่ส่งให้ backend แล้ว — ใช้กันการ trigger ซ้ำเมื่อค่าไม่เปลี่ยน */
+  private lastSentNetPrice: number | null = null;
 
   // Panel rows
   readonly currentPanelARows = signal<PanelARow[]>([]);
@@ -326,6 +329,7 @@ export class SalesEntryComponent implements OnInit {
     this.eligibleData.set(null);
     this.currentPanelARows.set([]);
     this.currentPanelBRows.set([]);
+    this.lastSentNetPrice = null;
     if (unit) {
       this.loadEligibleItems(unit.id, this.saleDate(), this.contractPrice());
     }
@@ -347,7 +351,10 @@ export class SalesEntryComponent implements OnInit {
     if (!this.eligibleHasExpressionWithContract()) return; // ไม่มี formula ที่ใช้ contract_price → ไม่ต้อง recalc
     if (this.contractPriceRecalcTimer) clearTimeout(this.contractPriceRecalcTimer);
     this.contractPriceRecalcTimer = setTimeout(() => {
-      this.loadEligibleItems(uid, this.saleDate(), price);
+      // ส่ง net_price ปัจจุบันไปด้วย เพื่อไม่ให้สูตรที่ใช้ net_price ตกกลับไปใช้ base_price
+      const np = this.eligibleHasNetPriceDependency() ? this.currentNetPrice() : null;
+      this.lastSentNetPrice = np;
+      this.loadEligibleItems(uid, this.saleDate(), price, np);
     }, 500);
   }
 
@@ -362,14 +369,68 @@ export class SalesEntryComponent implements OnInit {
     );
   }
 
+  /** ตรวจว่ามีสูตรที่ขึ้นกับ net_price ไหม (base_field='net_price' หรือ expression ที่อ้าง net_price) */
+  private eligibleHasNetPriceDependency(): boolean {
+    const data = this.eligibleData();
+    if (!data) return false;
+    const items = [...(data.panel_a ?? []), ...(data.panel_b ?? [])];
+    return items.some((it: any) =>
+      it.fee_formula?.base_field === 'net_price' ||
+      (it.fee_formula?.base_field === 'expression' &&
+       (it.fee_formula?.formula_expression ?? '').includes('net_price'))
+    );
+  }
+
+  /** คำนวณ net_price ปัจจุบัน = base_price - ผลรวมส่วนลด (รวม convert_to_discount + discount_convert_value) จาก panel A + B */
+  private currentNetPrice(): number {
+    const base = this.selectedUnit()?.base_price ?? 0;
+    if (base <= 0) return 0;
+    let totalDiscount = 0;
+    for (const r of this.currentPanelARows()) {
+      if (!r.promotion_item_id || !r.used_value || r.used_value <= 0) continue;
+      const isDiscount = r.convert_to_discount && r.category === 'premium'
+        ? true
+        : r.category === 'discount';
+      if (!isDiscount) continue;
+      // ถ้าแปลง premium → discount และมี discount_convert_value ระบุไว้ ให้ใช้ค่านั้น
+      const v = (r.convert_to_discount && r.discount_convert_value != null)
+        ? r.discount_convert_value
+        : r.used_value;
+      totalDiscount += v;
+    }
+    for (const r of this.currentPanelBRows()) {
+      if (!r.promotion_item_id || !r.used_value || r.used_value <= 0) continue;
+      if (r.category === 'discount') totalDiscount += r.used_value;
+    }
+    return Math.max(0, base - totalDiscount);
+  }
+
   onPanelAItemsChanged(rows: PanelARow[]): void {
     this.currentPanelARows.set(rows);
     this.syncBudgetPendingUsed();
+    this.scheduleNetPriceRecalc();
   }
 
   onPanelBItemsChanged(rows: PanelBRow[]): void {
     this.currentPanelBRows.set(rows);
     this.syncBudgetPendingUsed();
+    this.scheduleNetPriceRecalc();
+  }
+
+  /** debounce 500ms — recalc eligibility ด้วย net_price ปัจจุบัน เฉพาะเมื่อมีสูตรที่ขึ้นกับ net_price */
+  private scheduleNetPriceRecalc(): void {
+    const uid = this.selectedUnitId();
+    if (uid <= 0) return;
+    if (!this.eligibleHasNetPriceDependency()) return;
+
+    if (this.netPriceRecalcTimer) clearTimeout(this.netPriceRecalcTimer);
+    this.netPriceRecalcTimer = setTimeout(() => {
+      const np = this.currentNetPrice();
+      // ถ้าค่าไม่เปลี่ยน → ไม่ต้องยิง API ซ้ำ
+      if (np === this.lastSentNetPrice) return;
+      this.lastSentNetPrice = np;
+      this.loadEligibleItems(uid, this.saleDate(), this.contractPrice(), np);
+    }, 500);
   }
 
   // ─── Save ────────────────────────────────────────────────────────────
@@ -531,12 +592,12 @@ export class SalesEntryComponent implements OnInit {
     budgetSection.updatePendingUsed(pending);
   }
 
-  private loadEligibleItems(unitId: number, saleDate: string, contractPrice: number | null = null): void {
+  private loadEligibleItems(unitId: number, saleDate: string, contractPrice: number | null = null, netPrice: number | null = null): void {
     const pid = this.projectId();
     if (pid <= 0) return;
 
     this.loadingEligible.set(true);
-    this.salesSvc.getEligibleItems(pid, unitId, saleDate, contractPrice).subscribe({
+    this.salesSvc.getEligibleItems(pid, unitId, saleDate, contractPrice, netPrice).subscribe({
       next: data => {
         this.eligibleData.set(data);
         this.loadingEligible.set(false);

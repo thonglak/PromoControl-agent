@@ -133,6 +133,7 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->get('browse-source',     'PromotionItemController::browseSource');
         $routes->get('source-projects',   'PromotionItemController::sourceProjects');
         $routes->post('bulk-import',      'PromotionItemController::bulkImport');
+        $routes->post('import-json',      'PromotionItemController::importJson');
         $routes->put('(:num)',            'PromotionItemController::update/$1');
         $routes->delete('(:num)',         'PromotionItemController::delete/$1');
     });

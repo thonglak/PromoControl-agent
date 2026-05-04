@@ -6,7 +6,13 @@
       <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700">
         <app-icon name="adjustments-horizontal" class="w-5 h-5" />
       </button>
+      <button mat-stroked-button (click)="exportJson()" matTooltip="ส่งออกรายการที่กรองเป็นไฟล์ JSON" class="flex items-center gap-2">
+        <app-icon name="arrow-down-tray" class="w-4 h-4" /> ส่งออก JSON
+      </button>
       @if (canWrite()) {
+        <button mat-stroked-button (click)="openImportJson()" matTooltip="นำเข้ารายการจากไฟล์ JSON" class="flex items-center gap-2">
+          <app-icon name="arrow-up-tray" class="w-4 h-4" /> นำเข้า JSON
+        </button>
         <button mat-stroked-button color="primary" (click)="openBrowseFreebies()" class="flex items-center gap-2">
           <app-icon name="cloud-arrow-down" class="w-4 h-4" /> เพิ่มจาก Caldiscount
         </button>

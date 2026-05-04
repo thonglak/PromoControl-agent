@@ -102,8 +102,10 @@ class FeeFormulaController extends BaseController
     {
         $body = $this->request->getJSON(true) ?? [];
         try {
+            // รับทั้ง formula_id (ที่ frontend ส่ง) และ fee_formula_id (compat)
+            $fid = (int) ($body['formula_id'] ?? $body['fee_formula_id'] ?? 0);
             $r = $this->svc->testBatch(
-                (int) ($body['fee_formula_id'] ?? 0),
+                $fid,
                 $body['sale_date'] ?? date('Y-m-d'),
                 (int) ($body['project_id'] ?? 0)
             );

@@ -284,6 +284,7 @@ class FeeFormulaService
         $saleDate = $params['sale_date'] ?? date('Y-m-d');
         $manualInputs = $params['manual_inputs'] ?? [];
         $contractPrice = isset($params['contract_price']) ? (float) $params['contract_price'] : null;
+        $netPrice      = isset($params['net_price']) && $params['net_price'] !== '' ? (float) $params['net_price'] : null;
 
         // ดึงข้อมูลยูนิต + project (สำหรับ expression vars)
         if (($params['mode'] ?? 'unit') === 'unit') {
@@ -304,6 +305,8 @@ class FeeFormulaService
                 'electric_meter_fee' => (float) ($unit['electric_meter_fee'] ?? 0),
                 'water_meter_fee'    => (float) ($unit['water_meter_fee'] ?? 0),
                 'pool_budget_amount' => (float) ($unit['pool_budget_amount'] ?? 0),
+                // ถ้าผู้ใช้กรอก net_price → ใช้ค่านั้น (มิฉะนั้น calculateOne จะ fallback เป็น base_price)
+                'net_price'          => $netPrice,
             ];
         } else {
             $md = $params['manual_data'] ?? [];
@@ -319,14 +322,21 @@ class FeeFormulaService
                 'electric_meter_fee' => (float) ($md['electric_meter_fee'] ?? 0),
                 'water_meter_fee'    => (float) ($md['water_meter_fee'] ?? 0),
                 'pool_budget_amount' => (float) ($md['pool_budget_amount'] ?? 0),
+                'net_price'          => $netPrice,
             ];
         }
 
-        // ดึงสูตรทั้งหมด
-        $formulas = $this->db->table('fee_formulas f')
+        // ดึงสูตร — ถ้าระบุ formula_id ให้ดึงเฉพาะสูตรนั้น (มิฉะนั้นทุกสูตร)
+        $builder = $this->db->table('fee_formulas f')
             ->select('f.*, p.name AS item_name, p.code AS item_code, p.category, p.max_value AS item_max_value')
-            ->join('promotion_item_master p', 'p.id = f.promotion_item_id')
-            ->get()->getResultArray();
+            ->join('promotion_item_master p', 'p.id = f.promotion_item_id');
+        if (!empty($params['formula_id'])) {
+            $builder->where('f.id', (int) $params['formula_id']);
+        }
+        $formulas = $builder->get()->getResultArray();
+        if (!empty($params['formula_id']) && empty($formulas)) {
+            throw new RuntimeException('ไม่พบสูตรที่เลือก');
+        }
 
         $results = [];
         $totalCalculated = 0;

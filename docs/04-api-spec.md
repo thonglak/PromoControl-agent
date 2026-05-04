@@ -164,6 +164,7 @@ DELETE /api/promotion-items/{id}         (ลบรายการ — ถ้า
 GET    /api/promotion-items/browse-source         (ค้นจาก caldiscount.freebies — q, pj_code, page, per_page, project_id; คืน suggested_value_mode + already_added)
 GET    /api/promotion-items/source-projects       (list distinct fre_pj_code + count — สำหรับ filter dropdown)
 POST   /api/promotion-items/bulk-import           (นำเข้าทีละหลายรายการจาก freebies — project_id, default_category, fre_codes[])
+POST   /api/promotion-items/import-json           (นำเข้าจากไฟล์ JSON ที่ export มา — project_id, items[]; resolve eligible_house_model_names/eligible_unit_codes ตามโครงการปลายทาง; รหัสซ้ำในโครงการจะถูกข้าม; สูงสุด 500 รายการ/ครั้ง)
 
 ## Fee Formulas (สูตรคำนวณค่าธรรมเนียม)
 GET    /api/fee-formulas                      (รายการสูตรทั้งหมด พร้อม promotion_item + policy count)
@@ -185,7 +186,9 @@ POST/PUT body fields:
 - ผลลัพธ์ของสูตร IS ค่าสุดท้าย (ไม่นำไปคูณ rate × buyer_share อีก)
 - ถ้าสูตรใช้ `contract_price` แต่ยังไม่กรอก → คืน `needs_input: true`
 
-GET /api/promotion-items/eligible รองรับ query param `contract_price` (สำหรับ recalculate expression formula ที่ใช้ตัวแปรนี้)
+GET /api/promotion-items/eligible รองรับ query params:
+- `contract_price` — สำหรับ recalculate expression formula ที่ใช้ตัวแปรนี้
+- `net_price` — ราคาสุทธิปัจจุบัน (base_price - ผลรวมส่วนลด); ใช้ recalculate สูตรที่ `base_field='net_price'` หรือ expression ที่อ้าง `net_price` (ถ้าไม่ส่ง → fallback เป็น base_price + แสดง warning); FE คำนวณจาก panel 3A/3B แล้วยิงด้วย debounce 500ms ทุกครั้งที่รายการเปลี่ยน
 
 ## Fee Rate Policies (มาตรการ/นโยบาย)
 GET    /api/fee-rate-policies                 (รายการนโยบายทั้งหมด)
@@ -210,8 +213,8 @@ POST/PUT body fields:
 5. ถ้าไม่มี → ใช้ legacy `override_rate × override_buyer_share`
 
 ## Formula Tester (ทดสอบสูตร)
-POST   /api/fee-formulas/test                 (ทดสอบสูตร — ยูนิตจริงหรือค่าสมมติ)
-POST   /api/fee-formulas/test-batch           (ทดสอบกับทุกยูนิตในโครงการ)
+POST   /api/fee-formulas/test                 (ทดสอบสูตร — body: formula_id, mode='unit'|'manual', unit_id, sale_date, manual_input?, contract_price?, net_price?; ถ้าไม่ส่ง net_price → fallback เป็น base_price; ถ้าไม่ส่ง formula_id จะคืนทุกสูตร)
+POST   /api/fee-formulas/test-batch           (ทดสอบสูตรเดียวกับทุกยูนิตในโครงการ — body: formula_id, sale_date, project_id)
 
 ## Number Series (เลขที่เอกสาร)
 GET    /api/number-series                     (รายการ series ของโครงการที่เลือก)

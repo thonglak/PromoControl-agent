@@ -13,9 +13,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
-import { PromotionItemApiService, PromotionItem } from '../promotion-item-api.service';
+import { PromotionItemApiService, PromotionItem, PromotionItemExportFile, PromotionItemJson } from '../promotion-item-api.service';
 import { PromotionItemFormDialogComponent } from '../dialogs/promotion-item-form-dialog.component';
 import { BrowseFreebiesDialogComponent, BrowseFreebiesDialogData } from '../dialogs/browse-freebies-dialog.component';
+import { ImportJsonDialogComponent, ImportJsonDialogData } from '../dialogs/import-json-dialog.component';
 import { ProjectService } from '../../../../core/services/project.service';
 import { AuthService } from '../../../../core/services/auth.service';
 import { SvgIconComponent } from '../../../../shared/components/svg-icon/svg-icon.component';
@@ -174,6 +175,76 @@ export class PromotionItemListComponent implements OnInit {
       width: '700px', maxHeight: '90vh', disableClose: true,
       data: { mode: 'create' },
     }).afterClosed().subscribe(r => { if (r) { this.snack.open('สร้างรายการสำเร็จ', 'ปิด', { duration: 3000 }); this.loadData(); } });
+  }
+
+  /** Export รายการที่ผ่าน filter ปัจจุบัน → ไฟล์ JSON */
+  exportJson(): void {
+    // ใช้ filteredData เพื่อ export เฉพาะที่มองเห็นใน table หลังกรอง
+    const items = this.dataSource.filteredData ?? this.dataSource.data;
+    if (!items || items.length === 0) {
+      this.snack.open('ไม่มีรายการให้ส่งออก', 'ปิด', { duration: 3000 });
+      return;
+    }
+
+    const project = this.project.selectedProject();
+    const payload: PromotionItemExportFile = {
+      format:              'promotion-items.v1',
+      exported_at:         new Date().toISOString(),
+      source_project_id:   project ? Number(project.id) : undefined,
+      source_project_name: project?.name,
+      count:               items.length,
+      items:               items.map(it => this.toJsonItem(it)),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const ts   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const safe = (project?.name ?? 'project').replace(/[^a-zA-Z0-9ก-๙_-]+/g, '_').slice(0, 60);
+    a.href     = url;
+    a.download = `promotion-items_${safe}_${ts}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    this.snack.open(`ส่งออก ${items.length} รายการสำเร็จ`, 'ปิด', { duration: 3000 });
+  }
+
+  /** เปิด dialog เลือก/นำเข้าไฟล์ JSON */
+  openImportJson(): void {
+    const pid = this.projectId();
+    if (pid <= 0) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+    this.dialog.open(ImportJsonDialogComponent, {
+      width: '900px', maxWidth: '95vw', maxHeight: '90vh', disableClose: false,
+      data: {
+        projectId:   pid,
+        projectName: this.project.selectedProject()?.name,
+      } satisfies ImportJsonDialogData,
+    }).afterClosed().subscribe(saved => { if (saved) this.loadData(); });
+  }
+
+  private toJsonItem(it: PromotionItem): PromotionItemJson {
+    return {
+      code:                       it.code,
+      name:                       it.name,
+      category:                   it.category,
+      default_value:              Number(it.default_value ?? 0),
+      max_value:                  it.max_value != null ? Number(it.max_value) : null,
+      default_used_value:         it.default_used_value != null ? Number(it.default_used_value) : null,
+      discount_convert_value:     it.discount_convert_value != null ? Number(it.discount_convert_value) : null,
+      value_mode:                 it.value_mode,
+      is_unit_standard:           !!Number(it.is_unit_standard),
+      is_active:                  !!Number(it.is_active),
+      sort_order:                 Number(it.sort_order ?? 0),
+      eligible_start_date:        it.eligible_start_date,
+      eligible_end_date:          it.eligible_end_date,
+      eligible_house_model_names: (it.eligible_house_models ?? []).map(h => h.house_model_name).filter(Boolean),
+      eligible_unit_codes:        (it.eligible_units ?? []).map(u => u.unit_code).filter(Boolean),
+    };
   }
 
   openBrowseFreebies(): void {

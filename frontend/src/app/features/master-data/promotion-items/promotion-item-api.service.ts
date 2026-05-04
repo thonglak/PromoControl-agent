@@ -96,6 +96,13 @@ export class PromotionItemApiService {
       .get<{ data: SourceProject[] }>('/api/promotion-items/source-projects')
       .pipe(map(r => r.data));
   }
+
+  /** นำเข้ารายการโปรโมชั่นจากไฟล์ JSON (export มาจากโครงการอื่นได้) */
+  importJson(dto: ImportJsonDto): Observable<ImportJsonResult> {
+    return this.http
+      .post<{ message: string; data: ImportJsonResult }>('/api/promotion-items/import-json', dto)
+      .pipe(map(r => r.data));
+  }
 }
 
 export interface SourceProject {
@@ -141,4 +148,45 @@ export interface BulkImportFreebiesResult {
   calculated_count: number;
   skipped: { fre_code: string; reason: string }[];
   errors:  { fre_code: string; reason: string }[];
+}
+
+// ── Export / Import JSON ──────────────────────────────────────────────────
+
+/** รายการโปรโมชั่นในไฟล์ JSON ที่ export มา (ส่งกลับเข้ามา import ในโครงการเดียวกันหรือโครงการอื่น) */
+export interface PromotionItemJson {
+  code?: string;
+  name: string;
+  category: 'discount' | 'premium' | 'expense_support';
+  default_value: number;
+  max_value: number | null;
+  default_used_value: number | null;
+  discount_convert_value: number | null;
+  value_mode: 'fixed' | 'actual' | 'manual' | 'calculated';
+  is_unit_standard: boolean;
+  is_active: boolean;
+  sort_order: number;
+  eligible_start_date: string | null;
+  eligible_end_date: string | null;
+  eligible_house_model_names: string[];
+  eligible_unit_codes: string[];
+}
+
+export interface PromotionItemExportFile {
+  format: 'promotion-items.v1';
+  exported_at: string;
+  source_project_id?: number;
+  source_project_name?: string;
+  count: number;
+  items: PromotionItemJson[];
+}
+
+export interface ImportJsonDto {
+  project_id: number;
+  items: PromotionItemJson[];
+}
+
+export interface ImportJsonResult {
+  created: number;
+  skipped: { ref: string; reason: string }[];
+  errors:  { ref: string; reason: string }[];
 }

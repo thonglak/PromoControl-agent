@@ -24,7 +24,7 @@ class EligiblePromotionService
     // Public: ดึงรายการ eligible แยก panel_a / panel_b
     // ═══════════════════════════════════════════════════════════════════════
 
-    public function getEligibleItems(int $projectId, int $unitId, string $saleDate, ?float $contractPrice = null): array
+    public function getEligibleItems(int $projectId, int $unitId, string $saleDate, ?float $contractPrice = null, ?float $netPrice = null): array
     {
         // โหลดข้อมูลยูนิต + project-level vars (สำหรับ expression formulas)
         $unit = $this->db->table('project_units pu')
@@ -68,7 +68,7 @@ class EligiblePromotionService
             }
 
             // สร้าง response item
-            $responseItem = $this->buildResponseItem($item, $unit, $saleDate, $formulaMap[$id] ?? null, $contractPrice);
+            $responseItem = $this->buildResponseItem($item, $unit, $saleDate, $formulaMap[$id] ?? null, $contractPrice, $netPrice);
 
             if ($item['is_unit_standard']) {
                 $panelA[] = $responseItem;
@@ -212,7 +212,7 @@ class EligiblePromotionService
     // Private: Build response item
     // ═══════════════════════════════════════════════════════════════════════
 
-    private function buildResponseItem(array $item, array $unit, string $saleDate, ?array $formula, ?float $contractPrice = null): array
+    private function buildResponseItem(array $item, array $unit, string $saleDate, ?array $formula, ?float $contractPrice = null, ?float $netPrice = null): array
     {
         $result = [
             'id'                 => (int) $item['id'],
@@ -229,7 +229,7 @@ class EligiblePromotionService
 
         // สำหรับ calculated items — pre-calculate ค่า
         if ($item['value_mode'] === 'calculated' && $formula) {
-            $calcResult = $this->calculateFormula($formula, $unit, $saleDate, $contractPrice);
+            $calcResult = $this->calculateFormula($formula, $unit, $saleDate, $contractPrice, $netPrice);
             $result['fee_formula']            = $calcResult['fee_formula'];
             $result['calculated_value']       = $calcResult['calculated_value'];
             $result['effective_rate']         = $calcResult['effective_rate'];
@@ -252,7 +252,7 @@ class EligiblePromotionService
     // Private: Calculate formula + policy matching
     // ═══════════════════════════════════════════════════════════════════════
 
-    private function calculateFormula(array $formula, array $unit, string $saleDate, ?float $contractPrice = null): array
+    private function calculateFormula(array $formula, array $unit, string $saleDate, ?float $contractPrice = null, ?float $netPrice = null): array
     {
         $warnings = [];
         $baseField = $formula['base_field'];
@@ -282,9 +282,13 @@ class EligiblePromotionService
 
             case 'net_price':
                 $baseLabel = 'ราคาสุทธิ';
-                // net_price ยังไม่รู้จนกว่าจะคำนวณส่วนลด → ใช้ base_price ไปก่อน
-                $baseAmount = (float) $unit['base_price'];
-                $warnings[] = 'ค่าฐานใช้ราคาขาย (ยังไม่ได้หักส่วนลด) — จะคำนวณใหม่อัตโนมัติเมื่อกรอกข้อมูลครบ';
+                // ใช้ net_price ที่ FE ส่งมา (คำนวณจากส่วนลดปัจจุบัน) ถ้าไม่มี → fallback เป็น base_price
+                if ($netPrice !== null && $netPrice > 0) {
+                    $baseAmount = (float) $netPrice;
+                } else {
+                    $baseAmount = (float) $unit['base_price'];
+                    $warnings[] = 'ค่าฐานใช้ราคาขาย (ยังไม่ได้หักส่วนลด) — จะคำนวณใหม่อัตโนมัติเมื่อใส่ส่วนลด';
+                }
                 break;
 
             case 'manual_input':
@@ -307,7 +311,7 @@ class EligiblePromotionService
                     $baseAmount = 0;
                 } else {
                     try {
-                        $context = $this->buildExpressionContext($unit, $contractPrice);
+                        $context = $this->buildExpressionContext($unit, $contractPrice, $netPrice);
                         $expressionResult = $this->evaluator->evaluate($expr, $context);
                         $baseAmount = $expressionResult;
                     } catch (\Throwable $e) {
@@ -348,7 +352,7 @@ class EligiblePromotionService
             if (!empty($policy['condition_expression'])) {
                 $condExpr = $policy['condition_expression'];
                 try {
-                    $exprContext = $this->buildExpressionContext($unit, $contractPrice);
+                    $exprContext = $this->buildExpressionContext($unit, $contractPrice, $netPrice);
                     $boolResult = $this->evaluator->evaluateBoolean($condExpr, $exprContext);
                     if ($boolResult) {
                         $matchReasons[] = "เงื่อนไข [{$condExpr}] = true ✓";
@@ -418,7 +422,7 @@ class EligiblePromotionService
             // expression mode: ใช้ override_expression ของ policy ถ้ามี + matched
             if ($appliedPolicy && !empty($appliedPolicy['override_expression'])) {
                 try {
-                    $exprContext = $this->buildExpressionContext($unit, $contractPrice);
+                    $exprContext = $this->buildExpressionContext($unit, $contractPrice, $netPrice);
                     $calculatedValue = $this->evaluator->evaluate($appliedPolicy['override_expression'], $exprContext);
                 } catch (\Throwable $e) {
                     $warnings[] = 'override expression error: ' . $e->getMessage();
@@ -534,7 +538,7 @@ class EligiblePromotionService
      * สร้าง context ของตัวแปรทั้งหมดสำหรับ evaluator
      * — รวม project + unit + transaction
      */
-    private function buildExpressionContext(array $unit, ?float $contractPrice): array
+    private function buildExpressionContext(array $unit, ?float $contractPrice, ?float $netPrice = null): array
     {
         return [
             // Project-level
@@ -553,7 +557,10 @@ class EligiblePromotionService
 
             // Transaction-level
             'contract_price' => (float) ($contractPrice ?? 0),
-            'net_price'      => (float) ($unit['base_price'] ?? 0), // fallback ใช้ราคาขาย
+            // ใช้ net_price ที่ FE คำนวณส่งมา (base_price - ผลรวมส่วนลด); ถ้าไม่ส่ง → fallback เป็น base_price
+            'net_price'      => $netPrice !== null && $netPrice > 0
+                ? (float) $netPrice
+                : (float) ($unit['base_price'] ?? 0),
         ];
     }
 
