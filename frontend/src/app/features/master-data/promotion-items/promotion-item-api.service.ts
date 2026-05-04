@@ -72,4 +72,73 @@ export class PromotionItemApiService {
   delete(id: number): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>('/api/promotion-items/' + id);
   }
+
+  // ── Browse + Bulk import จาก caldiscount.freebies ──
+
+  browseSource(q: BrowseFreebiesQuery): Observable<BrowseFreebiesResponse> {
+    let p = new HttpParams().set('project_id', q.project_id);
+    if (q.q !== undefined && q.q !== '')             p = p.set('q', q.q);
+    if (q.pj_code !== undefined && q.pj_code !== '') p = p.set('pj_code', q.pj_code);
+    if (q.page !== undefined)                        p = p.set('page', q.page);
+    if (q.per_page !== undefined)                    p = p.set('per_page', q.per_page);
+    return this.http.get<BrowseFreebiesResponse>('/api/promotion-items/browse-source', { params: p });
+  }
+
+  bulkImport(dto: BulkImportFreebiesDto): Observable<BulkImportFreebiesResult> {
+    return this.http
+      .post<{ message: string; data: BulkImportFreebiesResult }>('/api/promotion-items/bulk-import', dto)
+      .pipe(map(r => r.data));
+  }
+
+  /** ดึง list distinct pj_code จาก freebies (สำหรับ filter dropdown) */
+  getSourceProjects(): Observable<SourceProject[]> {
+    return this.http
+      .get<{ data: SourceProject[] }>('/api/promotion-items/source-projects')
+      .pipe(map(r => r.data));
+  }
+}
+
+export interface SourceProject {
+  code: string;
+  total: number;
+}
+
+export interface FreebieSource {
+  fre_code: string;
+  fre_name: string;
+  fre_pj_code: string | null;
+  fre_calculation_type: 'fixed' | 'formula';
+  fre_formula: string | null;
+  fre_fixed_value: string | null;
+  fre_amt_convert_to_dc: string | null;
+  fre_remark: string | null;
+  fre_ordering: string | null;
+  suggested_value_mode: 'fixed' | 'manual' | 'calculated';
+  already_added: boolean;
+}
+
+export interface BrowseFreebiesQuery {
+  project_id: number;
+  q?: string;
+  pj_code?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface BrowseFreebiesResponse {
+  data: FreebieSource[];
+  meta: { total: number; page: number; per_page: number; last_page: number };
+}
+
+export interface BulkImportFreebiesDto {
+  project_id: number;
+  default_category: 'discount' | 'premium' | 'expense_support';
+  fre_codes: string[];
+}
+
+export interface BulkImportFreebiesResult {
+  created: number;
+  calculated_count: number;
+  skipped: { fre_code: string; reason: string }[];
+  errors:  { fre_code: string; reason: string }[];
 }

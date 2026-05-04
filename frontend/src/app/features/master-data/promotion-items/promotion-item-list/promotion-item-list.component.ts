@@ -15,6 +15,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { PromotionItemApiService, PromotionItem } from '../promotion-item-api.service';
 import { PromotionItemFormDialogComponent } from '../dialogs/promotion-item-form-dialog.component';
+import { BrowseFreebiesDialogComponent, BrowseFreebiesDialogData } from '../dialogs/browse-freebies-dialog.component';
 import { ProjectService } from '../../../../core/services/project.service';
 import { AuthService } from '../../../../core/services/auth.service';
 import { SvgIconComponent } from '../../../../shared/components/svg-icon/svg-icon.component';
@@ -173,6 +174,21 @@ export class PromotionItemListComponent implements OnInit {
       width: '700px', maxHeight: '90vh', disableClose: true,
       data: { mode: 'create' },
     }).afterClosed().subscribe(r => { if (r) { this.snack.open('สร้างรายการสำเร็จ', 'ปิด', { duration: 3000 }); this.loadData(); } });
+  }
+
+  openBrowseFreebies(): void {
+    const pid = this.projectId();
+    if (pid <= 0) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+    this.dialog.open(BrowseFreebiesDialogComponent, {
+      width: '1100px', maxWidth: '95vw', maxHeight: '90vh', disableClose: true,
+      data: {
+        projectId: pid,
+        projectName: this.project.selectedProject()?.name,
+      } satisfies BrowseFreebiesDialogData,
+    }).afterClosed().subscribe(saved => { if (saved) this.loadData(); });
   }
 
   openEdit(item: PromotionItem): void {

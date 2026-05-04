@@ -124,9 +124,12 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->get('(:num)',     'PromotionItemController::show/$1');
     });
     $routes->group('promotion-items', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
-        $routes->post('/',         'PromotionItemController::create');
-        $routes->put('(:num)',     'PromotionItemController::update/$1');
-        $routes->delete('(:num)',  'PromotionItemController::delete/$1');
+        $routes->post('/',                'PromotionItemController::create');
+        $routes->get('browse-source',     'PromotionItemController::browseSource');
+        $routes->get('source-projects',   'PromotionItemController::sourceProjects');
+        $routes->post('bulk-import',      'PromotionItemController::bulkImport');
+        $routes->put('(:num)',            'PromotionItemController::update/$1');
+        $routes->delete('(:num)',         'PromotionItemController::delete/$1');
     });
 
     // Budget Movements (งบประมาณ)

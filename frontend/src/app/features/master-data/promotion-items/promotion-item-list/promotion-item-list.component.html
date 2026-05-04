@@ -7,6 +7,9 @@
         <app-icon name="adjustments-horizontal" class="w-5 h-5" />
       </button>
       @if (canWrite()) {
+        <button mat-stroked-button color="primary" (click)="openBrowseFreebies()" class="flex items-center gap-2">
+          <app-icon name="cloud-arrow-down" class="w-4 h-4" /> เพิ่มจาก Caldiscount
+        </button>
         <button mat-flat-button color="primary" (click)="openCreate()" class="flex items-center gap-2">
           <app-icon name="plus" class="w-4 h-4" /> สร้างรายการ
         </button>
