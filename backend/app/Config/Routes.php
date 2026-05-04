@@ -280,6 +280,7 @@ $routes->group('api', static function (RouteCollection $routes): void {
     // Dev Tools (สำหรับทดสอบ — admin only)
     $routes->group('dev', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
         $routes->post('clear-transactions', 'DevToolController::clearTransactions');
+        $routes->get('clear-logs',          'DevToolController::clearLogs');
     });
 
     // Dashboard (Sales-Focused)

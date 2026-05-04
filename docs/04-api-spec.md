@@ -115,7 +115,9 @@ GET /api/house-models
 GET /api/house-models/{id}
 POST /api/house-models
 PUT /api/house-models/{id}
-DELETE /api/house-models/{id}
+DELETE /api/house-models/{id}    # 400 ถ้ายังมียูนิตผูกอยู่
+                                  #   - sold/transferred → block ถาวร, response: { error, units:[{unit_code,status}] }
+                                  #   - available/reserved → ขอให้ลบยูนิตก่อน, response: { error (พร้อมรหัสยูนิต preview), units:[{unit_code,status}] }
 
 ## Units
 GET /api/units
@@ -493,4 +495,49 @@ fk_lookup transform_value ตัวอย่าง:
 ```json
 {"lookup_table":"house_models","lookup_field":"code","scope_by_project":true,"create_if_missing":true,"create_fields":{"name":"{value}","code":"{value}"}}
 ```
+
+## Dev Tools (admin only)
+POST /api/dev/clear-transactions — ล้างข้อมูลการขายของโครงการ
+GET  /api/dev/clear-logs?project_id= — ประวัติการล้างข้อมูล (audit trail, ล่าสุด 50 รายการ)
+
+### POST /api/dev/clear-transactions
+
+| Method | Path | Description | Role |
+|--------|------|-------------|------|
+| POST | /api/dev/clear-transactions | ล้างข้อมูลการขายของโครงการ + เขียน audit log | admin |
+
+Request body:
+```json
+{
+  "project_id": 1,
+  "mode": "sales_only",
+  "project_name_confirm": "โครงการ A",
+  "reason": "เคลียร์ข้อมูลทดสอบ"
+}
+```
+
+Field:
+- `mode`: `sales_only` (ลบเฉพาะรายการขาย + USE/auto-RETURN — คงงบที่ตั้งไว้) หรือ `full_reset` (ลบทุกอย่าง รวม ALLOCATE/allocations + reset BUDGET_MOVE number_series)
+- `project_name_confirm`: ต้องตรงกับชื่อโครงการ — ป้องกันการล้างผิดโครงการ
+- `reason`: optional
+
+Response 200:
+```json
+{
+  "message": "ล้างข้อมูลสำเร็จ",
+  "mode": "sales_only",
+  "summary": {
+    "deleted_transaction_items": 12,
+    "deleted_transactions": 5,
+    "deleted_budget_movements": 18,
+    "deleted_budget_allocations": 0,
+    "reset_units": 5
+  }
+}
+```
+
+Error 400: `mode` ไม่ถูกต้อง / ชื่อโครงการไม่ตรง  
+Error 403: ไม่ใช่ admin  
+Error 404: ไม่พบโครงการ
+
 
