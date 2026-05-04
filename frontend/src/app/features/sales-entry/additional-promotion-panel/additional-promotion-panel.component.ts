@@ -288,19 +288,23 @@ export class AdditionalPromotionPanelComponent implements OnInit {
   });
 
   // ─── Effect: sync rows เมื่อ eligibleItems เปลี่ยน ──────────────────
-  // - First load (rows ว่าง): edit mode → ใช้ initialRows; ปกติ → ว่าง
+  // - First load (rows ว่าง): edit mode → ใช้ initialRows + enrich จาก eligibleItems; ปกติ → ว่าง
   // - Subsequent (recalc จาก parent): preserve rows ที่ user กรอก แต่ refresh fee_formula
   //   ของแถวที่อ้างถึง item ที่ค่าเปลี่ยน (calculated_value/formula_display/warnings)
   private resetEffect = effect(() => {
     const items = this.eligibleItems();
     const init = this.initialRows();
     const inFlight = untracked(() => this.rows());
+    const itemMap = new Map(items.map(it => [it.id, it]));
 
     // first load
     if (inFlight.length === 0) {
       if (init.length > 0) {
-        this.rows.set(init);
-        this.emitChanges(init);
+        // edit mode: enrich initialRows ด้วย server-derived fields (max_value/fee_formula ฯลฯ)
+        // เพราะ parent สร้าง init จากรายการเดิมเท่านั้น ไม่มี max_value/formula
+        const enriched = init.map(row => this.mergeFromItem(row, itemMap.get(row.promotion_item_id ?? -1)));
+        this.rows.set(enriched);
+        this.emitChanges(enriched);
       } else {
         this.rows.set([]);
         this.emitChanges([]);
@@ -309,7 +313,6 @@ export class AdditionalPromotionPanelComponent implements OnInit {
     }
 
     // subsequent: refresh server-derived fields แต่คงค่า user
-    const itemMap = new Map(items.map(it => [it.id, it]));
     const updated = inFlight.map(row => {
       if (row.promotion_item_id == null) return row;
       const item = itemMap.get(row.promotion_item_id);
@@ -331,6 +334,24 @@ export class AdditionalPromotionPanelComponent implements OnInit {
     this.rows.set(updated);
     this.emitChanges(updated);
   });
+
+  /** เติม server-derived fields ลง row จาก EligibleItem (ถ้าเจอ) — คง used_value/remark/funding_source ที่ user กรอกเดิมไว้ */
+  private mergeFromItem(row: PanelBRow, item: EligibleItem | undefined): PanelBRow {
+    if (!item) return row;
+    return {
+      ...row,
+      max_value:             item.max_value,
+      formula_display:       item.formula_display,
+      fee_formula:           item.fee_formula,
+      effective_rate:        item.effective_rate,
+      effective_buyer_share: item.effective_buyer_share,
+      warnings:              item.warnings ?? [],
+      calculated_value:      item.value_mode === 'calculated' ? (item.calculated_value ?? null) : row.calculated_value,
+      // edit mode: ใช้ value_mode/category จาก server (กันกรณี config เปลี่ยน)
+      value_mode:            item.value_mode || row.value_mode,
+      category:              row.category || item.category,
+    };
+  }
 
   ngOnInit(): void {}
 
