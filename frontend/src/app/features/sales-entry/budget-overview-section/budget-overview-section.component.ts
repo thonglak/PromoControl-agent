@@ -98,11 +98,13 @@ const SOURCE_CONFIG: { key: string; label: string; canAllocate: boolean }[] = [
                         </button>
                       }
                       @if (row.canAllocate && row.allocated > 0 && row.remaining > 0 && canReturnBudget()) {
-                        <button mat-stroked-button class="!min-w-0 !px-2 !py-0 !text-xs !text-sky-700 !border-sky-300"
-                          (click)="openTransferDialog(row)"
-                          matTooltip="โอนงบไป unit อื่น">
-                          โอนงบ
-                        </button>
+                        @if (row.key !== 'MANAGEMENT_SPECIAL') {
+                          <button mat-stroked-button class="!min-w-0 !px-2 !py-0 !text-xs !text-sky-700 !border-sky-300"
+                            (click)="openTransferDialog(row)"
+                            matTooltip="โอนงบไป unit อื่น">
+                            โอนงบ
+                          </button>
+                        }
                         @if (row.used === 0) {
                           <button mat-stroked-button class="!min-w-0 !px-2 !py-0 !text-xs !text-slate-600 !border-slate-300"
                             (click)="openVoidDialog(row)"

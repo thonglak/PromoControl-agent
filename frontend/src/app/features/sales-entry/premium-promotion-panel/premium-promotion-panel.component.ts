@@ -45,7 +45,7 @@ export interface PanelARow {
     <div class="section-card">
       <div class="flex items-center justify-between cursor-pointer" (click)="collapsed.set(!collapsed())">
         <h3 class="font-semibold m-0" style="font-size: var(--font-size-card-title); color: var(--color-text-primary)">
-          Panel 3A — โปรโมชั่น (งบยูนิต)
+          Premium (งบยูนิต)
           <span class="text-sm font-normal ml-2" style="color: var(--color-gray-500)">{{ rows().length }} รายการ</span>
         </h3>
         <div class="flex items-center gap-2">

@@ -58,7 +58,7 @@ const FUNDING_SOURCES = [
     <div class="section-card">
       <div class="flex items-center justify-between cursor-pointer" (click)="collapsed.set(!collapsed())">
         <h3 class="font-semibold m-0" style="font-size: var(--font-size-card-title); color: var(--color-text-primary)">
-          Panel 3B — ของแถมเพิ่มเติม (งบอื่น)
+          ของแถมเพิ่มเติม (งบอื่นๆ)
           <span class="text-sm font-normal ml-2" style="color: var(--color-gray-500)">{{ rows().length }} รายการ</span>
         </h3>
         <div class="flex items-center gap-2">
