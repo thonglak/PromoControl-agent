@@ -224,6 +224,10 @@ $routes->group('api', static function (RouteCollection $routes): void {
     $routes->group('number-series', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->put('(:num)',         'NumberSeriesController::update/$1');
         $routes->post('preview',       'NumberSeriesController::preview');
+        $routes->post('provision',     'NumberSeriesController::provision');
+    });
+    $routes->group('number-series', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
+        $routes->post('provision-all', 'NumberSeriesController::provisionAll');
     });
 
     // Reports (รายงาน)

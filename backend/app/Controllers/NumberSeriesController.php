@@ -148,6 +148,83 @@ class NumberSeriesController extends BaseController
         return $this->response->setStatusCode(200)->setJSON(['data' => $result]);
     }
 
+    // ─── POST /api/number-series/provision ────────────────────────────
+
+    /**
+     * สร้าง default number_series ที่ยังขาดให้ครบทุก document_type
+     * สำหรับโครงการที่สร้างผ่าน import หรือสร้างก่อนระบบ number series
+     *
+     * Body: { project_id }
+     * Response 200: { message, data: { created, types[] } }
+     */
+    public function provision(): ResponseInterface
+    {
+        $body      = $this->request->getJSON(true) ?? [];
+        $projectId = (int) ($body['project_id'] ?? 0);
+
+        if ($projectId <= 0) {
+            return $this->response->setStatusCode(422)->setJSON([
+                'errors' => ['project_id' => 'กรุณาระบุ project_id'],
+            ]);
+        }
+
+        if (!$this->canAccessProject($projectId)) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'error' => 'ไม่พบโครงการ',
+            ]);
+        }
+
+        try {
+            $result = $this->service->provisionMissingSeries($projectId);
+
+            $message = $result['created'] === 0
+                ? 'มีเลขที่เอกสารครบแล้ว ไม่ต้องสร้างเพิ่ม'
+                : "สร้างเลขที่เอกสารใหม่ {$result['created']} รายการ";
+
+            return $this->response->setStatusCode(200)->setJSON([
+                'message' => $message,
+                'data'    => $result,
+            ]);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    // ─── POST /api/number-series/provision-all ────────────────────────
+
+    /**
+     * สแกนทุกโครงการ → provision default number_series ที่ยังขาด
+     * เฉพาะ admin (ใช้ใน Fix Error tools)
+     *
+     * Response 200: { message, data: { total_projects, fixed_projects, total_created, details[] } }
+     */
+    public function provisionAll(): ResponseInterface
+    {
+        $role = $this->request->user_role ?? '';
+        if ($role !== 'admin') {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'เฉพาะ admin เท่านั้น']);
+        }
+
+        try {
+            $result = $this->service->provisionMissingSeriesAll();
+
+            $message = $result['fixed_projects'] === 0
+                ? "ตรวจ {$result['total_projects']} โครงการ — ครบทุกโครงการแล้ว"
+                : "แก้ไข {$result['fixed_projects']} โครงการ · สร้างเลขที่ใหม่ {$result['total_created']} รายการ";
+
+            return $this->response->setStatusCode(200)->setJSON([
+                'message' => $message,
+                'data'    => $result,
+            ]);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     // ─── GET /api/number-series/:id/logs ──────────────────────────────
 
     /**

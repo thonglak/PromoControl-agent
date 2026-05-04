@@ -65,6 +65,21 @@ export interface PaginatedResponse<T> {
   page_size: number;
 }
 
+export interface ProvisionAllDetail {
+  project_id: number;
+  project_code: string;
+  project_name: string;
+  created: number;
+  types: string[];
+}
+
+export interface ProvisionAllResult {
+  total_projects: number;
+  fixed_projects: number;
+  total_created: number;
+  details: ProvisionAllDetail[];
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -97,6 +112,23 @@ export class NumberSeriesService {
   preview(config: NumberSeriesPreviewRequest): Observable<NumberSeriesPreviewResponse> {
     return this.http
       .post<{ data: NumberSeriesPreviewResponse }>('/api/number-series/preview', config)
+      .pipe(map(r => r.data));
+  }
+
+  /** สร้าง default number series ที่ยังขาดให้ครบทุก document_type สำหรับโครงการ */
+  provision(projectId: number): Observable<{ created: number; types: string[] }> {
+    return this.http
+      .post<{ message: string; data: { created: number; types: string[] } }>(
+        '/api/number-series/provision',
+        { project_id: projectId }
+      )
+      .pipe(map(r => r.data));
+  }
+
+  /** สแกนทุกโครงการ → provision number_series ที่ขาด (admin only) */
+  provisionAll(): Observable<ProvisionAllResult> {
+    return this.http
+      .post<{ message: string; data: ProvisionAllResult }>('/api/number-series/provision-all', {})
       .pipe(map(r => r.data));
   }
 

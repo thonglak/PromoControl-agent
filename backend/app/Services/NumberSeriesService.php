@@ -443,6 +443,82 @@ class NumberSeriesService
     }
 
     // =====================================================================
+    //  6. provisionMissingSeries — สร้าง series rows ที่ยังขาดให้ครบ
+    // =====================================================================
+
+    /**
+     * ตรวจ DEFAULT_SERIES ทุกตัว แล้วสร้าง row ที่ยังไม่มีให้ครบ
+     * ใช้สำหรับโครงการที่สร้างผ่าน import หรือสร้างก่อนระบบ number series
+     *
+     * @return array{created: int, types: string[]} จำนวน + รายการ document_type ที่สร้างใหม่
+     */
+    public function provisionMissingSeries(int $projectId): array
+    {
+        $existing = $this->db->table('number_series')
+            ->select('document_type')
+            ->where('project_id', $projectId)
+            ->get()->getResultArray();
+        $existingTypes = array_column($existing, 'document_type');
+
+        $createdTypes = [];
+        foreach (self::DEFAULT_SERIES as $config) {
+            if (in_array($config['document_type'], $existingTypes, true)) {
+                continue;
+            }
+            $this->autoProvisionSeries($projectId, $config['document_type']);
+            $createdTypes[] = $config['document_type'];
+        }
+
+        return [
+            'created' => count($createdTypes),
+            'types'   => $createdTypes,
+        ];
+    }
+
+    /**
+     * สแกนทุกโครงการ → provision number_series ที่ยังขาด
+     * ใช้ในหน้า Fix Error สำหรับ admin
+     *
+     * @return array{
+     *   total_projects: int, fixed_projects: int, total_created: int,
+     *   details: array<int, array{project_id:int, project_code:string, project_name:string, created:int, types:string[]}>
+     * }
+     */
+    public function provisionMissingSeriesAll(): array
+    {
+        $projects = $this->db->table('projects')
+            ->select('id, code, name')
+            ->orderBy('id', 'ASC')
+            ->get()->getResultArray();
+
+        $details      = [];
+        $fixedCount   = 0;
+        $totalCreated = 0;
+
+        foreach ($projects as $p) {
+            $result = $this->provisionMissingSeries((int) $p['id']);
+            if ($result['created'] > 0) {
+                $fixedCount++;
+                $totalCreated += $result['created'];
+                $details[] = [
+                    'project_id'   => (int) $p['id'],
+                    'project_code' => (string) $p['code'],
+                    'project_name' => (string) $p['name'],
+                    'created'      => $result['created'],
+                    'types'        => $result['types'],
+                ];
+            }
+        }
+
+        return [
+            'total_projects' => count($projects),
+            'fixed_projects' => $fixedCount,
+            'total_created'  => $totalCreated,
+            'details'        => $details,
+        ];
+    }
+
+    // =====================================================================
     //  Private helper: Auto-provision missing series
     // =====================================================================
 
@@ -466,11 +542,12 @@ class NumberSeriesService
         $now    = date('Y-m-d H:i:s');
         $sample = $this->buildNumber($config, 1, date('Y-m-d'));
 
+        // หมายเหตุ: `separator` เป็น reserved word ใน MySQL 8 — ต้องใส่ backtick ทุก column
         $this->db->query(
-            'INSERT IGNORE INTO number_series
-             (project_id, document_type, prefix, separator, year_format, year_separator,
-              running_digits, reset_cycle, next_number, last_reset_date, sample_output,
-              is_active, created_at, updated_at)
+            'INSERT IGNORE INTO `number_series`
+             (`project_id`, `document_type`, `prefix`, `separator`, `year_format`, `year_separator`,
+              `running_digits`, `reset_cycle`, `next_number`, `last_reset_date`, `sample_output`,
+              `is_active`, `created_at`, `updated_at`)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, 1, ?, ?)',
             [
                 $projectId,

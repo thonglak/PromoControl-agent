@@ -8,9 +8,11 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CurrencyMaskDirective } from '../../../../shared/directives/currency-mask.directive';
 import { ProjectApiService, Project } from '../project-api.service';
+import { NumberSeriesService } from '../../../settings/services/number-series.service';
 
 export interface ProjectFormDialogData {
   mode: 'create' | 'edit';
@@ -142,6 +144,30 @@ export interface ProjectFormDialogData {
           <span class="text-xs text-slate-400">(ระบบจะแสดงคำเตือนแทนการบล็อก)</span>
         </div>
 
+        <!-- เลขที่เอกสาร — edit only: สำหรับโครงการที่สร้างผ่าน import จะไม่มี series -->
+        @if (data.mode === 'edit') {
+          <div class="border border-slate-200 rounded-md p-3 bg-slate-50/50">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1">
+                <div class="text-sm font-medium text-slate-700">เลขที่เอกสารอัตโนมัติ</div>
+                <div class="text-xs text-slate-500 mt-0.5">
+                  สร้างชุดเลข SO / BM / BL / UA ที่ยังขาด — ใช้สำหรับโครงการที่สร้างผ่าน import
+                </div>
+              </div>
+              <button mat-stroked-button type="button"
+                      [disabled]="provisioning()"
+                      (click)="provisionSeries()">
+                @if (provisioning()) {
+                  <mat-spinner diameter="16" class="!inline-block mr-1" />
+                  กำลังสร้าง…
+                } @else {
+                  สร้างเลขที่เอกสาร
+                }
+              </button>
+            </div>
+          </div>
+        }
+
         <!-- Server errors -->
         @if (serverError()) {
           <div class="text-red-600 text-sm bg-red-50 p-3 rounded">{{ serverError() }}</div>
@@ -164,8 +190,12 @@ export class ProjectFormDialogComponent {
   dialogRef = inject(MatDialogRef<ProjectFormDialogComponent>);
   private api = inject(ProjectApiService);
 
-  saving      = signal(false);
-  serverError = signal<string | null>(null);
+  private numberSeriesSvc = inject(NumberSeriesService);
+  private snack = inject(MatSnackBar);
+
+  saving       = signal(false);
+  provisioning = signal(false);
+  serverError  = signal<string | null>(null);
 
   private fb = inject(FormBuilder);
 
@@ -230,6 +260,27 @@ export class ProjectFormDialogComponent {
           this.serverError.set(body?.error ?? 'เกิดข้อผิดพลาด กรุณาลองใหม่');
         }
         this.saving.set(false);
+      },
+    });
+  }
+
+  provisionSeries(): void {
+    const id = this.data.project?.id;
+    if (!id || this.provisioning()) return;
+    this.provisioning.set(true);
+
+    this.numberSeriesSvc.provision(id).subscribe({
+      next: res => {
+        this.provisioning.set(false);
+        const msg = res.created === 0
+          ? 'มีเลขที่เอกสารครบแล้ว ไม่ต้องสร้างเพิ่ม'
+          : `สร้างเลขที่เอกสาร ${res.created} รายการ: ${res.types.join(', ')}`;
+        this.snack.open(msg, 'ปิด', { duration: 4000 });
+      },
+      error: err => {
+        this.provisioning.set(false);
+        const errMsg = err?.error?.error ?? 'สร้างเลขที่เอกสารไม่สำเร็จ';
+        this.snack.open(errMsg, 'ปิด', { duration: 5000 });
       },
     });
   }
