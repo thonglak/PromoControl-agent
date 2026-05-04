@@ -15,6 +15,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { UserService, UserListItem, AllProject } from '../user.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
 import { UserFormDialogComponent, UserFormDialogData } from '../dialogs/user-form-dialog.component';
 import { AssignProjectsDialogComponent, AssignProjectsDialogData } from '../dialogs/assign-projects-dialog.component';
@@ -55,6 +56,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 })
 export class UserListComponent implements OnInit {
   private userService = inject(UserService);
+  private auth        = inject(AuthService);
   private dialog      = inject(MatDialog);
   private snackBar    = inject(MatSnackBar);
   private tblCfg      = inject(TableConfigService);
@@ -228,6 +230,31 @@ export class UserListComponent implements OnInit {
       width: '420px', maxHeight: '90vh', disableClose: true,
       data: { userId: user.id, userName: user.name } satisfies ResetPasswordDialogData,
     }).afterClosed().subscribe(() => {});
+  }
+
+  // ── Delete ──
+
+  /** ลบตัวเองไม่ได้ — กันลั่น */
+  isSelf(user: UserListItem): boolean {
+    return Number(this.auth.currentUser()?.id) === Number(user.id);
+  }
+
+  confirmDelete(user: UserListItem): void {
+    if (this.isSelf(user)) {
+      this.snackBar.open('ไม่สามารถลบบัญชีของตนเองได้', 'ปิด', { duration: 3000 });
+      return;
+    }
+    if (!confirm(`ยืนยันลบผู้ใช้ "${user.name}" (${user.email})?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+
+    this.userService.deleteUser(user.id).subscribe({
+      next: () => {
+        this.snackBar.open('ลบผู้ใช้สำเร็จ', 'ปิด', { duration: 3000 });
+        this.loadUsers();
+      },
+      error: err => {
+        this.snackBar.open(err?.error?.error ?? 'ลบผู้ใช้ไม่สำเร็จ', 'ปิด', { duration: 5000 });
+      },
+    });
   }
 
   // ── Helpers ──

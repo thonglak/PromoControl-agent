@@ -181,6 +181,13 @@
                       (click)="openResetPasswordDialog(user)">
                 <app-icon name="lock-closed" class="w-4 h-4" />
               </button>
+              <button mat-icon-button
+                      [matTooltip]="isSelf(user) ? 'ลบบัญชีของตนเองไม่ได้' : 'ลบผู้ใช้'"
+                      [disabled]="isSelf(user)"
+                      class="!text-slate-500 hover:!text-red-600"
+                      (click)="confirmDelete(user)">
+                <app-icon name="trash" class="w-4 h-4" />
+              </button>
             </div>
           </td>
         </ng-container>
