@@ -124,7 +124,7 @@ export class SalesEntryService {
       .pipe(map(r => r.data));
   }
 
-  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { total_budget_remaining: number; total_budget_allocated: number; total_budget_used: number; management_budget_remaining: number } }> {
+  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number } }> {
     let p = new HttpParams();
     Object.entries(params).forEach(([k, v]) => { if (v != null && v !== '') p = p.set(k, v); });
     return this.http.get<any>('/api/sales-transactions', { params: p });

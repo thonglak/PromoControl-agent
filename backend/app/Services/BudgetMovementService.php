@@ -186,18 +186,24 @@ class BudgetMovementService
      *
      * @param int        $projectId
      * @param array|null $unitIds  จำกัดเฉพาะ unit_ids (optional, ถ้า null = ทุก unit)
+     * @param array|null $sources  จำกัดเฉพาะ budget_source_type (optional, ถ้า null = ทุก source)
      * @return array ['total_remaining' => float, 'total_allocated' => float, 'total_used' => float]
      */
-    public function getProjectBudgetTotals(int $projectId, ?array $unitIds = null): array
+    public function getProjectBudgetTotals(int $projectId, ?array $unitIds = null, ?array $sources = null): array
     {
+        $sources = $sources ?? ['UNIT_STANDARD', 'PROJECT_POOL', 'MANAGEMENT_SPECIAL'];
+
         // ─── 1. UNIT_STANDARD: allocated = SUM(standard_budget) จาก project_units ─────
-        $unitQb = $this->db->table('project_units')
-            ->selectSum('standard_budget', 'total_std_budget')
-            ->where('project_id', $projectId);
-        if ($unitIds !== null) {
-            $unitQb->whereIn('id', $unitIds);
+        $stdBudget = 0;
+        if (in_array('UNIT_STANDARD', $sources, true)) {
+            $unitQb = $this->db->table('project_units')
+                ->selectSum('standard_budget', 'total_std_budget')
+                ->where('project_id', $projectId);
+            if ($unitIds !== null) {
+                $unitQb->whereIn('id', $unitIds);
+            }
+            $stdBudget = (float) ($unitQb->get()->getRowArray()['total_std_budget'] ?? 0);
         }
-        $stdBudget = (float) ($unitQb->get()->getRowArray()['total_std_budget'] ?? 0);
 
         // ─── 2. budget_movements aggregate ทุก source ──────────────────────────
         $mqb = $this->db->table('budget_movements')
@@ -206,6 +212,7 @@ class BudgetMovementService
                       SUM(amount) as total_amt")
             ->where('project_id', $projectId)
             ->where('status', 'approved')
+            ->whereIn('budget_source_type', $sources)
             ->groupBy('budget_source_type, movement_type');
         if ($unitIds !== null) {
             $mqb->whereIn('unit_id', $unitIds);
@@ -221,11 +228,11 @@ class BudgetMovementService
         $allocTypes    = self::ALLOCATE_TYPES;
         $useTypes      = self::USE_TYPES;
         $returnTypes   = self::RETURN_TYPES;
-        $sources       = ['UNIT_STANDARD', 'PROJECT_POOL', 'MANAGEMENT_SPECIAL'];
 
         $totalAllocated = 0;
         $totalUsed      = 0;
         $totalRemaining = 0;
+        $breakdown      = [];
 
         foreach ($sources as $src) {
             $sm = $map[$src] ?? [];
@@ -250,17 +257,27 @@ class BudgetMovementService
             $transferredIn  = $sm['SPECIAL_BUDGET_TRANSFER_IN'] ?? 0;
             $transferredOut = abs($sm['SPECIAL_BUDGET_TRANSFER_OUT'] ?? 0);
 
-            $remaining = $allocated + $transferredIn - $used - $transferredOut - $returned + $adjusted;
+            $remaining   = $allocated + $transferredIn - $used - $transferredOut - $returned + $adjusted;
+            $allocatedNet = $allocated - $returned; // ตั้งงบสุทธิ
 
-            $totalAllocated += $allocated;
+            // ตั้งงบสุทธิ = allocated - returned (สอดคล้องกับ unit-level "ตั้งงบสุทธิ")
+            $totalAllocated += $allocatedNet;
             $totalUsed      += $used;
             $totalRemaining += $remaining;
+
+            $breakdown[$src] = [
+                'allocated' => round($allocatedNet, 2),
+                'used'      => round($used, 2),
+                'returned'  => round($returned, 2),
+                'remaining' => round($remaining, 2),
+            ];
         }
 
         return [
             'total_allocated' => round($totalAllocated, 2),
             'total_used'      => round($totalUsed, 2),
             'total_remaining' => round($totalRemaining, 2),
+            'breakdown'       => $breakdown,
         ];
     }
 

@@ -140,17 +140,23 @@ class SalesTransactionController extends BaseController
         }
         unset($row);
 
-        // ═══ ยอดรวมทั้งโครงการ — เฉพาะยูนิตที่มี active transaction ═══
-        $activeUnitIds = $this->db()->table('sales_transactions')
-            ->select('DISTINCT(unit_id) as unit_id')
-            ->where('project_id', $pid)
-            ->where('status', 'active')
-            ->get()->getResultArray();
-        $activeUnitIds = array_map(fn($r) => (int) $r['unit_id'], $activeUnitIds);
+        // ═══ ยอดรวมทั้งโครงการ — ทุกยูนิต (project-wide) แยกตาม source ═══
+        $projectTotals = $this->budgetSvc->getProjectBudgetTotals($pid);
+        $bd = $projectTotals['breakdown'] ?? [];
 
-        $projectTotals = !empty($activeUnitIds)
-            ? $this->budgetSvc->getProjectBudgetTotals($pid, $activeUnitIds)
-            : ['total_remaining' => 0, 'total_allocated' => 0, 'total_used' => 0];
+        $unitBreakdown = $bd['UNIT_STANDARD']      ?? ['used' => 0, 'remaining' => 0];
+        $poolBreakdown = $bd['PROJECT_POOL']       ?? ['used' => 0, 'remaining' => 0];
+        $mgmtBreakdown = $bd['MANAGEMENT_SPECIAL'] ?? ['used' => 0, 'remaining' => 0];
+
+        // งบผู้บริหารที่คืนแล้ว — project-wide (รวมที่คืนจากการยกเลิกขายและคืนแบบ manual)
+        $mgmtReturnedRow = $this->db()->table('budget_movements')
+            ->selectSum('amount', 'total')
+            ->where('project_id', $pid)
+            ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
+            ->whereIn('movement_type', ['RETURN', 'SPECIAL_BUDGET_RETURN'])
+            ->where('status', 'approved')
+            ->get()->getRowArray();
+        $managementBudgetReturned = abs((float) ($mgmtReturnedRow['total'] ?? 0));
 
         return $this->response->setStatusCode(200)->setJSON([
             'data' => $data,
@@ -158,11 +164,17 @@ class SalesTransactionController extends BaseController
             'page' => $page,
             'per_page' => $perPage,
             'summary' => [
-                'total_budget_remaining'      => $projectTotals['total_remaining'],
-                'total_budget_allocated'      => $projectTotals['total_allocated'],
-                'total_budget_used'           => $projectTotals['total_used'],
-                // งบผู้บริหารคงเหลือ — project-wide (ไม่ filter ตาม unit ที่มี active transaction)
-                'management_budget_remaining' => $this->budgetSvc->getManagementBudgetRemaining($pid),
+                // งบยูนิต — ทั้งโครงการ
+                'unit_budget_used'            => $unitBreakdown['used'],
+                'unit_budget_remaining'       => $unitBreakdown['remaining'],
+                // งบส่วนกลาง (Pool) — ทั้งโครงการ
+                'pool_budget_used'            => $poolBreakdown['used'],
+                'pool_budget_remaining'       => $poolBreakdown['remaining'],
+                // งบผู้บริหาร — ทั้งโครงการ
+                'management_budget_used'      => $mgmtBreakdown['used'],
+                'management_budget_remaining' => $mgmtBreakdown['remaining'],
+                // งบผู้บริหารที่คืนแล้ว — รวมจากการยกเลิกขายและคืนแบบ manual
+                'management_budget_returned'  => $managementBudgetReturned,
             ],
         ]);
     }

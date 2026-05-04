@@ -78,31 +78,72 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
       <!-- Summary cards -->
       @if (summary()) {
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <!-- งบยูนิต -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs text-slate-500 mb-1">งบจัดสรรรวม</p>
-            <p class="text-xl font-bold text-slate-700 tabular-nums">฿{{ summary()!.total_budget_allocated | number:'1.0-0' }}</p>
+            <p class="text-xs font-semibold text-slate-600 mb-2">งบยูนิต</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <p class="text-[11px] text-slate-400 mb-0.5">ใช้แล้ว</p>
+                <p class="text-base font-bold text-amber-600 tabular-nums">฿{{ summary()!.unit_budget_used | number:'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] text-slate-400 mb-0.5">คงเหลือ</p>
+                <p class="text-base font-bold tabular-nums"
+                   [class.text-primary-700]="summary()!.unit_budget_remaining >= 0"
+                   [class.text-loss]="summary()!.unit_budget_remaining < 0">
+                  ฿{{ summary()!.unit_budget_remaining | number:'1.0-0' }}
+                </p>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
           </div>
+
+          <!-- งบส่วนกลาง (Pool) -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs text-slate-500 mb-1">งบที่ใช้แล้ว</p>
-            <p class="text-xl font-bold text-amber-600 tabular-nums">฿{{ summary()!.total_budget_used | number:'1.0-0' }}</p>
+            <p class="text-xs font-semibold text-slate-600 mb-2">งบส่วนกลาง (Pool)</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <p class="text-[11px] text-slate-400 mb-0.5">ใช้แล้ว</p>
+                <p class="text-base font-bold text-amber-600 tabular-nums">฿{{ summary()!.pool_budget_used | number:'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] text-slate-400 mb-0.5">คงเหลือ</p>
+                <p class="text-base font-bold tabular-nums"
+                   [class.text-primary-700]="summary()!.pool_budget_remaining >= 0"
+                   [class.text-loss]="summary()!.pool_budget_remaining < 0">
+                  ฿{{ summary()!.pool_budget_remaining | number:'1.0-0' }}
+                </p>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
           </div>
+
+          <!-- งบผู้บริหาร -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs text-slate-500 mb-1">งบคงเหลือรวม</p>
-            <p class="text-xl font-bold tabular-nums"
-               [class.text-primary-700]="summary()!.total_budget_remaining >= 0"
-               [class.text-loss]="summary()!.total_budget_remaining < 0">
-              ฿{{ summary()!.total_budget_remaining | number:'1.0-0' }}
-            </p>
+            <p class="text-xs font-semibold text-slate-600 mb-2">งบผู้บริหาร</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <p class="text-[11px] text-slate-400 mb-0.5">ใช้แล้ว</p>
+                <p class="text-base font-bold text-amber-600 tabular-nums">฿{{ summary()!.management_budget_used | number:'1.0-0' }}</p>
+              </div>
+              <div>
+                <p class="text-[11px] text-slate-400 mb-0.5">คงเหลือ</p>
+                <p class="text-base font-bold tabular-nums"
+                   [class.text-primary-700]="summary()!.management_budget_remaining >= 0"
+                   [class.text-loss]="summary()!.management_budget_remaining < 0">
+                  ฿{{ summary()!.management_budget_remaining | number:'1.0-0' }}
+                </p>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
           </div>
+
+          <!-- งบผู้บริหารที่คืนแล้ว -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs text-slate-500 mb-1">งบผู้บริหารคงเหลือ</p>
-            <p class="text-xl font-bold tabular-nums"
-               [class.text-primary-700]="(summary()!.management_budget_remaining ?? 0) > 0"
-               [class.text-loss]="(summary()!.management_budget_remaining ?? 0) <= 0">
-              ฿{{ summary()!.management_budget_remaining | number:'1.0-0' }}
-            </p>
-            <p class="text-xs text-slate-400 mt-1">ยอด ณ ปัจจุบัน</p>
+            <p class="text-xs font-semibold text-slate-600 mb-2">งบผู้บริหารที่คืนแล้ว</p>
+            <p class="text-2xl font-bold text-emerald-600 tabular-nums">฿{{ summary()!.management_budget_returned | number:'1.0-0' }}</p>
+            <p class="text-xs text-slate-400 mt-2">รวมยกเลิกขาย + คืนเอง</p>
           </div>
         </div>
       }
@@ -287,7 +328,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               <ng-container matColumnDef="footer-value">
                 <td mat-footer-cell *matFooterCellDef [attr.colspan]="footerValueColspan()" class="!text-left !text-sm !font-bold !text-primary-700 !bg-slate-100 !py-3 tabular-nums">
                   @if (summary()) {
-                    ฿{{ summary()!.total_budget_remaining | number:'1.0-0' }}
+                    ฿{{ (summary()!.unit_budget_remaining + summary()!.pool_budget_remaining + summary()!.management_budget_remaining) | number:'1.0-0' }}
                   }
                 </td>
               </ng-container>
@@ -341,7 +382,7 @@ export class SalesListComponent implements OnInit {
   readonly sortField = signal('st.sale_date');
   readonly sortDir = signal<'ASC' | 'DESC'>('DESC');
   readonly statusFilter = signal('');
-  readonly summary = signal<{ total_budget_remaining: number; total_budget_allocated: number; total_budget_used: number; management_budget_remaining: number } | null>(null);
+  readonly summary = signal<{ unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number } | null>(null);
 
   searchControl = this.fb.control('');
 
