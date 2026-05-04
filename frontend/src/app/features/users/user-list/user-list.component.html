@@ -40,6 +40,14 @@
           }
         </mat-select>
       </mat-form-field>
+
+      <mat-slide-toggle
+        class="ml-auto pb-2"
+        [checked]="showInactive()"
+        (change)="toggleShowInactive($event.checked)"
+        matTooltip="แสดงผู้ใช้ที่ถูกปิดใช้งานด้วย">
+        <span class="text-sm">แสดงที่ปิดใช้งาน</span>
+      </mat-slide-toggle>
     </form>
   </div>
 
@@ -181,13 +189,22 @@
                       (click)="openResetPasswordDialog(user)">
                 <app-icon name="lock-closed" class="w-4 h-4" />
               </button>
-              <button mat-icon-button
-                      [matTooltip]="isSelf(user) ? 'ลบบัญชีของตนเองไม่ได้' : 'ลบผู้ใช้'"
-                      [disabled]="isSelf(user)"
-                      class="!text-slate-500 hover:!text-red-600"
-                      (click)="confirmDelete(user)">
-                <app-icon name="trash" class="w-4 h-4" />
-              </button>
+              @if (+user.is_active) {
+                <button mat-icon-button
+                        [matTooltip]="isSelf(user) ? 'ปิดใช้งานบัญชีของตนเองไม่ได้' : 'ปิดใช้งานผู้ใช้'"
+                        [disabled]="isSelf(user)"
+                        class="!text-slate-500 hover:!text-red-600"
+                        (click)="confirmDelete(user)">
+                  <app-icon name="x-circle" class="w-4 h-4" />
+                </button>
+              } @else {
+                <button mat-icon-button
+                        matTooltip="เปิดใช้งานอีกครั้ง"
+                        class="!text-slate-500 hover:!text-green-600"
+                        (click)="reactivate(user)">
+                  <app-icon name="check-circle" class="w-4 h-4" />
+                </button>
+              }
             </div>
           </td>
         </ng-container>

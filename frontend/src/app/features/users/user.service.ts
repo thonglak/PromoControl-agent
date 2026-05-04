@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -95,8 +95,19 @@ export class UserService {
   private readonly http = inject(HttpClient);
 
   /** GET /api/users → backend returns { data: UserListItem[] } */
-  getUsers(): Observable<UserListItem[]> {
-    return this.http.get<{ data: UserListItem[] }>('/api/users')
+  getUsers(filters: { is_active?: boolean } = {}): Observable<UserListItem[]> {
+    let params = new HttpParams();
+    if (filters.is_active !== undefined) {
+      params = params.set('is_active', filters.is_active ? '1' : '0');
+    }
+    return this.http.get<{ data: UserListItem[] }>('/api/users', { params })
+      .pipe(map(r => r.data));
+  }
+
+  /** PUT /api/users/{id} เฉพาะ is_active — สำหรับ ปิด/เปิดใช้งาน */
+  setUserActive(id: number, active: boolean): Observable<UserListItem> {
+    return this.http
+      .put<{ message: string; data: UserListItem }>(`/api/users/${id}`, { is_active: active })
       .pipe(map(r => r.data));
   }
 

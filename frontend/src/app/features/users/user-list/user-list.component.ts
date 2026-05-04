@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -49,7 +50,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     CommonModule, ReactiveFormsModule, DatePipe,
     MatTableModule, MatSortModule, MatPaginatorModule,
     MatButtonModule, MatFormFieldModule, MatInputModule,
-    MatSelectModule, MatTooltipModule, MatProgressSpinnerModule,
+    MatSelectModule, MatSlideToggleModule, MatTooltipModule, MatProgressSpinnerModule,
     MatDialogModule, SvgIconComponent,
   ],
   templateUrl: './user-list.component.html',
@@ -83,6 +84,9 @@ export class UserListComponent implements OnInit {
   loading      = signal(true);
   allProjects  = signal<AllProject[]>([]);
   dataSource   = new MatTableDataSource<UserListItem>([]);
+
+  /** ปกติแสดงเฉพาะผู้ใช้ที่ active (ปิดใช้งานแล้วถูกซ่อน) — toggle เพื่อแสดงทั้งหมด */
+  showInactive = signal(false);
 
   // ── Filter form (reactive) ──
   filterForm = this.fb.group({
@@ -131,7 +135,9 @@ export class UserListComponent implements OnInit {
 
   loadUsers(): void {
     this.loading.set(true);
-    this.userService.getUsers().subscribe({
+    // ส่ง is_active=1 เมื่อ showInactive = false → ซ่อนคนที่ปิดใช้งาน (ลบไปแล้ว)
+    const filters = this.showInactive() ? {} : { is_active: true };
+    this.userService.getUsers(filters).subscribe({
       next: users => {
         this.dataSource.data = users;
         this.loading.set(false);
@@ -142,6 +148,11 @@ export class UserListComponent implements OnInit {
         this.snackBar.open('ไม่สามารถโหลดข้อมูลผู้ใช้ได้', 'ปิด', { duration: 4000 });
       },
     });
+  }
+
+  toggleShowInactive(value: boolean): void {
+    this.showInactive.set(value);
+    this.loadUsers();
   }
 
   private loadProjects(): void {
@@ -241,18 +252,31 @@ export class UserListComponent implements OnInit {
 
   confirmDelete(user: UserListItem): void {
     if (this.isSelf(user)) {
-      this.snackBar.open('ไม่สามารถลบบัญชีของตนเองได้', 'ปิด', { duration: 3000 });
+      this.snackBar.open('ไม่สามารถปิดใช้งานบัญชีของตนเองได้', 'ปิด', { duration: 3000 });
       return;
     }
-    if (!confirm(`ยืนยันลบผู้ใช้ "${user.name}" (${user.email})?\n\nการกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+    // หมายเหตุ: backend ทำ soft delete (is_active = false) — record ยังอยู่ในฐานข้อมูล
+    if (!confirm(`ยืนยันปิดใช้งานผู้ใช้ "${user.name}" (${user.email})?\n\nผู้ใช้จะเข้าสู่ระบบไม่ได้ และจะถูกซ่อนจากรายการ — เปิดใช้งานใหม่ได้ภายหลัง`)) return;
 
     this.userService.deleteUser(user.id).subscribe({
       next: () => {
-        this.snackBar.open('ลบผู้ใช้สำเร็จ', 'ปิด', { duration: 3000 });
+        this.snackBar.open('ปิดใช้งานผู้ใช้สำเร็จ', 'ปิด', { duration: 3000 });
         this.loadUsers();
       },
       error: err => {
-        this.snackBar.open(err?.error?.error ?? 'ลบผู้ใช้ไม่สำเร็จ', 'ปิด', { duration: 5000 });
+        this.snackBar.open(err?.error?.error ?? 'ปิดใช้งานไม่สำเร็จ', 'ปิด', { duration: 5000 });
+      },
+    });
+  }
+
+  reactivate(user: UserListItem): void {
+    this.userService.setUserActive(user.id, true).subscribe({
+      next: () => {
+        this.snackBar.open(`เปิดใช้งาน ${user.name} แล้ว`, 'ปิด', { duration: 3000 });
+        this.loadUsers();
+      },
+      error: err => {
+        this.snackBar.open(err?.error?.error ?? 'เปิดใช้งานไม่สำเร็จ', 'ปิด', { duration: 5000 });
       },
     });
   }
