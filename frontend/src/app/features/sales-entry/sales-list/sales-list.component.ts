@@ -101,7 +101,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
           <!-- งบคงเหลือรวม — sum ทุกยูนิต (ไม่รวมยกเลิก) + Pool คงเหลือ -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs font-semibold text-slate-600 mb-2">งบคงเหลือรวม</p>
+            <p class="text-xs font-semibold text-slate-600 mb-2">งบคงเหลือรวม (X)</p>
             <p class="text-2xl font-bold tabular-nums"
                [class.text-primary-700]="totalRemaining() >= 0"
                [class.text-loss]="totalRemaining() < 0">

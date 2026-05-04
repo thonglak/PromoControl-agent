@@ -11,7 +11,6 @@ import { ProjectService } from '../../../core/services/project.service';
 import { BudgetService, UnitBudgetSummary, SourceSummary, PoolBalance } from '../../budget/services/budget.service';
 import { InlineBudgetDialogComponent, InlineBudgetDialogData } from './inline-budget-dialog.component';
 import { ReturnSpecialBudgetDialogComponent, ReturnSpecialBudgetDialogData } from '../../budget/dialogs/return-special-budget-dialog.component';
-import { TransferSpecialBudgetDialogComponent, TransferSpecialBudgetDialogData } from '../../budget/dialogs/transfer-special-budget-dialog.component';
 import { ReturnUnitBudgetDialogComponent, ReturnUnitBudgetDialogData } from './return-unit-budget-dialog.component';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
 import { AuthService } from '../../../core/services/auth.service';
@@ -98,13 +97,6 @@ const SOURCE_CONFIG: { key: string; label: string; canAllocate: boolean }[] = [
                         </button>
                       }
                       @if (row.canAllocate && row.allocated > 0 && row.remaining > 0 && canReturnBudget()) {
-                        @if (row.key !== 'MANAGEMENT_SPECIAL') {
-                          <button mat-stroked-button class="!min-w-0 !px-2 !py-0 !text-xs !text-sky-700 !border-sky-300"
-                            (click)="openTransferDialog(row)"
-                            matTooltip="โอนงบไป unit อื่น">
-                            โอนงบ
-                          </button>
-                        }
                         @if (row.used === 0) {
                           <button mat-stroked-button class="!min-w-0 !px-2 !py-0 !text-xs !text-slate-600 !border-slate-300"
                             (click)="openVoidDialog(row)"
@@ -356,39 +348,6 @@ export class BudgetOverviewSectionComponent implements OnDestroy {
       }
     });
   }
-
-  openTransferDialog(row: BudgetRow): void {
-    if (this.pendingItemSources().includes(row.key)) {
-      this.snack.open('มีรายการโปรโมชั่นที่ใช้งบนี้อยู่ กรุณาบันทึกหรือลบรายการก่อน', 'ปิด', { duration: 5000 });
-      return;
-    }
-
-    const s = this.summary();
-    const src = s ? (s as any)[row.key] : null;
-
-    const dialogData: TransferSpecialBudgetDialogData = {
-      from_unit_id: this.unitId(),
-      from_unit_code: s?.unit_code ?? '',
-      budget_source_type: row.key,
-      budget_source_label: row.label,
-      remaining: src?.remaining ?? 0,
-      project_id: this.projectId(),
-    };
-
-    const ref = this.dialog.open(TransferSpecialBudgetDialogComponent, {
-      data: dialogData,
-      width: '500px',
-      maxHeight: '90vh',
-    });
-
-    ref.afterClosed().subscribe(result => {
-      if (result) {
-        this.snack.open('โอนงบสำเร็จ', 'ปิด', { duration: 3000 });
-        this.loadSummary();
-      }
-    });
-  }
-
 
   openReturnToPoolDialog(row: BudgetRow): void {
     const s = this.summary();
