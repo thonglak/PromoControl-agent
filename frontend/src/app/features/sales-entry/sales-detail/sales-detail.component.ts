@@ -43,11 +43,14 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
             <app-icon name="x-circle" class="w-5 h-5 flex-shrink-0" style="color: var(--color-error)" />
             <div>
               <strong>รายการนี้ถูกยกเลิกแล้ว</strong>
+              @if (tx().cancel_date) {
+                <p class="mt-1 mb-0 text-sm">วันที่ยกเลิก: {{ tx().cancel_date | thaiDate:'auto' }}</p>
+              }
               @if (tx().cancel_reason) {
                 <p class="mt-1 mb-0 text-sm">เหตุผล: {{ tx().cancel_reason }}</p>
               }
               <p class="mt-1 mb-0 text-sm" style="color: var(--color-text-secondary)">
-                ยกเลิกโดย: {{ tx().cancelled_by_name }} &middot; {{ tx().cancelled_at | thaiDate:'auto-datetime' }}
+                บันทึกโดย: {{ tx().cancelled_by_name }} &middot; {{ tx().cancelled_at | thaiDate:'auto-datetime' }}
               </p>
             </div>
           </div>

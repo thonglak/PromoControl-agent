@@ -225,9 +225,12 @@ GET    /api/number-series/{id}/logs           (ประวัติการอ
 POST   /api/number-series/generate            (ออกเลขใหม่ — internal, ใช้ row lock)
 
 ## Sales Transactions
-GET /api/sales-transactions
-POST /api/sales-transactions
-PUT /api/sales-transactions/{id}
+GET    /api/sales-transactions
+GET    /api/sales-transactions/{id}
+POST   /api/sales-transactions
+PUT    /api/sales-transactions/{id}
+POST   /api/sales-transactions/{id}/cancel     (ยกเลิกรายการขาย)
+POST   /api/sales-transactions/{id}/transfer   (เปลี่ยนสถานะเป็นโอนแล้ว)
 
 POST/PUT body (รายการขาย):
 ```json
@@ -245,6 +248,29 @@ POST/PUT body (รายการขาย):
 Field `contract_price` (DECIMAL 15,2): ราคาหน้าสัญญา — บังคับกรอก ต้อง > 0
 - เก็บแยกจาก `base_price` / `net_price` ใช้อ้างอิงทางสัญญา/audit
 - ไม่นำไปใช้ในสูตรคำนวณ profit / discount
+
+### POST /api/sales-transactions/{id}/cancel — ยกเลิกขาย
+
+```json
+{
+  "cancel_date": "2026-05-04",   // required, YYYY-MM-DD, ห้ามอนาคต
+  "reason": "ลูกค้ายกเลิกสัญญา"   // optional, ≤ 500 ตัวอักษร (ละไว้/ส่ง '' ก็ได้ → NULL)
+}
+```
+
+- ผลกระทบ: void budget movements ที่ผูกกับ transaction → คืนงบกลับแหล่งเดิม + เปลี่ยนสถานะยูนิตเป็น `available`
+- รายละเอียด business rule + เงื่อนไข + schema ดู [docs/15-cancel-sale.md](./15-cancel-sale.md)
+
+### POST /api/sales-transactions/{id}/transfer — โอนกรรมสิทธิ์
+
+```json
+{
+  "transfer_date": "2026-05-04"   // required, YYYY-MM-DD, ห้ามอนาคต
+}
+```
+
+- เงื่อนไข: `transaction.status = active` AND `unit.status = sold`
+- ผลกระทบ: เปลี่ยนสถานะยูนิตเป็น `transferred` → ห้ามยกเลิกขายอีก
 
 ## Budget Movements
 GET /api/budget-movements

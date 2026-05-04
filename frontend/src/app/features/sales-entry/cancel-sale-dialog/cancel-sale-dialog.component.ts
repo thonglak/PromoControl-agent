@@ -1,9 +1,10 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
@@ -21,7 +22,11 @@ export interface CancelSaleDialogData {
 @Component({
   selector: 'app-cancel-sale-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatProgressSpinnerModule],
+  imports: [
+    CommonModule, FormsModule, ReactiveFormsModule,
+    MatDialogModule, MatFormFieldModule, MatInputModule,
+    MatDatepickerModule, MatButtonModule, MatProgressSpinnerModule,
+  ],
   template: `
     <h2 mat-dialog-title>ยกเลิกรายการขาย</h2>
     <mat-dialog-content style="max-height: 90vh">
@@ -45,10 +50,22 @@ export interface CancelSaleDialogData {
           </ul>
         </div>
 
-        <!-- เหตุผล -->
-        <mat-form-field>
-          <mat-label>เหตุผลการยกเลิก *</mat-label>
-          <textarea matInput [(ngModel)]="reason" rows="3" maxlength="500" required></textarea>
+        <!-- วันที่ยกเลิก (required) -->
+        <mat-form-field appearance="outline" style="width: 100%">
+          <mat-label>วันที่ยกเลิก</mat-label>
+          <input matInput [matDatepicker]="picker"
+                 [formControl]="cancelDateControl"
+                 [max]="today"
+                 required>
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+          <mat-error>กรุณาระบุวันที่ยกเลิก</mat-error>
+        </mat-form-field>
+
+        <!-- เหตุผล (optional) -->
+        <mat-form-field appearance="outline">
+          <mat-label>เหตุผลการยกเลิก (ไม่บังคับ)</mat-label>
+          <textarea matInput [(ngModel)]="reason" rows="3" maxlength="500"></textarea>
           <mat-hint align="end">{{ reason.length }}/500</mat-hint>
         </mat-form-field>
 
@@ -61,7 +78,8 @@ export interface CancelSaleDialogData {
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close [disabled]="saving()">ยกเลิก</button>
-      <button mat-flat-button color="warn" (click)="onConfirm()" [disabled]="saving() || !reason.trim()">
+      <button mat-flat-button color="warn" (click)="onConfirm()"
+              [disabled]="saving() || !cancelDateControl.valid">
         @if (saving()) { <mat-spinner diameter="20"></mat-spinner> }
         @else { ยืนยันยกเลิกขาย }
       </button>
@@ -74,15 +92,25 @@ export class CancelSaleDialogComponent {
   readonly data: CancelSaleDialogData = inject(MAT_DIALOG_DATA);
 
   reason = '';
+  readonly cancelDateControl = new FormControl<Date | null>(new Date(), Validators.required);
+  readonly today = new Date();
   readonly saving = signal(false);
   readonly errorMsg = signal('');
 
   onConfirm(): void {
-    if (!this.reason.trim()) return;
+    if (!this.cancelDateControl.valid || !this.cancelDateControl.value) return;
+
+    // Format date เป็น YYYY-MM-DD (รองรับทั้ง Date และ Moment)
+    const d: any = this.cancelDateControl.value;
+    const yyyy = typeof d.year === 'function' ? d.year() : d.getFullYear();
+    const mm = String((typeof d.month === 'function' ? d.month() : d.getMonth()) + 1).padStart(2, '0');
+    const dd = String(typeof d.date === 'function' ? d.date() : d.getDate()).padStart(2, '0');
+    const cancelDate = `${yyyy}-${mm}-${dd}`;
+
     this.saving.set(true);
     this.errorMsg.set('');
 
-    this.salesSvc.cancelSale(this.data.id, this.reason.trim()).subscribe({
+    this.salesSvc.cancelSale(this.data.id, cancelDate, this.reason.trim()).subscribe({
       next: (res) => {
         this.saving.set(false);
         this.dialogRef.close({ success: true, data: res });

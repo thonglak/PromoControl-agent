@@ -55,14 +55,18 @@
 │  • เปลี่ยนสถานะยูนิตเป็น "ว่าง"              │
 │  • ไม่สามารถย้อนกลับได้                     │
 │                                         │
-│  เหตุผลการยกเลิก *                        │
+│  วันที่ยกเลิก *                           │
+│  [__ / __ / ____]  (mat-datepicker)      │
+│                                         │
+│  เหตุผลการยกเลิก (ไม่บังคับ)               │
 │  [____________________________]          │
 │                                         │
 │  [ยกเลิก]     [ยืนยันยกเลิกขาย] (warn)    │
 └─────────────────────────────────────────┘
 ```
 
-- **เหตุผล** (textarea): required, max 500 ตัวอักษร
+- **วันที่ยกเลิก** (mat-datepicker): **required**, ห้ามเป็นวันในอนาคต (default = วันนี้)
+- **เหตุผล** (textarea): **optional** (ไม่บังคับ), max 500 ตัวอักษรถ้ากรอก
 - ปุ่ม **"ยืนยันยกเลิกขาย"**: สีแดง (warn)
 - ปุ่ม **"ยกเลิก"** (cancel dialog): ปิด dialog กลับ
 
@@ -80,9 +84,10 @@
 
 **Step 3:** อัปเดต transaction
 - `sale_transactions.status = 'cancelled'`
-- `sale_transactions.cancelled_at = NOW()`
+- `sale_transactions.cancelled_at = NOW()` — เวลาที่กดในระบบ
 - `sale_transactions.cancelled_by = current_user.id`
-- `sale_transactions.cancel_reason = เหตุผลที่กรอก`
+- `sale_transactions.cancel_date = วันที่ที่กรอก` — วันที่ยกเลิกทางธุรกิจ (อาจย้อนหลังได้)
+- `sale_transactions.cancel_reason = เหตุผลที่กรอก` (NULL ถ้าไม่ได้กรอก)
 
 **Step 4:** อัปเดตสถานะยูนิต
 - `project_units.status = 'available'`
@@ -98,14 +103,18 @@
 
 ## API Endpoint
 
-### POST `/api/sales/{id}/cancel`
+### POST `/api/sales-transactions/{id}/cancel`
 
 **Request:**
 ```json
 {
+  "cancel_date": "2026-03-15",
   "reason": "ลูกค้ายกเลิกสัญญา"
 }
 ```
+
+- `cancel_date`: **required**, รูปแบบ `YYYY-MM-DD`, ห้ามเป็นวันในอนาคต
+- `reason`: **optional**, ไม่เกิน 500 ตัวอักษร (ถ้าไม่ส่งหรือเว้นว่างจะถูกเก็บเป็น NULL)
 
 **Response:** `200 OK`
 ```json
@@ -114,6 +123,8 @@
   "status": "cancelled",
   "cancelled_at": "2026-03-17T14:30:00",
   "cancelled_by": "admin1",
+  "cancel_date": "2026-03-15",
+  "cancel_reason": "ลูกค้ายกเลิกสัญญา",
   "voided_movements": [
     { "movement_id": 456, "type": "USE", "amount": -80000 },
     { "movement_id": 457, "type": "SPECIAL_BUDGET_USE", "amount": -50000 }
@@ -126,7 +137,8 @@
 - `400` — transaction ไม่ใช่ status active
 - `400` — ยูนิตสถานะ transferred
 - `400` — มี RETURN movement ที่ยังไม่ void
-- `422` — reason ว่าง
+- `422` — `cancel_date` ว่าง / รูปแบบผิด / เป็นวันในอนาคต
+- `422` — `reason` ยาวเกิน 500 ตัวอักษร
 
 ---
 
@@ -137,9 +149,10 @@
 | คอลัมน์ | Type | คำอธิบาย |
 |---------|------|---------|
 | `status` | enum: active, cancelled | สถานะรายการ (เพิ่ม cancelled) |
-| `cancelled_at` | datetime, nullable | วันที่ยกเลิก |
-| `cancelled_by` | FK → users.id, nullable | ผู้ยกเลิก |
-| `cancel_reason` | varchar(500), nullable | เหตุผลการยกเลิก |
+| `cancelled_at` | datetime, nullable | timestamp ที่กดยกเลิกในระบบ |
+| `cancelled_by` | FK → users.id, nullable | ผู้กดยกเลิก |
+| `cancel_date` | date, nullable | วันที่ยกเลิกทางธุรกิจ (required เมื่อยกเลิก, อาจย้อนหลังได้) |
+| `cancel_reason` | varchar(500), nullable | เหตุผลการยกเลิก (optional) |
 
 ### budget_movements (เพิ่มคอลัมน์)
 
@@ -178,8 +191,9 @@
 - แสดง **Alert banner** ด้านบน (สีแดง):
   ```
   ⚠️ รายการนี้ถูกยกเลิกแล้ว
-  เหตุผล: ลูกค้ายกเลิกสัญญา
-  ยกเลิกโดย: admin1 | วันที่: 17/03/2026 14:30
+  วันที่ยกเลิก: 15/03/2026
+  เหตุผล: ลูกค้ายกเลิกสัญญา           ← แสดงเฉพาะกรณีกรอก
+  บันทึกโดย: admin1 | 17/03/2026 14:30
   ```
 - ซ่อนปุ่ม "ยกเลิกขาย" (ยกเลิกแล้ว)
 - ซ่อนปุ่ม "แก้ไข" (ถ้ามี)
@@ -190,15 +204,16 @@
 ## Business Rules
 
 1. **ยกเลิกได้**: transaction status = `active` AND unit status ≠ `transferred`
-2. **ต้องกรอกเหตุผล** (cancel_reason): required, ไม่เว้นว่าง
-3. **Void movements**: เฉพาะ movements ที่ `sale_transaction_id = transaction.id`
-4. **ไม่ void allocations**: ALLOCATE, SPECIAL_BUDGET_ALLOCATE ที่ตั้งไว้ใน Section 2 **ไม่ถูก void** — จัดการแยก
-5. **Atomic**: ทุกขั้นตอนอยู่ใน 1 DB transaction — fail ทั้งหมดหรือสำเร็จทั้งหมด
-6. **Audit**: เก็บ cancelled_at, cancelled_by, cancel_reason ไว้เสมอ
-7. **ห้ามยกเลิกซ้ำ**: transaction ที่ cancelled แล้วไม่แสดงปุ่มยกเลิก
-8. **งบคืนอัตโนมัติ**: เมื่อ movement ถูก void → balance recalculate อัตโนมัติ (voided ไม่นับ)
-9. **ยูนิตกลับ available**: หลังยกเลิก ยูนิตสามารถขายใหม่ได้
-10. **RETURN conflict**: ถ้ามี RETURN movement สำหรับยูนิตนี้แล้ว → ต้อง void RETURN ก่อนจึงยกเลิกขายได้ (ป้องกันงบเกิน)
+2. **ต้องกรอกวันที่ยกเลิก** (`cancel_date`): required, ห้ามเป็นวันในอนาคต
+3. **เหตุผล** (`cancel_reason`): **optional** — ไม่กรอกได้ (เก็บเป็น NULL)
+4. **Void movements**: เฉพาะ movements ที่ `sale_transaction_id = transaction.id`
+5. **ไม่ void allocations**: ALLOCATE, SPECIAL_BUDGET_ALLOCATE ที่ตั้งไว้ใน Section 2 **ไม่ถูก void** — จัดการแยก
+6. **Atomic**: ทุกขั้นตอนอยู่ใน 1 DB transaction — fail ทั้งหมดหรือสำเร็จทั้งหมด
+7. **Audit**: เก็บ `cancelled_at`, `cancelled_by`, `cancel_date`, `cancel_reason` ไว้เสมอ
+8. **ห้ามยกเลิกซ้ำ**: transaction ที่ cancelled แล้วไม่แสดงปุ่มยกเลิก
+9. **งบคืนอัตโนมัติ**: เมื่อ movement ถูก void → balance recalculate อัตโนมัติ (voided ไม่นับ)
+10. **ยูนิตกลับ available**: หลังยกเลิก ยูนิตสามารถขายใหม่ได้
+11. **RETURN conflict**: ถ้ามี RETURN movement สำหรับยูนิตนี้แล้ว → ต้อง void RETURN ก่อนจึงยกเลิกขายได้ (ป้องกันงบเกิน)
 
 ---
 

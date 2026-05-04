@@ -37,7 +37,15 @@ class CancelSaleService
         return $this->numberSeriesSvc->generate($projectId, 'BUDGET_MOVE', null, 'budget_movements', $createdBy);
     }
 
-    public function cancelSale(int $transactionId, string $reason, int $cancelledBy): array
+    /**
+     * ยกเลิกรายการขาย
+     *
+     * @param int    $transactionId
+     * @param string $cancelDate  YYYY-MM-DD วันที่ยกเลิก (required, validate ที่ controller)
+     * @param string $reason      เหตุผล (optional — รับ '' ได้)
+     * @param int    $cancelledBy
+     */
+    public function cancelSale(int $transactionId, string $cancelDate, string $reason, int $cancelledBy): array
     {
         $this->db->transBegin();
 
@@ -218,7 +226,8 @@ class CancelSaleService
                     'status'        => 'cancelled',
                     'cancelled_at'  => $now,
                     'cancelled_by'  => $cancelledBy,
-                    'cancel_reason' => $reason,
+                    'cancel_date'   => $cancelDate,
+                    'cancel_reason' => $reason !== '' ? $reason : null,
                     'updated_at'    => $now,
                 ]);
 
@@ -247,7 +256,8 @@ class CancelSaleService
             'status'           => 'cancelled',
             'cancelled_at'     => $now,
             'cancelled_by'     => $cancelledByUser['name'] ?? '',
-            'cancel_reason'    => $reason,
+            'cancel_date'      => $cancelDate,
+            'cancel_reason'    => $reason !== '' ? $reason : null,
             'voided_movements' => $voidedMovements,
             'unit_status'      => 'available',
         ];

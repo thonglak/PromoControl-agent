@@ -338,24 +338,37 @@ class SalesTransactionController extends BaseController
     public function cancelSale(int $id): ResponseInterface
     {
         $body = $this->request->getJSON(true) ?? [];
-        $reason = trim($body["reason"] ?? "");
+        $cancelDate = trim($body['cancel_date'] ?? '');
+        $reason = trim($body['reason'] ?? '');
 
-        if ($reason === "") {
-            return $this->response->setStatusCode(422)->setJSON(["error" => "กรุณาระบุเหตุผลการยกเลิก"]);
+        // วันที่ยกเลิก: บังคับ + format YYYY-MM-DD + ห้ามอนาคต
+        if ($cancelDate === '') {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'กรุณาระบุวันที่ยกเลิก']);
         }
 
-        if (strlen($reason) > 500) {
-            return $this->response->setStatusCode(422)->setJSON(["error" => "เหตุผลต้องไม่เกิน 500 ตัวอักษร"]);
+        $d = \DateTime::createFromFormat('Y-m-d', $cancelDate);
+        if (!$d || $d->format('Y-m-d') !== $cancelDate) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)']);
+        }
+
+        // เทียบเป็น date string (Y-m-d) ป้องกันกรณี createFromFormat คงเวลาปัจจุบัน → วันนี้กลายเป็น > today 00:00
+        if ($cancelDate > date('Y-m-d')) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'วันที่ยกเลิกต้องไม่เป็นวันในอนาคต']);
+        }
+
+        // เหตุผล: ไม่บังคับ — ใส่หรือไม่ก็ได้ แต่ถ้าใส่ต้องไม่เกิน 500 ตัวอักษร
+        if ($reason !== '' && mb_strlen($reason) > 500) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'เหตุผลต้องไม่เกิน 500 ตัวอักษร']);
         }
 
         try {
-            $result = $this->cancelSvc->cancelSale($id, $reason, $this->userId());
+            $result = $this->cancelSvc->cancelSale($id, $cancelDate, $reason, $this->userId());
             return $this->response->setStatusCode(200)->setJSON([
-                "message" => "ยกเลิกรายการขายสำเร็จ",
-                "data"    => $result,
+                'message' => 'ยกเลิกรายการขายสำเร็จ',
+                'data'    => $result,
             ]);
         } catch (RuntimeException $e) {
-            return $this->response->setStatusCode(400)->setJSON(["error" => $e->getMessage()]);
+            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
         }
     }
 

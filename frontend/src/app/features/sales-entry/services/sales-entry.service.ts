@@ -79,6 +79,7 @@ export interface SalesTransaction {
   cancelled_at?: string;
   cancelled_by?: number;
   cancelled_by_name?: string;
+  cancel_date?: string;
   cancel_reason?: string;
   transfer_date?: string;
   transferred_by?: number;
@@ -146,8 +147,11 @@ export class SalesEntryService {
       .pipe(map(r => r.data));
   }
 
-  cancelSale(transactionId: number, reason: string): Observable<any> {
-    return this.http.post<any>(`/api/sales-transactions/${transactionId}/cancel`, { reason });
+  cancelSale(transactionId: number, cancelDate: string, reason: string): Observable<any> {
+    return this.http.post<any>(`/api/sales-transactions/${transactionId}/cancel`, {
+      cancel_date: cancelDate,
+      reason,
+    });
   }
 
   markAsTransferred(transactionId: number, transferDate: string): Observable<TransferResponse> {
