@@ -5,6 +5,10 @@
     <div actions class="flex items-center gap-2">
       <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700"><app-icon name="adjustments-horizontal" class="w-5 h-5" /></button>
       @if (canWrite()) {
+        <button mat-stroked-button (click)="openPriceRecalculate()" matTooltip="กำหนดราคาประเมิน / ต้นทุน ด้วยสูตรเป็น batch">
+          <app-icon name="cog-6-tooth" class="w-4 h-4 mr-1"></app-icon>
+          ตั้งค่าราคา
+        </button>
         <button mat-stroked-button (click)="toggleImport()">
           <app-icon name="arrow-up-tray" class="w-4 h-4 mr-1"></app-icon>
           นำเข้า CSV

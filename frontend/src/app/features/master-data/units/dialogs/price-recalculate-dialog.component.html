@@ -1,0 +1,224 @@
+<div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-200">
+  <div>
+    <h2 class="text-lg font-semibold text-slate-800 m-0">ตั้งค่าราคาประเมิน / ต้นทุน</h2>
+    @if (data.projectName) {
+      <p class="text-xs text-slate-500 mt-0.5">โครงการ: <span class="font-medium">{{ data.projectName }}</span></p>
+    }
+  </div>
+  <button mat-icon-button (click)="cancel()" class="!text-slate-400 hover:!text-slate-600">
+    <app-icon name="x-mark" class="w-5 h-5" />
+  </button>
+</div>
+
+<form [formGroup]="form" class="px-6 py-4 space-y-5" (input)="resetPreview()" (change)="resetPreview()">
+
+  <!-- Section 1: ต้นทุน -->
+  <section class="rounded-lg border border-slate-200 bg-white">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50/60">
+      <div class="flex items-center gap-2">
+        <mat-checkbox formControlName="cost_enabled">
+          <span class="font-medium text-slate-800">กำหนดต้นทุน</span>
+        </mat-checkbox>
+      </div>
+    </div>
+    <div class="p-4 space-y-3" [class.opacity-50]="!form.value.cost_enabled">
+      <mat-radio-group formControlName="cost_mode" class="flex flex-col gap-2">
+        <mat-radio-button value="percent" class="!text-sm">
+          <div class="flex items-center gap-2">
+            <span>สูตร: <span class="font-mono text-slate-500">base_price ×</span></span>
+            <mat-form-field appearance="outline" class="w-24" subscriptSizing="dynamic">
+              <input matInput type="number" formControlName="cost_percent" min="0.01" max="999.99" step="0.01" />
+              <span matSuffix class="text-slate-400 mr-2">%</span>
+            </mat-form-field>
+          </div>
+        </mat-radio-button>
+        <mat-radio-button value="fixed" class="!text-sm">
+          <div class="flex items-center gap-2">
+            <span>กำหนดค่าตรง:</span>
+            <mat-form-field appearance="outline" class="w-44" subscriptSizing="dynamic">
+              <input matInput type="number" formControlName="cost_amount" min="0.01" max="999999999.99" step="1" />
+              <span matSuffix class="text-slate-400 mr-2">บาท</span>
+            </mat-form-field>
+          </div>
+        </mat-radio-button>
+      </mat-radio-group>
+
+      @if (form.value.cost_enabled && form.value.cost_mode === 'percent' && form.controls.cost_percent.invalid && form.controls.cost_percent.touched) {
+        <p class="text-xs text-red-600">% ต้องอยู่ระหว่าง 0.01–999.99</p>
+      }
+      @if (form.value.cost_enabled && form.value.cost_mode === 'fixed' && form.controls.cost_amount.invalid && form.controls.cost_amount.touched) {
+        <p class="text-xs text-red-600">จำนวนเงินต้องอยู่ระหว่าง 0.01–999,999,999.99</p>
+      }
+    </div>
+  </section>
+
+  <!-- Section 2: ราคาประเมิน -->
+  <section class="rounded-lg border border-slate-200 bg-white">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50/60">
+      <mat-checkbox formControlName="appraisal_enabled">
+        <span class="font-medium text-slate-800">กำหนดราคาประเมิน</span>
+      </mat-checkbox>
+    </div>
+    <div class="p-4 space-y-3" [class.opacity-50]="!form.value.appraisal_enabled">
+      <!-- โหมด: percent (มี source) | fixed -->
+      <mat-radio-group formControlName="appraisal_mode" class="flex flex-col gap-1">
+        <mat-radio-button value="percent" class="!text-sm">สูตรเป็น % ของแหล่งอ้างอิง</mat-radio-button>
+        <mat-radio-button value="fixed" class="!text-sm">กำหนดค่าตรง</mat-radio-button>
+      </mat-radio-group>
+
+      @if (form.value.appraisal_mode === 'percent') {
+        <div class="pl-6 pt-1 space-y-2 border-l-2 border-slate-200 ml-2">
+          <mat-radio-group formControlName="appraisal_source" class="flex flex-col gap-1">
+            <mat-radio-button value="base_price" class="!text-sm">
+              จากราคาขาย: <span class="font-mono text-slate-500 ml-1">appraisal_price = base_price × %</span>
+            </mat-radio-button>
+            <mat-radio-button value="unit_cost" class="!text-sm">
+              จากต้นทุน: <span class="font-mono text-slate-500 ml-1">appraisal_price = unit_cost × %</span>
+            </mat-radio-button>
+          </mat-radio-group>
+
+          <div class="flex items-center gap-2 text-sm text-slate-700">
+            <span>กำหนด %</span>
+            <mat-form-field appearance="outline" class="w-28" subscriptSizing="dynamic">
+              <input matInput type="number" formControlName="appraisal_percent" min="0.01" max="999.99" step="0.01" />
+              <span matSuffix class="text-slate-400 mr-2">%</span>
+            </mat-form-field>
+          </div>
+          @if (form.value.appraisal_enabled && form.controls.appraisal_percent.invalid && form.controls.appraisal_percent.touched) {
+            <p class="text-xs text-red-600">% ต้องอยู่ระหว่าง 0.01–999.99</p>
+          }
+        </div>
+      } @else {
+        <div class="pl-6 pt-1 border-l-2 border-slate-200 ml-2 space-y-2">
+          <div class="flex items-center gap-2 text-sm text-slate-700">
+            <span>จำนวนเงิน:</span>
+            <mat-form-field appearance="outline" class="w-44" subscriptSizing="dynamic">
+              <input matInput type="number" formControlName="appraisal_amount" min="0.01" max="999999999.99" step="1" />
+              <span matSuffix class="text-slate-400 mr-2">บาท</span>
+            </mat-form-field>
+          </div>
+          @if (form.value.appraisal_enabled && form.controls.appraisal_amount.invalid && form.controls.appraisal_amount.touched) {
+            <p class="text-xs text-red-600">จำนวนเงินต้องอยู่ระหว่าง 0.01–999,999,999.99</p>
+          }
+        </div>
+      }
+
+      @if (form.value.cost_enabled && form.value.appraisal_enabled
+           && form.value.appraisal_mode === 'percent'
+           && form.value.appraisal_source === 'unit_cost') {
+        <div class="flex items-start gap-2 p-2 rounded bg-blue-50 text-xs text-blue-800">
+          <app-icon name="exclamation-triangle" class="w-4 h-4 mt-0.5" />
+          <span>ระบบจะคำนวณ <b>ต้นทุนใหม่ก่อน</b> แล้วใช้ค่านั้นในการคำนวณราคาประเมิน</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Section 3: ขอบเขต -->
+  <section class="rounded-lg border border-slate-200 bg-white">
+    <div class="px-4 py-3 border-b border-slate-200 bg-slate-50/60">
+      <span class="font-medium text-slate-800">ขอบเขตการอัปเดต</span>
+    </div>
+    <div class="p-4">
+      <mat-radio-group formControlName="scope" class="flex flex-col gap-2">
+        <mat-radio-button value="zero_only" class="!text-sm">
+          เฉพาะที่ค่ายังเป็น 0 (แนะนำ — ไม่ทับข้อมูลที่แก้มือไว้)
+        </mat-radio-button>
+        <mat-radio-button value="all" class="!text-sm">
+          ทุกยูนิต (overwrite ทุกแถว)
+        </mat-radio-button>
+      </mat-radio-group>
+      <p class="text-xs text-slate-500 mt-2">
+        <app-icon name="exclamation-triangle" class="w-3 h-3 inline mr-1 text-amber-500" />
+        ระบบจะอัปเดตเฉพาะยูนิตสถานะ <b>ว่าง</b> หรือ <b>จอง</b> เท่านั้น
+      </p>
+    </div>
+  </section>
+
+  <!-- Preview / Confirm -->
+  @if (showConfirm() && previewCount() !== null && previewCount()! > 0) {
+    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+      <app-icon name="exclamation-triangle" class="w-5 h-5 text-amber-600" />
+      <div class="flex-1 text-sm text-amber-900">
+        จะอัปเดต <span class="font-bold">{{ previewCount() }}</span> ยูนิต — ตรวจตัวอย่างด้านล่าง แล้วกด "บันทึก"
+      </div>
+    </div>
+
+    <!-- Preview table (max 20 rows) -->
+    <div class="rounded-lg border border-slate-200 overflow-hidden">
+      <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600 font-medium flex items-center justify-between">
+        <span>ตัวอย่าง {{ previewSamples().length }} รายการแรก</span>
+        @if (previewCount()! > previewSamples().length) {
+          <span class="text-slate-400">…และอีก {{ previewCount()! - previewSamples().length }} รายการ</span>
+        }
+      </div>
+      <div class="overflow-x-auto" style="max-height: 280px; overflow-y: auto;">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50 sticky top-0">
+            <tr class="text-slate-500 uppercase text-[10px] tracking-wide">
+              <th class="text-left px-3 py-2 font-semibold">รหัส</th>
+              <th class="text-right px-3 py-2 font-semibold">ราคาขาย</th>
+              <th class="text-right px-3 py-2 font-semibold">ต้นทุนเดิม</th>
+              <th class="text-right px-3 py-2 font-semibold">ต้นทุนใหม่</th>
+              <th class="text-right px-3 py-2 font-semibold">ประเมินเดิม</th>
+              <th class="text-right px-3 py-2 font-semibold">ประเมินใหม่</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of previewSamples(); track s.unit_code) {
+              <tr class="border-t border-slate-100 hover:bg-slate-50">
+                <td class="px-3 py-1.5 font-mono text-slate-700">{{ s.unit_code }}</td>
+                <td class="px-3 py-1.5 text-right text-slate-600">{{ formatMoney(s.base_price) }}</td>
+                <td class="px-3 py-1.5 text-right text-slate-400">{{ formatMoney(s.current_cost) }}</td>
+                <td class="px-3 py-1.5 text-right"
+                    [class.text-emerald-700]="costChanged(s)"
+                    [class.font-semibold]="costChanged(s)"
+                    [class.text-slate-300]="s.new_cost === null">
+                  @if (s.new_cost === null) { <span>—</span> }
+                  @else { {{ formatMoney(s.new_cost) }} }
+                </td>
+                <td class="px-3 py-1.5 text-right text-slate-400">{{ formatMoney(s.current_appraisal) }}</td>
+                <td class="px-3 py-1.5 text-right"
+                    [class.text-emerald-700]="appraisalChanged(s)"
+                    [class.font-semibold]="appraisalChanged(s)"
+                    [class.text-slate-300]="s.new_appraisal === null">
+                  @if (s.new_appraisal === null) { <span>—</span> }
+                  @else { {{ formatMoney(s.new_appraisal) }} }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+  @if (showConfirm() && previewCount() === 0) {
+    <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+      ไม่มียูนิตที่ตรงเงื่อนไข — ลองเปลี่ยนขอบเขตเป็น "ทุกยูนิต"
+    </div>
+  }
+</form>
+
+<div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 bg-white">
+  <button mat-stroked-button (click)="cancel()" [disabled]="saving()">ยกเลิก</button>
+
+  @if (!showConfirm()) {
+    <button mat-flat-button color="primary"
+            (click)="preview()"
+            [disabled]="!formValid || loading()">
+      @if (loading()) {
+        <mat-spinner diameter="18" class="inline-block mr-2"></mat-spinner>
+      }
+      ดูตัวอย่าง
+    </button>
+  } @else {
+    <button mat-flat-button color="primary"
+            (click)="submit()"
+            [disabled]="saving() || (previewCount() ?? 0) === 0">
+      @if (saving()) {
+        <mat-spinner diameter="18" class="inline-block mr-2"></mat-spinner>
+      }
+      บันทึก ({{ previewCount() }} ยูนิต)
+    </button>
+  }
+</div>

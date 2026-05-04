@@ -417,4 +417,263 @@ class UnitController extends BaseController
 
         return $data;
     }
+
+    // ─── POST /api/units/preview-recalculate ─────────────────────────────────
+    // dry-run: นับจำนวน unit ที่จะถูก update ตาม scope/rule
+
+    public function previewRecalculate(): ResponseInterface
+    {
+        [$ok, $errOrInput] = $this->validateRecalcInput();
+        if (!$ok) {
+            return $errOrInput;
+        }
+        $projectId     = $errOrInput['project_id'];
+        $scope         = $errOrInput['scope'];
+        $costRule      = $errOrInput['cost_rule'];
+        $appraisalRule = $errOrInput['appraisal_rule'];
+
+        $count = $this->unitsForRecalc($projectId, $scope, $costRule, $appraisalRule)
+            ->countAllResults();
+
+        // ดึงตัวอย่าง 20 row แรก (sort เหมือน list หลัก) แล้วคำนวณค่าใหม่
+        $samples = $this->unitsForRecalc($projectId, $scope, $costRule, $appraisalRule)
+            ->select('id, unit_code, base_price, unit_cost, appraisal_price')
+            ->orderBy('unit_code', 'ASC')
+            ->limit(20)
+            ->findAll();
+
+        $samplesOut = [];
+        foreach ($samples as $u) {
+            $newCost      = (float) $u['unit_cost'];
+            $newAppraisal = $u['appraisal_price'] !== null ? (float) $u['appraisal_price'] : null;
+
+            if ($costRule['enabled']) {
+                $newCost = $costRule['mode'] === 'fixed'
+                    ? round($costRule['amount'], 2)
+                    : round((float) $u['base_price'] * ($costRule['percent'] / 100), 2);
+            }
+            if ($appraisalRule['enabled']) {
+                if ($appraisalRule['mode'] === 'fixed') {
+                    $newAppraisal = round($appraisalRule['amount'], 2);
+                } else {
+                    $sourceVal = $appraisalRule['source'] === 'unit_cost'
+                        ? $newCost
+                        : (float) $u['base_price'];
+                    $newAppraisal = round($sourceVal * ($appraisalRule['percent'] / 100), 2);
+                }
+            }
+
+            $samplesOut[] = [
+                'unit_code'        => $u['unit_code'],
+                'base_price'       => (float) $u['base_price'],
+                'current_cost'     => (float) $u['unit_cost'],
+                'new_cost'         => $costRule['enabled'] ? $newCost : null,
+                'current_appraisal'=> $u['appraisal_price'] !== null ? (float) $u['appraisal_price'] : null,
+                'new_appraisal'    => $appraisalRule['enabled'] ? $newAppraisal : null,
+            ];
+        }
+
+        return $this->response->setStatusCode(200)->setJSON([
+            'data' => [
+                'count'   => $count,
+                'samples' => $samplesOut,
+            ],
+        ]);
+    }
+
+    // ─── POST /api/units/bulk-recalculate ────────────────────────────────────
+    // คำนวณ unit_cost / appraisal_price ตามสูตร แล้ว UPDATE ทุก unit ที่ตรง scope
+    // ลำดับ: คำนวณ cost ก่อน แล้ว appraisal อ้างอิงค่าใหม่
+
+    public function bulkRecalculate(): ResponseInterface
+    {
+        [$ok, $errOrInput] = $this->validateRecalcInput();
+        if (!$ok) {
+            return $errOrInput;
+        }
+        $projectId     = $errOrInput['project_id'];
+        $scope         = $errOrInput['scope'];
+        $costRule      = $errOrInput['cost_rule'];
+        $appraisalRule = $errOrInput['appraisal_rule'];
+
+        $rows = $this->unitsForRecalc($projectId, $scope, $costRule, $appraisalRule)
+            ->select('id, base_price, unit_cost, appraisal_price')
+            ->findAll();
+
+        $now              = date('Y-m-d H:i:s');
+        $updated          = 0;
+        $costChanged      = 0;
+        $appraisalChanged = 0;
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        foreach ($rows as $u) {
+            $newCost      = (float) $u['unit_cost'];
+            $newAppraisal = $u['appraisal_price'] !== null ? (float) $u['appraisal_price'] : null;
+            $patch        = ['updated_at' => $now];
+
+            if ($costRule['enabled']) {
+                $newCost = $costRule['mode'] === 'fixed'
+                    ? round($costRule['amount'], 2)
+                    : round((float) $u['base_price'] * ($costRule['percent'] / 100), 2);
+                if (abs($newCost - (float) $u['unit_cost']) > 0.001) {
+                    $patch['unit_cost'] = $newCost;
+                    $costChanged++;
+                }
+            }
+
+            if ($appraisalRule['enabled']) {
+                if ($appraisalRule['mode'] === 'fixed') {
+                    $newAppraisal = round($appraisalRule['amount'], 2);
+                } else {
+                    $sourceVal = $appraisalRule['source'] === 'unit_cost'
+                        ? $newCost                          // chain: ใช้ค่า cost ใหม่
+                        : (float) $u['base_price'];
+                    $newAppraisal = round($sourceVal * ($appraisalRule['percent'] / 100), 2);
+                }
+                $oldAppraisal = $u['appraisal_price'] !== null ? (float) $u['appraisal_price'] : null;
+                if ($oldAppraisal === null || abs($newAppraisal - $oldAppraisal) > 0.001) {
+                    $patch['appraisal_price'] = $newAppraisal;
+                    $appraisalChanged++;
+                }
+            }
+
+            // อัปเดตเฉพาะถ้ามี field เปลี่ยน (มากกว่าแค่ updated_at)
+            if (count($patch) > 1) {
+                $db->table('project_units')->where('id', $u['id'])->update($patch);
+                $updated++;
+            }
+        }
+
+        $db->transComplete();
+        if (! $db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON(
+                ['error' => 'เกิดข้อผิดพลาดระหว่างอัปเดต กรุณาลองใหม่']
+            );
+        }
+
+        return $this->response->setStatusCode(200)->setJSON([
+            'message' => "อัปเดตสำเร็จ {$updated} ยูนิต",
+            'data'    => [
+                'updated'           => $updated,
+                'cost_changed'      => $costChanged,
+                'appraisal_changed' => $appraisalChanged,
+            ],
+        ]);
+    }
+
+    /**
+     * Validate input ของ preview / bulk recalculate
+     * @return array{0: bool, 1: ResponseInterface|array}
+     */
+    private function validateRecalcInput(): array
+    {
+        if (!$this->canWrite()) {
+            return [false, $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์ดำเนินการ'])];
+        }
+
+        $body      = $this->request->getJSON(true) ?? [];
+        $projectId = (int) ($body['project_id'] ?? 0);
+
+        if ($projectId <= 0) {
+            return [false, $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id'])];
+        }
+        if (!$this->canWriteProject($projectId)) {
+            return [false, $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์แก้ไขโครงการนี้'])];
+        }
+
+        $scope = (string) ($body['scope'] ?? 'zero_only');
+        if (!in_array($scope, ['zero_only', 'all'], true)) {
+            return [false, $this->response->setStatusCode(422)->setJSON(['error' => 'scope ต้องเป็น zero_only หรือ all'])];
+        }
+
+        $costRule      = $this->parseRule($body['cost_rule']      ?? null, ['base_price']);
+        $appraisalRule = $this->parseRule($body['appraisal_rule'] ?? null, ['base_price', 'unit_cost']);
+
+        if (is_string($costRule)) {
+            return [false, $this->response->setStatusCode(422)->setJSON(['error' => 'cost_rule: ' . $costRule])];
+        }
+        if (is_string($appraisalRule)) {
+            return [false, $this->response->setStatusCode(422)->setJSON(['error' => 'appraisal_rule: ' . $appraisalRule])];
+        }
+
+        if (!$costRule['enabled'] && !$appraisalRule['enabled']) {
+            return [false, $this->response->setStatusCode(422)->setJSON(['error' => 'กรุณาเปิดอย่างน้อย 1 สูตร'])];
+        }
+
+        return [true, [
+            'project_id'     => $projectId,
+            'scope'          => $scope,
+            'cost_rule'      => $costRule,
+            'appraisal_rule' => $appraisalRule,
+        ]];
+    }
+
+    /**
+     * แปลง rule input — return array ถ้าผ่าน, string error message ถ้าไม่ผ่าน
+     * mode: 'percent' (X% ของ source) | 'fixed' (กำหนดค่าตรง)
+     * fallback mode='percent' เพื่อ backward compat
+     */
+    private function parseRule($rule, array $allowedSources): array|string
+    {
+        $rule    = (array) ($rule ?? []);
+        $enabled = (bool) ($rule['enabled'] ?? false);
+
+        if (!$enabled) {
+            return ['enabled' => false, 'mode' => 'percent', 'percent' => 0, 'amount' => 0, 'source' => null];
+        }
+
+        $mode = (string) ($rule['mode'] ?? 'percent');
+        if (!in_array($mode, ['percent', 'fixed'], true)) {
+            return 'mode ต้องเป็น percent หรือ fixed';
+        }
+
+        if ($mode === 'fixed') {
+            $amount = (float) ($rule['amount'] ?? 0);
+            if ($amount < 0.01 || $amount > 999999999.99) {
+                return 'amount ต้องอยู่ระหว่าง 0.01–999,999,999.99';
+            }
+            return ['enabled' => true, 'mode' => 'fixed', 'percent' => 0, 'amount' => $amount, 'source' => null];
+        }
+
+        // mode === 'percent'
+        $percent = (float) ($rule['percent'] ?? 0);
+        if ($percent < 0.01 || $percent > 999.99) {
+            return 'percent ต้องอยู่ระหว่าง 0.01–999.99';
+        }
+
+        $source = null;
+        if (count($allowedSources) > 1) {
+            $source = (string) ($rule['source'] ?? '');
+            if (!in_array($source, $allowedSources, true)) {
+                return 'source ต้องเป็น: ' . implode(', ', $allowedSources);
+            }
+        } else {
+            $source = $allowedSources[0];
+        }
+
+        return ['enabled' => true, 'mode' => 'percent', 'percent' => $percent, 'amount' => 0, 'source' => $source];
+    }
+
+    /**
+     * Builder สำหรับเลือก unit ที่จะ recalc ตาม scope
+     */
+    private function unitsForRecalc(int $projectId, string $scope, array $costRule, array $appraisalRule)
+    {
+        $b = $this->unitModel
+            ->where('project_id', $projectId)
+            ->whereIn('status', ['available', 'reserved']);
+
+        if ($scope === 'zero_only') {
+            // นับเฉพาะแถวที่อย่างน้อย 1 field (ที่ enabled) ยังเป็น 0/null
+            $conds = [];
+            if ($costRule['enabled'])      $conds[] = '(unit_cost IS NULL OR unit_cost = 0)';
+            if ($appraisalRule['enabled']) $conds[] = '(appraisal_price IS NULL OR appraisal_price = 0)';
+            if (!empty($conds)) {
+                $b->where('(' . implode(' OR ', $conds) . ')', null, false);
+            }
+        }
+        return $b;
+    }
 }

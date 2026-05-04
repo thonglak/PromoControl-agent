@@ -65,10 +65,12 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->get('(:num)',   'UnitController::show/$1');
     });
     $routes->group('units', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
-        $routes->post('/',          'UnitController::create');
-        $routes->put('(:num)',      'UnitController::update/$1');
-        $routes->delete('(:num)',   'UnitController::delete/$1');
-        $routes->post('bulk',       'UnitController::bulkCreate');
+        $routes->post('/',                    'UnitController::create');
+        $routes->put('(:num)',                'UnitController::update/$1');
+        $routes->delete('(:num)',             'UnitController::delete/$1');
+        $routes->post('bulk',                 'UnitController::bulkCreate');
+        $routes->post('preview-recalculate',  'UnitController::previewRecalculate');
+        $routes->post('bulk-recalculate',     'UnitController::bulkRecalculate');
     });
 
 

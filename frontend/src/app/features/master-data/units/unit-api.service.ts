@@ -98,4 +98,55 @@ export class UnitApiService {
       .post<{ message: string; data: BulkCreateResult }>('/api/units/bulk', { project_id: projectId, units: rows })
       .pipe(map(r => r.data));
   }
+
+  previewRecalculate(dto: RecalculateDto): Observable<RecalculatePreview> {
+    return this.http
+      .post<{ data: RecalculatePreview }>('/api/units/preview-recalculate', dto)
+      .pipe(map(r => r.data));
+  }
+
+  bulkRecalculate(dto: RecalculateDto): Observable<RecalculateResult> {
+    return this.http
+      .post<{ message: string; data: RecalculateResult }>('/api/units/bulk-recalculate', dto)
+      .pipe(map(r => r.data));
+  }
+}
+
+export interface PriceRule {
+  enabled: boolean;
+  /** percent = สูตร X × %; fixed = กำหนดค่าตรง */
+  mode: 'percent' | 'fixed';
+  /** ใช้เมื่อ mode = 'percent' */
+  percent?: number;
+  /** ใช้เมื่อ mode = 'fixed' (บาท) */
+  amount?: number;
+  /** เฉพาะ appraisal_rule + mode='percent' */
+  source?: 'base_price' | 'unit_cost';
+}
+
+export interface RecalculateDto {
+  project_id: number;
+  scope: 'zero_only' | 'all';
+  cost_rule: PriceRule;
+  appraisal_rule: PriceRule;
+}
+
+export interface RecalculateResult {
+  updated: number;
+  cost_changed: number;
+  appraisal_changed: number;
+}
+
+export interface RecalculatePreviewSample {
+  unit_code: string;
+  base_price: number;
+  current_cost: number;
+  new_cost: number | null;
+  current_appraisal: number | null;
+  new_appraisal: number | null;
+}
+
+export interface RecalculatePreview {
+  count: number;
+  samples: RecalculatePreviewSample[];
 }

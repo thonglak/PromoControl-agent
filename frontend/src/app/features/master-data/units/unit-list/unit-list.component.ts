@@ -15,6 +15,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { UnitApiService, Unit, BulkCreateRow, BulkCreateResult } from '../unit-api.service';
 import { UnitFormDialogComponent } from '../dialogs/unit-form-dialog.component';
+import { PriceRecalculateDialogComponent, PriceRecalculateDialogData } from '../dialogs/price-recalculate-dialog.component';
 import { HouseModelApiService, HouseModel } from '../../house-models/house-model-api.service';
 import { ProjectService } from '../../../../core/services/project.service';
 import { AuthService } from '../../../../core/services/auth.service';
@@ -199,6 +200,24 @@ export class UnitListComponent implements OnInit, AfterViewInit {
         this.snack.open('สร้างยูนิตสำเร็จ', 'ปิด', { duration: 3000 });
         this.loadUnits();
       }
+    });
+  }
+
+  openPriceRecalculate(): void {
+    if (!this.projectId) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+    this.dialog.open(PriceRecalculateDialogComponent, {
+      data: {
+        projectId: this.projectId,
+        projectName: this.project.selectedProject()?.name,
+      } satisfies PriceRecalculateDialogData,
+      width: '640px',
+      maxHeight: '90vh',
+      disableClose: true,
+    }).afterClosed().subscribe(result => {
+      if (result) this.loadUnits();
     });
   }
 

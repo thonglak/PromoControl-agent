@@ -116,6 +116,8 @@ GET /api/units/{id}
 POST /api/units
 PUT /api/units/{id}
 DELETE /api/units/{id}
+POST /api/units/preview-recalculate     # dry-run: นับยูนิตที่จะถูกอัปเดต
+POST /api/units/bulk-recalculate        # คำนวณ unit_cost / appraisal_price จากสูตร แบบ batch
 
 ## Unit Types (ประเภทยูนิต — กำหนดเองต่อโครงการ)
 GET    /api/unit-types?project_id=     (รายการประเภทยูนิตของโครงการ)
