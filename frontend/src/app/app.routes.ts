@@ -19,6 +19,7 @@ import { FeeFormulaListComponent } from './features/fee-formula/formula-list/fee
 import { FeeRatePolicyListComponent } from './features/fee-formula/policy-list/fee-rate-policy-list.component';
 import { FeeFormulaTesterComponent } from './features/fee-formula/tester/fee-formula-tester.component';
 import { ClearTransactionsComponent } from './features/dev-tools/clear-transactions/clear-transactions.component';
+import { FixErrorComponent } from './features/dev-tools/fix-error/fix-error.component';
 
 import { authGuard } from './core/guards/auth.guard';
 import { projectGuard } from './core/guards/project.guard';
@@ -102,6 +103,7 @@ export const routes: Routes = [
 
           // ── Dev Tools (ทดสอบ) ────────────────────────────────────
           { path: 'dev/clear-transactions', component: ClearTransactionsComponent, canActivate: [roleGuard], data: { roles: ['admin'] } },
+          { path: 'dev/fix-error',          component: FixErrorComponent,          canActivate: [roleGuard], data: { roles: ['admin'] } },
         ],
       },
     ],

@@ -91,7 +91,6 @@ const MENU: MenuItem[] = [
     children: [
       { label: 'เลขที่เอกสาร', path: '/settings/number-series', roles: ['admin', 'manager'] },
       { label: 'รูปแบบวันที่', path: '/settings/date-format' },
-      { label: 'Fix Error',   path: '/settings/fix-error', roles: ['admin'] },
     ],
   },
   { label: 'จัดการผู้ใช้', icon: 'users',   path: '/users',    roles: ['admin'] },
@@ -100,6 +99,7 @@ const MENU: MenuItem[] = [
     roles: ['admin'],
     children: [
       { label: 'ล้างข้อมูลขาย', path: '/dev/clear-transactions', roles: ['admin'] },
+      { label: 'Fix Error',     path: '/dev/fix-error',          roles: ['admin'] },
     ],
   },
 ];

@@ -8,7 +8,7 @@ import { MatTableModule } from '@angular/material/table';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/components/section-card/section-card.component';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
-import { NumberSeriesService, ProvisionAllResult } from '../services/number-series.service';
+import { NumberSeriesService, ProvisionAllResult } from '../../settings/services/number-series.service';
 
 @Component({
   selector: 'app-fix-error',
