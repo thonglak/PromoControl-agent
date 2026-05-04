@@ -52,7 +52,7 @@ function toISODateStr(d: any): string {
             (contractPriceChanged)="onContractPriceChanged($event)" />
 
           <!-- Section 2: งบประมาณ -->
-          <app-budget-overview-section [unitId]="selectedUnitId()" [editReversal]="editReversal()" />
+          <app-budget-overview-section [unitId]="selectedUnitId()" [editReversal]="editReversal()" [unitStatus]="selectedUnit()?.status ?? null" />
 
           <!-- Section 3A/3B -->
           @if (selectedUnitId() > 0) {

@@ -266,10 +266,10 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
             const unit = data.find(u => String(u.id) === String(currentId)) ?? null;
             this.selectedUnit.set(unit);
             if (unit) {
-              const display = unit.house_model_name
-                ? `${unit.unit_code} — ${unit.house_model_name}`
-                : unit.unit_code;
-              this.unitSearchControl.setValue(display, { emitEvent: false });
+              // ส่ง unit.id (ไม่ใช่ display string) เพราะ MatAutocompleteTrigger จะวิ่งผ่าน
+              // displayWith → displayUnit(id) คืน display string ให้เอง
+              // (ถ้าส่ง display string ตรง ๆ displayUnit จะหา unit ไม่เจอแล้วคืน '' ทำให้ input โล่ง)
+              this.unitSearchControl.setValue(unit.id as any, { emitEvent: false });
             }
             this.unitSelected.emit(unit);
           }

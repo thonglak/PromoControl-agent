@@ -90,7 +90,7 @@ const SOURCE_CONFIG: { key: string; label: string; canAllocate: boolean }[] = [
                           + ตั้งงบ
                         </button>
                       }
-                      @if (!row.canAllocate && row.key === 'UNIT_STANDARD' && row.remaining > 0 && canReturnBudget()) {
+                      @if (!row.canAllocate && row.key === 'UNIT_STANDARD' && row.remaining > 0 && canReturnBudget() && unitStatus() === 'transferred') {
                         <button mat-stroked-button class="!min-w-0 !px-2 !py-0 !text-xs !text-sky-700 !border-sky-300"
                           (click)="openReturnToPoolDialog(row)"
                           matTooltip="คืนงบยูนิตเข้า Pool">
@@ -156,6 +156,8 @@ export class BudgetOverviewSectionComponent implements OnDestroy {
   pendingItemSources = input<string[]>([]);
   /** edit mode: จำนวนเงินจากรายการเดิมที่ต้องหักกลับ เช่น { UNIT_STANDARD: 200000, MANAGEMENT_SPECIAL: 180000 } */
   editReversal = input<Record<string, number>>({});
+  /** สถานะยูนิตปัจจุบัน — ใช้ตัดสินว่าซ่อนปุ่ม "คืนงบ Pool" หรือไม่ (คืนได้เฉพาะ transferred) */
+  unitStatus = input<string | null>(null);
 
   // State
   readonly collapsed = signal(false);
