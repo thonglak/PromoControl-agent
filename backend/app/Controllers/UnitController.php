@@ -437,7 +437,7 @@ class UnitController extends BaseController
 
         // ดึงตัวอย่าง 20 row แรก (sort เหมือน list หลัก) แล้วคำนวณค่าใหม่
         $samples = $this->unitsForRecalc($projectId, $scope, $costRule, $appraisalRule)
-            ->select('id, unit_code, base_price, unit_cost, appraisal_price')
+            ->select('id, unit_code, base_price, unit_cost, appraisal_price, standard_budget')
             ->orderBy('unit_code', 'ASC')
             ->limit(20)
             ->findAll();
@@ -448,9 +448,7 @@ class UnitController extends BaseController
             $newAppraisal = $u['appraisal_price'] !== null ? (float) $u['appraisal_price'] : null;
 
             if ($costRule['enabled']) {
-                $newCost = $costRule['mode'] === 'fixed'
-                    ? round($costRule['amount'], 2)
-                    : round((float) $u['base_price'] * ($costRule['percent'] / 100), 2);
+                $newCost = $this->computeCost($costRule, $u);
             }
             if ($appraisalRule['enabled']) {
                 if ($appraisalRule['mode'] === 'fixed') {
@@ -497,7 +495,7 @@ class UnitController extends BaseController
         $appraisalRule = $errOrInput['appraisal_rule'];
 
         $rows = $this->unitsForRecalc($projectId, $scope, $costRule, $appraisalRule)
-            ->select('id, base_price, unit_cost, appraisal_price')
+            ->select('id, base_price, unit_cost, appraisal_price, standard_budget')
             ->findAll();
 
         $now              = date('Y-m-d H:i:s');
@@ -514,9 +512,7 @@ class UnitController extends BaseController
             $patch        = ['updated_at' => $now];
 
             if ($costRule['enabled']) {
-                $newCost = $costRule['mode'] === 'fixed'
-                    ? round($costRule['amount'], 2)
-                    : round((float) $u['base_price'] * ($costRule['percent'] / 100), 2);
+                $newCost = $this->computeCost($costRule, $u);
                 if (abs($newCost - (float) $u['unit_cost']) > 0.001) {
                     $patch['unit_cost'] = $newCost;
                     $costChanged++;
@@ -588,8 +584,9 @@ class UnitController extends BaseController
             return [false, $this->response->setStatusCode(422)->setJSON(['error' => 'scope ต้องเป็น zero_only หรือ all'])];
         }
 
-        $costRule      = $this->parseRule($body['cost_rule']      ?? null, ['base_price']);
-        $appraisalRule = $this->parseRule($body['appraisal_rule'] ?? null, ['base_price', 'unit_cost']);
+        // cost_rule รองรับ base_minus_budget (= base_price − standard_budget); appraisal_rule ไม่รองรับ
+        $costRule      = $this->parseRule($body['cost_rule']      ?? null, ['base_price'],              true);
+        $appraisalRule = $this->parseRule($body['appraisal_rule'] ?? null, ['base_price', 'unit_cost'], false);
 
         if (is_string($costRule)) {
             return [false, $this->response->setStatusCode(422)->setJSON(['error' => 'cost_rule: ' . $costRule])];
@@ -612,10 +609,10 @@ class UnitController extends BaseController
 
     /**
      * แปลง rule input — return array ถ้าผ่าน, string error message ถ้าไม่ผ่าน
-     * mode: 'percent' (X% ของ source) | 'fixed' (กำหนดค่าตรง)
+     * mode: 'percent' (X% ของ source) | 'fixed' (กำหนดค่าตรง) | 'base_minus_budget' (cost-only: base_price − standard_budget)
      * fallback mode='percent' เพื่อ backward compat
      */
-    private function parseRule($rule, array $allowedSources): array|string
+    private function parseRule($rule, array $allowedSources, bool $allowBaseMinusBudget = false): array|string
     {
         $rule    = (array) ($rule ?? []);
         $enabled = (bool) ($rule['enabled'] ?? false);
@@ -624,9 +621,17 @@ class UnitController extends BaseController
             return ['enabled' => false, 'mode' => 'percent', 'percent' => 0, 'amount' => 0, 'source' => null];
         }
 
+        $validModes = $allowBaseMinusBudget
+            ? ['percent', 'fixed', 'base_minus_budget']
+            : ['percent', 'fixed'];
         $mode = (string) ($rule['mode'] ?? 'percent');
-        if (!in_array($mode, ['percent', 'fixed'], true)) {
-            return 'mode ต้องเป็น percent หรือ fixed';
+        if (!in_array($mode, $validModes, true)) {
+            return 'mode ต้องเป็น ' . implode(' หรือ ', $validModes);
+        }
+
+        if ($mode === 'base_minus_budget') {
+            // ไม่ต้องการ percent/amount/source — สูตรตายตัว: base_price − standard_budget
+            return ['enabled' => true, 'mode' => 'base_minus_budget', 'percent' => 0, 'amount' => 0, 'source' => null];
         }
 
         if ($mode === 'fixed') {
@@ -654,6 +659,24 @@ class UnitController extends BaseController
         }
 
         return ['enabled' => true, 'mode' => 'percent', 'percent' => $percent, 'amount' => 0, 'source' => $source];
+    }
+
+    /**
+     * คำนวณ unit_cost ใหม่ตาม cost_rule (fixed | percent | base_minus_budget)
+     * @param array $u row ของ project_units (ต้องมี base_price, standard_budget)
+     */
+    private function computeCost(array $costRule, array $u): float
+    {
+        if ($costRule['mode'] === 'fixed') {
+            return round((float) $costRule['amount'], 2);
+        }
+        if ($costRule['mode'] === 'base_minus_budget') {
+            // base_price − standard_budget; กันค่าติดลบโดย floor ที่ 0
+            $diff = (float) $u['base_price'] - (float) ($u['standard_budget'] ?? 0);
+            return round(max(0, $diff), 2);
+        }
+        // percent (default)
+        return round((float) $u['base_price'] * ($costRule['percent'] / 100), 2);
     }
 
     /**

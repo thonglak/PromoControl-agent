@@ -211,15 +211,15 @@ export class PremiumPromotionPanelComponent implements OnInit {
     // อ่าน rows ปัจจุบันแบบไม่ติดตาม (กัน infinite loop)
     const inFlight = untracked(() => this.rows());
 
-    // ลำดับความสำคัญของค่าที่จะ merge:
-    // 1) initialRows (edit mode — มีก็ต่อเมื่อโหลดรายการเดิมเข้ามา)
-    // 2) inFlight (ค่าที่ user กำลังกรอกอยู่)
+    // ลำดับความสำคัญของค่าที่จะ merge (last-write-wins):
+    // 1) initRows ก่อน — seed ค่าจากรายการเดิมตอน first load (inFlight ยังว่าง)
+    // 2) inFlight ทับ — หลัง user กรอก ค่า user ต้องชนะ initRows ตอน eligible reload (net_price recalc)
     const savedMap = new Map<number, PanelARow>();
-    for (const r of inFlight) {
-      if (r.promotion_item_id) savedMap.set(r.promotion_item_id, r);
-    }
     for (const r of initRows) {
       savedMap.set(r.promotion_item_id, r);
+    }
+    for (const r of inFlight) {
+      if (r.promotion_item_id) savedMap.set(r.promotion_item_id, r);
     }
 
     const newRows = items.map(item => {

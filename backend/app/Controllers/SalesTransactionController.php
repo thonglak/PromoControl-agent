@@ -41,6 +41,44 @@ class SalesTransactionController extends BaseController
     private function userId(): int { return (int) ($this->request->user_id ?? 0); }
     private function db(): \CodeIgniter\Database\BaseConnection { return \Config\Database::connect(); }
 
+    /**
+     * ใส่ filter เดียวกัน (status/date/search/unit_id + sort) ที่ index() ใช้ ลงใน builder ใดๆ
+     * — สำหรับ aggregate query ที่ไม่ใช้ orderBy ส่ง $applySort=false
+     */
+    private function applyIndexFilters($builder, int $pid, bool $applySort = true): void
+    {
+        $builder->where('st.project_id', $pid);
+
+        if ($uid = (int) $this->request->getGet('unit_id')) {
+            $builder->where('st.unit_id', $uid);
+        }
+        if ($status = $this->request->getGet('status')) {
+            $builder->where('st.status', $status);
+        }
+        if ($df = $this->request->getGet('date_from')) {
+            $builder->where('st.sale_date >=', $df);
+        }
+        if ($dt = $this->request->getGet('date_to')) {
+            $builder->where('st.sale_date <=', $dt);
+        }
+        if ($search = trim($this->request->getGet('search') ?? '')) {
+            $builder->groupStart()
+                ->like('st.sale_no', $search)
+                ->orLike('pu.unit_code', $search)
+                ->groupEnd();
+        }
+
+        if ($applySort) {
+            $sortField = $this->request->getGet('sort') ?? 'st.sale_date';
+            $sortDir   = strtoupper($this->request->getGet('dir') ?? 'DESC');
+            $sortDir   = in_array($sortDir, ['ASC', 'DESC'], true) ? $sortDir : 'DESC';
+            if (!in_array($sortField, ['st.sale_date', 'st.net_price', 'st.profit', 'st.created_at'], true)) {
+                $sortField = 'st.sale_date';
+            }
+            $builder->orderBy($sortField, $sortDir);
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // GET /api/sales-transactions
     // ═══════════════════════════════════════════════════════════════════════
@@ -58,40 +96,8 @@ class SalesTransactionController extends BaseController
         $builder = $this->db()->table('sales_transactions st')
             ->select('st.*, pu.unit_code, pu.status as unit_status, pu.standard_budget, p.name as project_name, p.pool_budget_amount')
             ->join('project_units pu', 'pu.id = st.unit_id', 'left')
-            ->join('projects p', 'p.id = st.project_id', 'left')
-            ->where('st.project_id', $pid);
-
-        if ($uid = (int) $this->request->getGet('unit_id')) {
-            $builder->where('st.unit_id', $uid);
-        }
-
-        if ($status = $this->request->getGet('status')) {
-            $builder->where('st.status', $status);
-        }
-
-        if ($df = $this->request->getGet('date_from')) {
-            $builder->where('st.sale_date >=', $df);
-        }
-        if ($dt = $this->request->getGet('date_to')) {
-            $builder->where('st.sale_date <=', $dt);
-        }
-
-        if ($search = trim($this->request->getGet('search') ?? '')) {
-            $builder->groupStart()
-                ->like('st.sale_no', $search)
-                ->orLike('pu.unit_code', $search)
-                ->groupEnd();
-        }
-
-        $sortField = $this->request->getGet('sort') ?? 'st.sale_date';
-        $sortDir = strtoupper($this->request->getGet('dir') ?? 'DESC');
-        $sortDir = in_array($sortDir, ['ASC', 'DESC']) ? $sortDir : 'DESC';
-        
-        $allowedSorts = ['st.sale_date', 'st.net_price', 'st.profit', 'st.created_at'];
-        if (!in_array($sortField, $allowedSorts, true)) {
-            $sortField = 'st.sale_date';
-        }
-        $builder->orderBy($sortField, $sortDir);
+            ->join('projects p', 'p.id = st.project_id', 'left');
+        $this->applyIndexFilters($builder, $pid);
 
         $countBuilder = clone $builder;
         $total = $countBuilder->countAllResults(false);
@@ -152,6 +158,32 @@ class SalesTransactionController extends BaseController
         // คำนวณแบบ unit-level (allocated − used − returned) ทำให้ RETURN กลับ Pool ไม่สะท้อนยอดเหลือ
         $poolRemaining = $this->budgetSvc->getPoolBalance($pid);
 
+        // ═══ sum คอลัมน์ "งบคงเหลือรวม" — ทุก row ที่ตรง filter ยกเว้นรายการยกเลิก (ไม่ paginate, ไม่ dedupe) ═══
+        // group by unit_id แล้ว fetch unit summary 1 ครั้งต่อยูนิต × tx_count → sum
+        $aggBuilder = $this->db()->table('sales_transactions st')
+            ->select('st.unit_id, COUNT(*) as tx_count')
+            ->join('project_units pu', 'pu.id = st.unit_id', 'left');
+        $this->applyIndexFilters($aggBuilder, $pid, false);
+        $aggBuilder->where('st.status !=', 'cancelled');  // ตัดรายการยกเลิกออก แม้ user filter จะรวมไว้
+        $unitTxCounts = $aggBuilder->groupBy('st.unit_id')->get()->getResultArray();
+
+        $totalColumnSum = 0;
+        foreach ($unitTxCounts as $r) {
+            $uid = (int) $r['unit_id'];
+            $cnt = (int) $r['tx_count'];
+            if ($uid <= 0 || $cnt <= 0) continue;
+            $cacheKey = "{$pid}_{$uid}";
+            try {
+                if (!isset($summaryCache[$cacheKey])) {
+                    $summaryCache[$cacheKey] = $this->budgetSvc->getUnitBudgetSummary($pid, $uid);
+                }
+                $unitRemaining = (float) ($summaryCache[$cacheKey]['total_remaining'] ?? 0);
+                $totalColumnSum += $unitRemaining * $cnt;
+            } catch (\Throwable $e) {
+                // ข้ามยูนิตที่ดึง summary ไม่ได้
+            }
+        }
+
         // งบผู้บริหารที่คืนแล้ว — project-wide (รวมที่คืนจากการยกเลิกขายและคืนแบบ manual)
         $mgmtReturnedRow = $this->db()->table('budget_movements')
             ->selectSum('amount', 'total')
@@ -179,6 +211,8 @@ class SalesTransactionController extends BaseController
                 'management_budget_remaining' => $mgmtBreakdown['remaining'],
                 // งบผู้บริหารที่คืนแล้ว — รวมจากการยกเลิกขายและคืนแบบ manual
                 'management_budget_returned'  => $managementBudgetReturned,
+                // sum literal ของคอลัมน์ "งบคงเหลือรวม" ทุก row ตรง filter (ไม่ paginate, ไม่ dedupe)
+                'total_budget_remaining_all_units' => round((float) $totalColumnSum, 2),
             ],
         ]);
     }

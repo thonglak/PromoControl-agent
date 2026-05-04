@@ -1114,6 +1114,79 @@ class BudgetMovementService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // 11b. autoReturnRemainingOnTransfer — คืนงบเหลือทั้งหมดเข้า Pool (ใช้ตอนโอนกรรมสิทธิ์)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * คืน remaining ทั้ง 3 source กลับ Pool — สำหรับเรียกตอนโอนกรรมสิทธิ์
+     *
+     * คุณสมบัติ:
+     * - ไม่จัดการ transaction เอง (caller ต้องครอบ transBegin/transCommit ให้)
+     * - ไม่ check unit.status (เพราะตอนโอน status อาจยังไม่ commit)
+     * - ข้ามถ้าไม่มีงบเหลือ (return [])
+     * - Reference type = 'sales_transaction_transfer' เพื่อ trace ที่มา
+     *
+     * @return array ข้อมูล RETURN movements ที่สร้าง (empty ถ้าไม่มีงบเหลือ)
+     */
+    public function autoReturnRemainingOnTransfer(
+        int $projectId,
+        int $unitId,
+        int $transactionId,
+        int $createdBy,
+        string $note = 'คืนงบเข้า Pool อัตโนมัติ (โอนกรรมสิทธิ์)'
+    ): array {
+        $summary       = $this->getUnitBudgetSummary($projectId, $unitId);
+        $unitRemaining = $summary['UNIT_STANDARD']['remaining']      ?? 0;
+        $poolRemaining = $summary['PROJECT_POOL']['remaining']       ?? 0;
+        $mgmtRemaining = $summary['MANAGEMENT_SPECIAL']['remaining'] ?? 0;
+
+        // ปัดเศษกัน floating-point เกือบ 0 (เช่น 0.00001)
+        $unitRemaining = round($unitRemaining, 2);
+        $poolRemaining = round($poolRemaining, 2);
+        $mgmtRemaining = round($mgmtRemaining, 2);
+
+        if ($unitRemaining <= 0 && $poolRemaining <= 0 && $mgmtRemaining <= 0) {
+            return [];
+        }
+
+        $now      = date('Y-m-d H:i:s');
+        $movements = [];
+
+        $sources = [
+            ['UNIT_STANDARD',      $unitRemaining],
+            ['PROJECT_POOL',       $poolRemaining],
+            ['MANAGEMENT_SPECIAL', $mgmtRemaining],
+        ];
+
+        foreach ($sources as [$source, $amount]) {
+            if ($amount <= 0) continue;
+            $movementNo = $this->generateMovementNo($projectId, $createdBy);
+            $this->db->table('budget_movements')->insert([
+                'movement_no'        => $movementNo,
+                'project_id'         => $projectId,
+                'unit_id'            => $unitId,
+                'movement_type'      => 'RETURN',
+                'budget_source_type' => $source,
+                'amount'             => $amount,
+                'status'             => 'approved',
+                'reference_id'       => $transactionId,
+                'reference_type'     => 'sales_transaction_transfer',
+                'note'               => $note,
+                'created_by'         => $createdBy,
+                'approved_by'        => $createdBy,
+                'approved_at'        => $now,
+                'created_at'         => $now,
+            ]);
+            $movements[] = [
+                'source' => $source,
+                'amount' => $amount,
+            ];
+        }
+
+        return $movements;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // 12. batchReturnUnitBudgetToPool — คืนงบยูนิตหลายรายการเข้า Pool
     // ═══════════════════════════════════════════════════════════════════════
 

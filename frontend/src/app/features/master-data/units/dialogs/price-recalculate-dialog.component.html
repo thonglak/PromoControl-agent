@@ -41,6 +41,9 @@
             </mat-form-field>
           </div>
         </mat-radio-button>
+        <mat-radio-button value="base_minus_budget" class="!text-sm">
+          <span>สูตร: <span class="font-mono text-slate-500">unit_cost = base_price − standard_budget</span></span>
+        </mat-radio-button>
       </mat-radio-group>
 
       @if (form.value.cost_enabled && form.value.cost_mode === 'percent' && form.controls.cost_percent.invalid && form.controls.cost_percent.touched) {
@@ -48,6 +51,9 @@
       }
       @if (form.value.cost_enabled && form.value.cost_mode === 'fixed' && form.controls.cost_amount.invalid && form.controls.cost_amount.touched) {
         <p class="text-xs text-red-600">จำนวนเงินต้องอยู่ระหว่าง 0.01–999,999,999.99</p>
+      }
+      @if (form.value.cost_enabled && form.value.cost_mode === 'base_minus_budget') {
+        <p class="text-xs text-slate-500">หากผลลัพธ์ติดลบ ระบบจะตั้งเป็น 0</p>
       }
     </div>
   </section>

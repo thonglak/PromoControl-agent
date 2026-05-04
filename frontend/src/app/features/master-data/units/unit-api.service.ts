@@ -114,8 +114,8 @@ export class UnitApiService {
 
 export interface PriceRule {
   enabled: boolean;
-  /** percent = สูตร X × %; fixed = กำหนดค่าตรง */
-  mode: 'percent' | 'fixed';
+  /** percent = X × %; fixed = ค่าตรง; base_minus_budget = base_price − standard_budget (เฉพาะ cost_rule) */
+  mode: 'percent' | 'fixed' | 'base_minus_budget';
   /** ใช้เมื่อ mode = 'percent' */
   percent?: number;
   /** ใช้เมื่อ mode = 'fixed' (บาท) */

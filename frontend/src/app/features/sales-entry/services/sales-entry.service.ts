@@ -102,6 +102,9 @@ export interface TransferResponse {
   transfer_date: string;
   transferred_by: string;
   transferred_at: string;
+  /** RETURN movements ที่สร้างอัตโนมัติตอนโอน (ถ้ามีงบเหลือ) */
+  auto_returned: { source: string; amount: number }[];
+  total_returned: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -124,7 +127,7 @@ export class SalesEntryService {
       .pipe(map(r => r.data));
   }
 
-  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number } }> {
+  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number; total_budget_remaining_all_units: number } }> {
     let p = new HttpParams();
     Object.entries(params).forEach(([k, v]) => { if (v != null && v !== '') p = p.set(k, v); });
     return this.http.get<any>('/api/sales-transactions', { params: p });

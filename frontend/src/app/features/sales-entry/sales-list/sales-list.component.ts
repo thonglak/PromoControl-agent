@@ -78,7 +78,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
       <!-- Summary cards -->
       @if (summary()) {
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           <!-- งบยูนิต -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
             <p class="text-xs font-semibold text-slate-600 mb-2">งบยูนิต</p>
@@ -99,24 +99,17 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
             <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
           </div>
 
-          <!-- งบส่วนกลาง (Pool) -->
+          <!-- งบคงเหลือรวม — sum ทุกยูนิต (ไม่รวมยกเลิก) + Pool คงเหลือ -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs font-semibold text-slate-600 mb-2">งบส่วนกลาง (Pool)</p>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <p class="text-[11px] text-slate-400 mb-0.5">ใช้แล้ว</p>
-                <p class="text-base font-bold text-amber-600 tabular-nums">฿{{ summary()!.pool_budget_used | number:'1.0-0' }}</p>
-              </div>
-              <div>
-                <p class="text-[11px] text-slate-400 mb-0.5">คงเหลือ</p>
-                <p class="text-base font-bold tabular-nums"
-                   [class.text-primary-700]="summary()!.pool_budget_remaining >= 0"
-                   [class.text-loss]="summary()!.pool_budget_remaining < 0">
-                  ฿{{ summary()!.pool_budget_remaining | number:'1.0-0' }}
-                </p>
-              </div>
-            </div>
-            <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
+            <p class="text-xs font-semibold text-slate-600 mb-2">งบคงเหลือรวม</p>
+            <p class="text-2xl font-bold tabular-nums"
+               [class.text-primary-700]="totalRemaining() >= 0"
+               [class.text-loss]="totalRemaining() < 0">
+              ฿{{ totalRemaining() | number:'1.0-0' }}
+            </p>
+            <p class="text-xs text-slate-400 mt-2">
+              + Pool คงเหลือ: ฿{{ summary()!.pool_budget_remaining | number:'1.0-0' }}
+            </p>
           </div>
 
           <!-- งบผู้บริหาร -->
@@ -139,12 +132,6 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
             <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
           </div>
 
-          <!-- งบผู้บริหารที่คืนแล้ว -->
-          <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs font-semibold text-slate-600 mb-2">งบผู้บริหารที่คืนแล้ว</p>
-            <p class="text-2xl font-bold text-emerald-600 tabular-nums">฿{{ summary()!.management_budget_returned | number:'1.0-0' }}</p>
-            <p class="text-xs text-slate-400 mt-2">รวมยกเลิกขาย + คืนเอง</p>
-          </div>
         </div>
       }
 
@@ -319,26 +306,11 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
                 </td>
               </ng-container>
 
-              <!-- Footer: งบคงเหลือรวม -->
-              <ng-container matColumnDef="footer-label">
-                <td mat-footer-cell *matFooterCellDef [attr.colspan]="footerLabelColspan()" class="!text-right !text-sm !font-semibold !text-slate-600 !bg-slate-100 !py-3 !pr-4">
-                  งบคงเหลือรวมทั้งโครงการ
-                </td>
-              </ng-container>
-              <ng-container matColumnDef="footer-value">
-                <td mat-footer-cell *matFooterCellDef [attr.colspan]="footerValueColspan()" class="!text-left !text-sm !font-bold !text-primary-700 !bg-slate-100 !py-3 tabular-nums">
-                  @if (summary()) {
-                    ฿{{ (summary()!.unit_budget_remaining + summary()!.pool_budget_remaining + summary()!.management_budget_remaining) | number:'1.0-0' }}
-                  }
-                </td>
-              </ng-container>
-
               <tr mat-header-row *matHeaderRowDef="displayedColumns(); sticky: true"></tr>
               <tr mat-row *matRowDef="let row; columns: displayedColumns();"
                 class="hover:bg-primary-100 transition-colors even:bg-slate-50/40 cursor-pointer"
                 [class.opacity-60]="row.status === 'cancelled'"
                 (click)="goToDetail(row.id)"></tr>
-              <tr mat-footer-row *matFooterRowDef="['footer-label', 'footer-value']" class="!bg-slate-100"></tr>
 
               <tr class="mat-row" *matNoDataRow>
                 <td class="mat-cell text-center py-12 text-slate-400" [attr.colspan]="displayedColumns().length">
@@ -382,7 +354,7 @@ export class SalesListComponent implements OnInit {
   readonly sortField = signal('st.sale_date');
   readonly sortDir = signal<'ASC' | 'DESC'>('DESC');
   readonly statusFilter = signal('');
-  readonly summary = signal<{ unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number } | null>(null);
+  readonly summary = signal<{ unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number; total_budget_remaining_all_units: number } | null>(null);
 
   searchControl = this.fb.control('');
 
@@ -399,15 +371,11 @@ export class SalesListComponent implements OnInit {
   columnDefs = signal<ColumnDef[]>(this.tblCfg.getConfig(TABLE_ID, DEFAULT_COLUMNS));
   displayedColumns = computed(() => this.tblCfg.getVisibleKeys(this.columnDefs()));
 
-  // Footer colspan: label กินคอลัมน์ถึง total_budget_remaining, value กินส่วนที่เหลือ
-  readonly footerLabelColspan = computed(() => {
-    const cols = this.displayedColumns();
-    const idx = cols.indexOf('total_budget_remaining');
-    return idx >= 0 ? idx : cols.length - 1;
-  });
-  readonly footerValueColspan = computed(() => {
-    const cols = this.displayedColumns();
-    return cols.length - this.footerLabelColspan();
+  /** งบคงเหลือรวม = sum คอลัมน์ (ไม่รวมรายการยกเลิก) + Pool คงเหลือ */
+  readonly totalRemaining = computed(() => {
+    const s = this.summary();
+    if (!s) return 0;
+    return (s.total_budget_remaining_all_units ?? 0) + (s.pool_budget_remaining ?? 0);
   });
 
   ngOnInit(): void {

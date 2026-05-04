@@ -797,7 +797,11 @@ export class SalesDetailComponent implements OnInit {
     });
     ref.afterClosed().subscribe(result => {
       if (result?.success) {
-        this.snack.open('โอนกรรมสิทธิ์สำเร็จ', 'ปิด', { duration: 3000 });
+        const totalReturned = Number(result?.data?.total_returned ?? 0);
+        const msg = totalReturned > 0
+          ? `โอนกรรมสิทธิ์สำเร็จ — คืนงบเข้า Pool ฿${totalReturned.toLocaleString('th-TH', { maximumFractionDigits: 0 })}`
+          : 'โอนกรรมสิทธิ์สำเร็จ';
+        this.snack.open(msg, 'ปิด', { duration: 4000 });
         this.loadDetail(this.tx().id);
       }
     });

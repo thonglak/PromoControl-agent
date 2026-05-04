@@ -14,15 +14,18 @@ use RuntimeException;
  * 3. transfer_date ต้องไม่เกินวันปัจจุบัน
  * 4. เปลี่ยน unit.status → 'transferred'
  * 5. บันทึก transfer_date, transferred_by, transferred_at
- * 6. เปลี่ยนแล้วย้อนกลับไม่ได้
+ * 6. คืนงบเหลือ (UNIT_STANDARD, PROJECT_POOL, MANAGEMENT_SPECIAL) เข้า Pool อัตโนมัติ
+ * 7. เปลี่ยนแล้วย้อนกลับไม่ได้
  */
 class TransferService
 {
     private BaseConnection $db;
+    private BudgetMovementService $budgetSvc;
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
+        $this->budgetSvc = new BudgetMovementService();
     }
 
     public function markAsTransferred(int $transactionId, string $transferDate, int $transferredBy): array
@@ -87,6 +90,15 @@ class TransferService
                     'updated_at'     => $now,
                 ]);
 
+            // 7. คืนงบเหลือเข้า Pool อัตโนมัติ — อยู่ใน transaction เดียวกัน
+            //    ถ้าคืนล้มเหลวจะ rollback การโอนด้วย
+            $autoReturned = $this->budgetSvc->autoReturnRemainingOnTransfer(
+                (int) $transaction['project_id'],
+                (int) $transaction['unit_id'],
+                $transactionId,
+                $transferredBy
+            );
+
             $this->db->transCommit();
         } catch (\Throwable $e) {
             $this->db->transRollback();
@@ -99,12 +111,16 @@ class TransferService
             ->where('id', $transferredBy)
             ->get()->getRowArray();
 
+        $totalReturned = array_sum(array_column($autoReturned, 'amount'));
+
         return [
-            'transaction_id' => $transactionId,
-            'unit_status'    => 'transferred',
-            'transfer_date'  => $transferDate,
-            'transferred_by' => $transferredByUser['name'] ?? '',
-            'transferred_at' => $now,
+            'transaction_id'    => $transactionId,
+            'unit_status'       => 'transferred',
+            'transfer_date'     => $transferDate,
+            'transferred_by'    => $transferredByUser['name'] ?? '',
+            'transferred_at'    => $now,
+            'auto_returned'     => $autoReturned,
+            'total_returned'    => round((float) $totalReturned, 2),
         ];
     }
 }

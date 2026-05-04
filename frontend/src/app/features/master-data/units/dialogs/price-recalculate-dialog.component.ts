@@ -20,7 +20,7 @@ export interface PriceRecalculateDialogData {
 }
 
 type Scope = 'zero_only' | 'all';
-type RuleMode = 'percent' | 'fixed';
+type RuleMode = 'percent' | 'fixed' | 'base_minus_budget';
 type AppraisalSource = 'base_price' | 'unit_cost';
 
 @Component({
@@ -70,8 +70,9 @@ export class PriceRecalculateDialogComponent {
     if (!this.atLeastOneEnabled) return false;
     const v = this.form.value;
     if (v.cost_enabled) {
-      const ctrl = v.cost_mode === 'fixed' ? this.form.controls.cost_amount : this.form.controls.cost_percent;
-      if (ctrl.invalid) return false;
+      // base_minus_budget ไม่มี input เลย → ไม่ต้อง validate field ใดๆ
+      if (v.cost_mode === 'fixed' && this.form.controls.cost_amount.invalid) return false;
+      if (v.cost_mode === 'percent' && this.form.controls.cost_percent.invalid) return false;
     }
     if (v.appraisal_enabled) {
       const ctrl = v.appraisal_mode === 'fixed' ? this.form.controls.appraisal_amount : this.form.controls.appraisal_percent;
@@ -82,12 +83,19 @@ export class PriceRecalculateDialogComponent {
 
   private buildDto(): RecalculateDto {
     const v = this.form.getRawValue();
+    let cost_rule: RecalculateDto['cost_rule'];
+    if (v.cost_mode === 'fixed') {
+      cost_rule = { enabled: v.cost_enabled, mode: 'fixed', amount: Number(v.cost_amount) };
+    } else if (v.cost_mode === 'base_minus_budget') {
+      cost_rule = { enabled: v.cost_enabled, mode: 'base_minus_budget' };
+    } else {
+      cost_rule = { enabled: v.cost_enabled, mode: 'percent', percent: Number(v.cost_percent) };
+    }
+
     return {
       project_id: this.data.projectId,
       scope: v.scope,
-      cost_rule: v.cost_mode === 'fixed'
-        ? { enabled: v.cost_enabled, mode: 'fixed', amount: Number(v.cost_amount) }
-        : { enabled: v.cost_enabled, mode: 'percent', percent: Number(v.cost_percent) },
+      cost_rule,
       appraisal_rule: v.appraisal_mode === 'fixed'
         ? { enabled: v.appraisal_enabled, mode: 'fixed', amount: Number(v.appraisal_amount) }
         : { enabled: v.appraisal_enabled, mode: 'percent', percent: Number(v.appraisal_percent), source: v.appraisal_source },
