@@ -451,12 +451,26 @@ app-icon svg {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  padding: var(--space-6);
-  transition: all 0.2s ease;
+  padding: var(--space-4);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 
-  &:hover {
+  @media (min-width: 640px) {
+    padding: var(--space-6);
+  }
+
+  // Hover เฉพาะอุปกรณ์ที่ hover ได้จริง (เมาส์) — กัน sticky-hover บน touch
+  @media (hover: hover) {
+    &:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+      border-color: var(--color-primary-300);
+    }
+  }
+
+  // Touch feedback บนมือถือ
+  &:active {
+    transform: scale(0.98);
     box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
     border-color: var(--color-primary-300);
   }
 }
@@ -539,6 +553,24 @@ mat-error, .mat-mdc-form-field-error-wrapper {
   font-family: var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// .num — มาตรฐานตัวเลขทั้งระบบ (text-right + tabular + mono)
+// ใช้กับ <td>, <input>, <span>, <div> ที่แสดงจำนวนเงิน/จำนวนนับ/% / ขนาด
+// ยกเว้น: ID/รหัส (sale_no, unit_code, เลขที่เอกสาร) ใช้ class font-mono ปกติ ชิดซ้าย
+// ═══════════════════════════════════════════════════════════════════════════
+
+.num {
+  text-align: right !important;
+  font-family: var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+// บังคับ align ขวา ลงไปถึง <input> ที่อยู่ใน mat-form-field (override Mat default)
+.mat-mdc-form-field .num,
+.mat-mdc-form-field input.num {
+  text-align: right !important;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

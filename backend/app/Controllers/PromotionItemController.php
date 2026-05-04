@@ -412,6 +412,9 @@ class PromotionItemController extends BaseController
         $projectId = (int) ($this->request->getGet('project_id') ?? 0);
         $unitId    = (int) ($this->request->getGet('unit_id') ?? 0);
         $saleDate  = $this->request->getGet('sale_date') ?? date('Y-m-d');
+        $contractPriceParam = $this->request->getGet('contract_price');
+        $contractPrice = ($contractPriceParam !== null && $contractPriceParam !== '')
+            ? (float) $contractPriceParam : null;
 
         if ($projectId <= 0) return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
         if ($unitId <= 0)    return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ unit_id']);
@@ -421,7 +424,7 @@ class PromotionItemController extends BaseController
 
         try {
             $eligibleSvc = new EligiblePromotionService();
-            $result = $eligibleSvc->getEligibleItems($projectId, $unitId, $saleDate);
+            $result = $eligibleSvc->getEligibleItems($projectId, $unitId, $saleDate, $contractPrice);
             return $this->response->setStatusCode(200)->setJSON(['data' => $result]);
         } catch (RuntimeException $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);

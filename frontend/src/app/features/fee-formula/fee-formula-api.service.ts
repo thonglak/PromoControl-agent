@@ -10,8 +10,9 @@ export interface FeeFormula {
   promotion_item_code: string;
   promotion_item_category: string;
   item_max_value: number | null;
-  base_field: 'appraisal_price' | 'base_price' | 'net_price' | 'manual_input';
+  base_field: 'appraisal_price' | 'base_price' | 'net_price' | 'manual_input' | 'expression';
   manual_input_label: string | null;
+  formula_expression: string | null;
   default_rate: number;
   buyer_share: number;
   description: string | null;
@@ -26,6 +27,8 @@ export interface FeeRatePolicy {
   policy_name: string;
   override_rate: number;
   override_buyer_share: number | null;
+  override_expression: string | null;
+  condition_expression: string | null;
   conditions: any;
   effective_from: string;
   effective_to: string;
@@ -41,11 +44,27 @@ export interface TestResult {
   total_savings: number;
 }
 
+export interface ExpressionVariableUsed {
+  name: string;
+  label: string;
+  unit: string;
+  scope: string;
+  value: number;
+}
+
+export interface ExpressionDetail {
+  expression: string;
+  substituted: string | null;
+  variables_used: ExpressionVariableUsed[];
+  error: string | null;
+}
+
 export interface TestResultItem {
   promotion_item_id: number;
   promotion_item_name: string;
   category: string;
-  formula: { base_field: string; base_amount: number; default_rate: number; buyer_share: number; normal_value: number };
+  formula: { base_field: string; base_amount: number; default_rate: number; buyer_share: number; normal_value: number; formula_expression?: string | null };
+  expression_detail?: ExpressionDetail | null;
   applied_policy: { id: number; policy_name: string } | null;
   effective_rate: number;
   effective_buyer_share: number;
@@ -99,6 +118,19 @@ export class FeeFormulaApiService {
   }
   togglePolicy(id: number): Observable<FeeRatePolicy> {
     return this.http.patch<{ data: FeeRatePolicy }>('/api/fee-rate-policies/' + id + '/toggle', {}).pipe(map(r => r.data));
+  }
+
+  // ── Variables (สำหรับ expression mode) ──
+  getVariables(): Observable<{ name: string; label: string; scope: string; unit: string }[]> {
+    return this.http.get<{ data: any[] }>('/api/fee-formulas/variables').pipe(map(r => r.data));
+  }
+
+  validateExpression(expression: string): Observable<{ valid: boolean; error?: string; used_variables?: string[]; unknown_variables?: string[] }> {
+    return this.http.post<any>('/api/fee-formulas/validate-expression', { expression });
+  }
+
+  validateBooleanExpression(expression: string): Observable<{ valid: boolean; error?: string; used_variables?: string[]; unknown_variables?: string[] }> {
+    return this.http.post<any>('/api/fee-formulas/validate-boolean-expression', { expression });
   }
 
   // ── Tester ──

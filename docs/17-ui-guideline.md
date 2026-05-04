@@ -264,6 +264,26 @@ Scale: 4, 8, 12, 16, 20, 24, 32, 40, 48
 - field สำคัญควรมี helper text
 - validation ต้องบอกตรงจุด
 
+### 11.4 มาตรฐานตัวเลข (Numeric Standard) ⭐
+
+> **กฎ**: ตัวเลขทุกชนิด (จำนวนเงิน, จำนวนนับ, %, area, ขนาด) ต้อง **ชิดขวา** + ใช้ **tabular-nums** + ฟอนต์ **mono** เสมอ
+> **ยกเว้น**: ID/รหัส (sale_no, unit_code, เลขที่เอกสาร) ใช้ `font-mono` ปกติ ชิดซ้าย เพราะอ่านเป็นข้อความ
+
+**Class ที่ต้องใช้:**
+
+| สถานการณ์ | วิธีใช้ |
+|-----------|---------|
+| Cell ในตาราง / span / div แสดงตัวเลข | `class="num"` ที่ `<td>` หรือ `<span>` |
+| Header ของคอลัมน์ตัวเลข | `class="num"` ที่ `<th>` ด้วย (ให้สอดคล้องกับ cell) |
+| **Input ตัวเลข editable** (เงิน/จำนวน/%) | ใช้ `currencyMask` directive — align ขวา + format อัตโนมัติ |
+| Input ตัวเลข readonly | `<input matInput class="num" readonly>` |
+
+**ห้าม:**
+- ห้ามใช้ `<input type="number">` กับฟิลด์เงิน/จำนวน — ใช้ `currencyMask` แทน (format ชัด, ไม่มี spinner ที่ดูไม่จบ)
+- ห้ามชิดซ้ายตัวเลขที่เป็นจำนวน
+
+**Migration**: ของเก่า migrate ทยอยตอนแก้ไขหน้านั้น ๆ ไม่ต้องกวาดทั้งระบบ — แต่หน้าใหม่ทุกหน้าต้องเป็นไปตามนี้
+
 ### 11.3 Form Section ที่ใช้บ่อย
 
 Basic Info, Pricing, Discount & Promotion, Gift Items, Approval, Audit Info

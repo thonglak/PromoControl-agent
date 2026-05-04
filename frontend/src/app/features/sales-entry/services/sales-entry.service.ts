@@ -74,6 +74,7 @@ export interface SalesTransaction {
   total_cost: number;
   profit: number;
   sale_date: string;
+  contract_price: number | null;
   status: 'active' | 'cancelled';
   cancelled_at?: string;
   cancelled_by?: number;
@@ -106,11 +107,14 @@ export interface TransferResponse {
 export class SalesEntryService {
   private http = inject(HttpClient);
 
-  getEligibleItems(projectId: number, unitId: number, saleDate: string): Observable<EligibleResponse> {
-    const params = new HttpParams()
+  getEligibleItems(projectId: number, unitId: number, saleDate: string, contractPrice?: number | null): Observable<EligibleResponse> {
+    let params = new HttpParams()
       .set('project_id', projectId)
       .set('unit_id', unitId)
       .set('sale_date', saleDate);
+    if (contractPrice != null && contractPrice > 0) {
+      params = params.set('contract_price', contractPrice);
+    }
     return this.http
       .get<{ data: EligibleResponse }>('/api/promotion-items/eligible', { params })
       .pipe(map(r => r.data));

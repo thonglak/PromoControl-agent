@@ -38,6 +38,13 @@ const MENU: MenuItem[] = [
     ],
   },
   {
+    label: 'การขาย', icon: 'document-text',
+    children: [
+      { label: 'บันทึกขาย',  path: '/sales',      roles: ['admin', 'manager', 'sales'], exact: true },
+      { label: 'รายการขาย',  path: '/sales/list' },
+    ],
+  },
+  {
     label: 'สูตรคำนวณ', icon: 'calculator',
     roles: ['admin', 'manager'],
     children: [
@@ -63,13 +70,6 @@ const MENU: MenuItem[] = [
       { label: 'ทดสอบ API',    path: '/sync-from-api/debug',    roles: ['admin', 'manager'] },
       { label: 'จับคู่ Field',  path: '/sync-from-api/mappings', roles: ['admin', 'manager'] },
       { label: 'Target Tables', path: '/sync-from-api/targets', roles: ['admin'] },
-    ],
-  },
-  {
-    label: 'การขาย', icon: 'document-text',
-    children: [
-      { label: 'บันทึกขาย',  path: '/sales',      roles: ['admin', 'manager', 'sales'], exact: true },
-      { label: 'รายการขาย',  path: '/sales/list' },
     ],
   },
   {

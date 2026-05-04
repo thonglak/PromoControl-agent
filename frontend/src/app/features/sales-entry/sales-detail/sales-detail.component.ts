@@ -114,6 +114,16 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                   <span class="detail-value">{{ tx().sale_date | thaiDate:'auto' }}</span>
                 </div>
                 <div class="detail-field">
+                  <span class="detail-label">ราคาหน้าสัญญา</span>
+                  <span class="detail-value tabular-nums">
+                    @if (tx().contract_price != null) {
+                      ฿{{ n(tx().contract_price) | number:'1.0-0' }}
+                    } @else {
+                      <span style="color: var(--color-gray-400)">—</span>
+                    }
+                  </span>
+                </div>
+                <div class="detail-field">
                   <span class="detail-label">ราคาขาย</span>
                   <span class="detail-value tabular-nums">฿{{ n(tx().base_price) | number:'1.0-0' }}</span>
                 </div>

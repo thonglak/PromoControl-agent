@@ -86,6 +86,68 @@ Sidebar:
 | `base_price` | ราคาขาย |
 | `net_price` | ราคาสุทธิ |
 | `manual_input` | กรอกเอง |
+| `expression` | นิพจน์ (เขียนสูตรเอง) |
+
+### Expression Mode (เขียนสูตรเอง) ⭐
+
+ใช้ Symfony ExpressionLanguage ที่ฝั่ง backend (parse + evaluate ปลอดภัย ไม่ใช่ `eval()`)
+
+**ตัวแปรที่ใช้ได้:**
+
+| ตัวแปร | ที่มา | label |
+|--------|------|-------|
+| `common_fee_rate` | projects | อัตราค่าส่วนกลาง |
+| `electric_meter_fee` | projects | ค่าติดตั้งมิเตอร์ไฟฟ้า |
+| `water_meter_fee` | projects | ค่าติดตั้งมิเตอร์ประปา |
+| `pool_budget_amount` | projects | งบ Pool |
+| `base_price` | project_units | ราคาขาย |
+| `unit_cost` | project_units | ต้นทุนยูนิต |
+| `appraisal_price` | project_units | ราคาประเมิน |
+| `land_area_sqw` | project_units | ขนาดที่ดิน (ตร.ว.) |
+| `area_sqm` | project_units | พื้นที่ใช้สอย (ตร.ม.) |
+| `standard_budget` | project_units | งบยูนิต |
+| `contract_price` | sales_transactions | ราคาหน้าสัญญา (ต้องกรอก) |
+| `net_price` | computed | ราคาสุทธิ |
+
+**Operators ที่รองรับ:** `+ - * / ( )`
+**Functions ที่ whitelist:** `max(a,b)`, `min(a,b)`, `round(x, p?)`, `abs(x)`, `floor(x)`, `ceil(x)`
+
+**ตัวอย่างสูตร:**
+```
+contract_price * 0.02                         # ค่าโอน 2%
+contract_price * 0.02 + electric_meter_fee    # ค่าโอน + ค่ามิเตอร์
+common_fee_rate * land_area_sqw * 12          # ค่าส่วนกลาง 1 ปี
+max(appraisal_price, contract_price) * 0.01   # ใช้ราคาที่สูงกว่า
+```
+
+**กฎพิเศษ:**
+- ผลลัพธ์ของสูตร = ค่าสุดท้าย ไม่นำไปคูณ `rate × buyer_share` อีก (แตกต่างจาก mode อื่น)
+- Cap ที่ `max_value` ของ promotion_item ยังบังคับใช้
+- ถ้าสูตรใช้ `contract_price` แต่ยังไม่กรอก → flag `needs_input` ให้ frontend แสดง warning
+
+### Policy แบบ Expression ⭐
+
+นโยบายรองรับการเขียนทั้ง **override expression** (สูตร override) และ **condition expression** (เงื่อนไข boolean)
+
+**Schema ของ `fee_rate_policies`:**
+- `override_expression TEXT` — สูตร override เต็มรูป
+- `condition_expression TEXT` — boolean expression สำหรับ matching
+- `override_rate`, `override_buyer_share`, `conditions` — legacy (backward compat)
+
+**Boolean operators:** `>`, `<`, `>=`, `<=`, `==`, `!=`, `and`, `or`, `not`
+
+**ตัวแปร string:** `project_type` ใช้ `==` / `!=` กับ string literal เช่น `project_type == "condo"`
+
+**ตัวอย่าง use case จริง:**
+
+| ชื่อ Policy | override_expression | condition_expression |
+|-----------|---------------------|----------------------|
+| ลด 25% premium | `contract_price * 0.015` | `contract_price > 5000000` |
+| ฟรีค่าโอนคอนโด | `0` | `project_type == "condo"` |
+| ผู้ขายช่วยครึ่ง | `contract_price * 0.02 * 0.5` | `area_sqm > 100 and project_type == "house"` |
+| จำกัดเพดาน 50,000 | `min(contract_price * 0.02, 50000)` | (ไม่กำหนด — ใช้ทุกกรณี) |
+
+**Priority:** ถ้ามีหลาย policy ตรงพร้อมกัน → ใช้ตัวที่ `priority` สูงสุด (เลขมาก = สำคัญกว่า)
 
 ### Create/Edit Dialog
 

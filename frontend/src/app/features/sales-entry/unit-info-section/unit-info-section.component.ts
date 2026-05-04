@@ -1,6 +1,6 @@
 import { Component, inject, ElementRef, signal, computed, output, effect, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -10,6 +10,7 @@ import { Subscription } from 'rxjs';
 
 import { ProjectService } from '../../../core/services/project.service';
 import { UnitApiService, Unit } from '../../master-data/units/unit-api.service';
+import { CurrencyMaskDirective } from '../../../shared/directives/currency-mask.directive';
 
 /** แปลง Date หรือ Moment → YYYY-MM-DD string */
 function toISODateStr(d: any): string {
@@ -27,6 +28,7 @@ function toISODateStr(d: any): string {
     CommonModule, ReactiveFormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
     MatDatepickerModule,
+    CurrencyMaskDirective,
   ],
   template: `
     <div class="section-card">
@@ -67,17 +69,32 @@ function toISODateStr(d: any): string {
           <mat-datepicker #picker></mat-datepicker>
         </mat-form-field>
 
+        <!-- ราคาหน้าสัญญา -->
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>ราคาหน้าสัญญา</mat-label>
+          <input matInput currencyMask
+            [formControl]="contractPriceControl"
+            placeholder="0">
+          <span matTextPrefix>฿&nbsp;</span>
+          @if (contractPriceControl.touched && contractPriceControl.hasError('required')) {
+            <mat-error>กรุณาระบุราคาหน้าสัญญา</mat-error>
+          }
+          @if (contractPriceControl.touched && contractPriceControl.hasError('min')) {
+            <mat-error>ราคาหน้าสัญญาต้องมากกว่า 0</mat-error>
+          }
+        </mat-form-field>
+
         <!-- ราคาขาย -->
         <mat-form-field appearance="outline" class="w-full readonly-field">
           <mat-label>ราคาขาย (Base Price)</mat-label>
-          <input matInput [value]="selectedUnit()?.base_price | number:'1.0-0'" readonly>
+          <input matInput class="num" [value]="selectedUnit()?.base_price | number:'1.0-0'" readonly>
           <span matTextPrefix>฿&nbsp;</span>
         </mat-form-field>
 
         <!-- ต้นทุน -->
         <mat-form-field appearance="outline" class="w-full readonly-field">
           <mat-label>ต้นทุน (Unit Cost)</mat-label>
-          <input matInput [value]="selectedUnit()?.unit_cost | number:'1.0-0'" readonly>
+          <input matInput class="num" [value]="selectedUnit()?.unit_cost | number:'1.0-0'" readonly>
           <span matTextPrefix>฿&nbsp;</span>
         </mat-form-field>
 
@@ -85,6 +102,7 @@ function toISODateStr(d: any): string {
         <mat-form-field appearance="outline" class="w-full readonly-field">
           <mat-label>ราคาประเมิน</mat-label>
           <input matInput
+            [class.num]="selectedUnit()?.appraisal_price != null"
             [value]="selectedUnit()?.appraisal_price != null
               ? (selectedUnit()!.appraisal_price | number:'1.0-0')
               : 'ยังไม่มีราคาประเมิน'"
@@ -129,12 +147,15 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   // Outputs
   unitSelected = output<Unit | null>();
   saleDateChanged = output<string>();
+  contractPriceChanged = output<number | null>();
 
   // Form controls
   unitControl = this.fb.control<number | null>(null);
   /** Text input control for the autocomplete field — value is display string, not unit ID */
   unitSearchControl = this.fb.control<string>('');
   saleDateControl = this.fb.control<Date>(new Date(), { nonNullable: true });
+  /** ราคาหน้าสัญญา — บังคับกรอก ต้อง > 0 */
+  contractPriceControl = this.fb.control<number | null>(null, [Validators.required, Validators.min(0.01)]);
 
   // Signals
   readonly units = signal<Unit[]>([]);
@@ -177,6 +198,13 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
         if (date) {
           this.saleDateChanged.emit(this.formatDate(date));
         }
+      })
+    );
+
+    // เมื่อเปลี่ยนราคาหน้าสัญญา → emit (parent ใช้ recalc expression formulas)
+    this.subs.push(
+      this.contractPriceControl.valueChanges.subscribe(price => {
+        this.contractPriceChanged.emit(price);
       })
     );
 
@@ -272,14 +300,21 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     return this.formatDate(this.saleDateControl.value);
   }
 
-  getFormValues(): { sale_date: string } {
+  getFormValues(): { sale_date: string; contract_price: number | null } {
     return {
       sale_date: this.getSaleDate(),
+      contract_price: this.contractPriceControl.value,
     };
   }
 
   isValid(): boolean {
-    const valid = !!this.selectedUnit();
+    // mark touched เพื่อแสดง error
+    this.contractPriceControl.markAsTouched();
+    this.contractPriceControl.updateValueAndValidity();
+
+    const hasUnit = !!this.selectedUnit();
+    const contractValid = this.contractPriceControl.valid;
+    const valid = hasUnit && contractValid;
     if (!valid) {
       this.focusFirstInvalid();
     }

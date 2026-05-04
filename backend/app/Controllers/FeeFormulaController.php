@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Services\FeeFormulaService;
+use App\Services\FormulaExpressionEvaluator;
 use CodeIgniter\HTTP\ResponseInterface;
 use RuntimeException;
 
@@ -10,6 +11,34 @@ class FeeFormulaController extends BaseController
 {
     private FeeFormulaService $svc;
     public function __construct() { $this->svc = new FeeFormulaService(); }
+
+    // GET /api/fee-formulas/variables — รายการตัวแปรที่ใช้ได้ในสูตร expression
+    public function variables(): ResponseInterface
+    {
+        return $this->response->setStatusCode(200)->setJSON([
+            'data' => FormulaExpressionEvaluator::getAvailableVariables(),
+        ]);
+    }
+
+    // POST /api/fee-formulas/validate-expression — ตรวจสูตรก่อนบันทึก
+    public function validateExpression(): ResponseInterface
+    {
+        $body = $this->request->getJSON(true) ?? [];
+        $expr = (string) ($body['expression'] ?? '');
+        $ev = new FormulaExpressionEvaluator();
+        $result = $ev->validate($expr);
+        return $this->response->setStatusCode(200)->setJSON($result);
+    }
+
+    // POST /api/fee-formulas/validate-boolean-expression — ตรวจเงื่อนไข boolean
+    public function validateBooleanExpression(): ResponseInterface
+    {
+        $body = $this->request->getJSON(true) ?? [];
+        $expr = (string) ($body['expression'] ?? '');
+        $ev = new FormulaExpressionEvaluator();
+        $result = $ev->validateBoolean($expr);
+        return $this->response->setStatusCode(200)->setJSON($result);
+    }
 
     private function canWrite(): bool { return in_array($this->request->user_role ?? '', ['admin', 'manager'], true); }
 
@@ -96,7 +125,7 @@ class FeeFormulaController extends BaseController
 
         $db   = \Config\Database::connect();
         $unit = $db->table('project_units pu')
-            ->select('pu.base_price, pu.appraisal_price, pu.unit_cost, pr.project_type')
+            ->select('pu.*, pr.project_type, pr.common_fee_rate, pr.electric_meter_fee, pr.water_meter_fee, pr.pool_budget_amount')
             ->join('projects pr', 'pr.id = pu.project_id', 'left')
             ->where('pu.id', $unitId)->get()->getRowArray();
 
@@ -105,10 +134,17 @@ class FeeFormulaController extends BaseController
         }
 
         $unitData = [
-            'base_price'      => (float) $unit['base_price'],
-            'appraisal_price' => $unit['appraisal_price'] !== null ? (float) $unit['appraisal_price'] : null,
-            'unit_cost'       => (float) $unit['unit_cost'],
-            'project_type'    => $unit['project_type'] ?? '',
+            'base_price'         => (float) $unit['base_price'],
+            'appraisal_price'    => $unit['appraisal_price'] !== null ? (float) $unit['appraisal_price'] : null,
+            'unit_cost'          => (float) $unit['unit_cost'],
+            'land_area_sqw'      => (float) ($unit['land_area_sqw'] ?? 0),
+            'area_sqm'           => (float) ($unit['area_sqm'] ?? 0),
+            'standard_budget'    => (float) ($unit['standard_budget'] ?? 0),
+            'project_type'       => $unit['project_type'] ?? '',
+            'common_fee_rate'    => (float) ($unit['common_fee_rate'] ?? 0),
+            'electric_meter_fee' => (float) ($unit['electric_meter_fee'] ?? 0),
+            'water_meter_fee'    => (float) ($unit['water_meter_fee'] ?? 0),
+            'pool_budget_amount' => (float) ($unit['pool_budget_amount'] ?? 0),
         ];
 
         $result = $this->svc->calculateForSalesEntry(
@@ -117,6 +153,7 @@ class FeeFormulaController extends BaseController
             $body['sale_date'] ?? date('Y-m-d'),
             isset($body['net_price']) ? (float) $body['net_price'] : null,
             isset($body['manual_input']) ? (float) $body['manual_input'] : null,
+            isset($body['contract_price']) ? (float) $body['contract_price'] : null,
         );
 
         return $this->response->setStatusCode(200)->setJSON($result);

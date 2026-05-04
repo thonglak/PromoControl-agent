@@ -24,11 +24,15 @@ class SalesTransactionService
         $projectId = (int) ($data['project_id'] ?? 0);
         $unitId = (int) ($data['unit_id'] ?? 0);
         $saleDate = $data['sale_date'] ?? date('Y-m-d');
+        $contractPrice = isset($data['contract_price']) && $data['contract_price'] !== '' ? (float) $data['contract_price'] : null;
         $items = $data['items'] ?? [];
         $createdBy = (int) ($data['created_by'] ?? 0);
 
         if ($projectId <= 0) throw new RuntimeException('กรุณาระบุ project_id');
         if ($unitId <= 0) throw new RuntimeException('กรุณาระบุ unit_id');
+        if ($contractPrice === null || $contractPrice <= 0) {
+            throw new RuntimeException('กรุณาระบุราคาหน้าสัญญา');
+        }
 
         $this->db->transBegin();
 
@@ -54,6 +58,7 @@ class SalesTransactionService
                 'total_cost' => $calculations['total_cost'],
                 'profit' => $calculations['profit'],
                 'sale_date' => $saleDate,
+                'contract_price' => $contractPrice,
                 'created_by' => $createdBy,
             ]);
 
@@ -90,11 +95,17 @@ class SalesTransactionService
         $projectId = (int) ($data['project_id'] ?? $transaction['project_id']);
         $unitId = (int) ($data['unit_id'] ?? $transaction['unit_id']);
         $saleDate = $data['sale_date'] ?? $transaction['sale_date'];
+        $contractPrice = array_key_exists('contract_price', $data) && $data['contract_price'] !== '' && $data['contract_price'] !== null
+            ? (float) $data['contract_price']
+            : (isset($transaction['contract_price']) ? (float) $transaction['contract_price'] : null);
         $items = $data['items'] ?? [];
         $createdBy = (int) ($data['created_by'] ?? $transaction['created_by']);
 
         if ($projectId <= 0) throw new RuntimeException('กรุณาระบุ project_id');
         if ($unitId <= 0) throw new RuntimeException('กรุณาระบุ unit_id');
+        if ($contractPrice === null || $contractPrice <= 0) {
+            throw new RuntimeException('กรุณาระบุราคาหน้าสัญญา');
+        }
 
         $this->db->transBegin();
 
@@ -132,6 +143,7 @@ class SalesTransactionService
                     'total_cost' => $calculations['total_cost'],
                     'profit' => $calculations['profit'],
                     'sale_date' => $saleDate,
+                    'contract_price' => $contractPrice,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
 

@@ -133,6 +133,7 @@ export class FeeFormulaListComponent implements OnInit {
       case 'base_price':      return 'ราคาขาย';
       case 'net_price':       return 'ราคาสุทธิ';
       case 'manual_input':    return 'กำหนดเอง';
+      case 'expression':      return 'นิพจน์';
       default:                return bf;
     }
   }
@@ -143,6 +144,7 @@ export class FeeFormulaListComponent implements OnInit {
       case 'base_price':      return 'bg-green-50 text-green-700';
       case 'net_price':       return 'bg-amber-50 text-amber-700';
       case 'manual_input':    return 'bg-purple-50 text-purple-700';
+      case 'expression':      return 'bg-indigo-50 text-indigo-700';
       default:                return 'bg-slate-100 text-slate-600';
     }
   }

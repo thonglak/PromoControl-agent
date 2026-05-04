@@ -137,6 +137,9 @@ class ProjectController extends BaseController
                 'approval_required'   => (bool) ($body['approval_required'] ?? false),
                 'allow_over_budget'   => (bool) ($body['allow_over_budget'] ?? false),
                 'pool_budget_amount'  => max(0, (float) ($body['pool_budget_amount'] ?? 0)),
+                'common_fee_rate'     => max(0, (float) ($body['common_fee_rate'] ?? 0)),
+                'electric_meter_fee'  => max(0, (float) ($body['electric_meter_fee'] ?? 0)),
+                'water_meter_fee'     => max(0, (float) ($body['water_meter_fee'] ?? 0)),
                 'status'              => 'active',
                 'created_at'          => $now,
                 'updated_at'          => $now,
@@ -193,6 +196,9 @@ class ProjectController extends BaseController
         if (isset($body['approval_required']))  $updateData['approval_required']  = (bool) $body['approval_required'];
         if (isset($body['allow_over_budget']))  $updateData['allow_over_budget']  = (bool) $body['allow_over_budget'];
         if (isset($body['pool_budget_amount'])) $updateData['pool_budget_amount'] = max(0, (float) $body['pool_budget_amount']);
+        if (isset($body['common_fee_rate']))    $updateData['common_fee_rate']    = max(0, (float) $body['common_fee_rate']);
+        if (isset($body['electric_meter_fee'])) $updateData['electric_meter_fee'] = max(0, (float) $body['electric_meter_fee']);
+        if (isset($body['water_meter_fee']))    $updateData['water_meter_fee']    = max(0, (float) $body['water_meter_fee']);
         if (isset($body['status']))             $updateData['status']             = (string) $body['status'];
 
         $this->projectModel->update($id, $updateData);

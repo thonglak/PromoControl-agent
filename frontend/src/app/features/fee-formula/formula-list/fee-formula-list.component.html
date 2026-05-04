@@ -48,16 +48,28 @@
           </td>
         </ng-container>
 
-        <!-- Default Rate -->
+        <!-- Default Rate / Expression -->
         <ng-container matColumnDef="default_rate">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">อัตรา</th>
-          <td mat-cell *matCellDef="let r" class="!text-sm !text-right !text-slate-700 !font-medium">{{ formatRate(r.default_rate) }}</td>
+          <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">อัตรา / สูตร</th>
+          <td mat-cell *matCellDef="let r" class="!text-sm !text-slate-700">
+            @if (r.base_field === 'expression') {
+              <code class="font-mono text-xs px-2 py-0.5 bg-indigo-50 text-indigo-800 rounded border border-indigo-100" [matTooltip]="r.formula_expression">{{ r.formula_expression }}</code>
+            } @else {
+              <span class="num">{{ formatRate(r.default_rate) }}</span>
+            }
+          </td>
         </ng-container>
 
         <!-- Buyer Share -->
         <ng-container matColumnDef="buyer_share">
           <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">สัดส่วนผู้ซื้อ</th>
-          <td mat-cell *matCellDef="let r" class="!text-sm !text-right !text-slate-700">{{ formatShare(r.buyer_share) }}</td>
+          <td mat-cell *matCellDef="let r" class="!text-sm num">
+            @if (r.base_field === 'expression') {
+              <span class="text-slate-400">—</span>
+            } @else {
+              {{ formatShare(r.buyer_share) }}
+            }
+          </td>
         </ng-container>
 
         <!-- Policies -->

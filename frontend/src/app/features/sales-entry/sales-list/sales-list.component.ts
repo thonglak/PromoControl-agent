@@ -32,6 +32,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: 'sale_no',       label: 'เลขที่ขาย',  visible: true },
   { key: 'unit_code',     label: 'ยูนิต',      visible: true },
   { key: 'sale_date',     label: 'วันที่ขาย',  visible: true },
+  { key: 'contract_price', label: 'ราคาหน้าสัญญา', visible: true },
   { key: 'net_price',     label: 'ราคาสุทธิ',  visible: true },
   { key: 'profit',        label: 'กำไร',       visible: true },
   { key: 'status',        label: 'สถานะ',      visible: true },
@@ -174,6 +175,18 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               <ng-container matColumnDef="sale_date">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">วันที่ขาย</th>
                 <td mat-cell *matCellDef="let row" class="!text-sm !text-slate-500 whitespace-nowrap">{{ row.sale_date | thaiDate }}</td>
+              </ng-container>
+
+              <!-- ราคาหน้าสัญญา -->
+              <ng-container matColumnDef="contract_price">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">ราคาหน้าสัญญา</th>
+                <td mat-cell *matCellDef="let row" class="!text-right !text-sm !text-slate-700 tabular-nums">
+                  @if (row.contract_price != null) {
+                    ฿{{ row.contract_price | number:'1.0-0' }}
+                  } @else {
+                    <span class="text-slate-400">—</span>
+                  }
+                </td>
               </ng-container>
 
               <!-- ราคาสุทธิ -->

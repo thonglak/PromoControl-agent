@@ -13,6 +13,9 @@ export interface Project {
   approval_required: boolean | number;
   allow_over_budget: boolean | number;
   pool_budget_amount: number;
+  common_fee_rate?: number;
+  electric_meter_fee?: number;
+  water_meter_fee?: number;
   unit_count?: number;
 }
 
@@ -24,6 +27,9 @@ export interface ProjectCreatePayload {
   approval_required?: boolean;
   allow_over_budget?: boolean;
   pool_budget_amount?: number;
+  common_fee_rate?: number;
+  electric_meter_fee?: number;
+  water_meter_fee?: number;
 }
 
 export interface ProjectUpdatePayload {
@@ -34,6 +40,9 @@ export interface ProjectUpdatePayload {
   approval_required?: boolean;
   allow_over_budget?: boolean;
   pool_budget_amount?: number;
+  common_fee_rate?: number;
+  electric_meter_fee?: number;
+  water_meter_fee?: number;
 }
 
 @Injectable({ providedIn: 'root' })

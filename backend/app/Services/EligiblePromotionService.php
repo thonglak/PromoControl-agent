@@ -12,21 +12,23 @@ use RuntimeException;
 class EligiblePromotionService
 {
     private BaseConnection $db;
+    private FormulaExpressionEvaluator $evaluator;
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
+        $this->evaluator = new FormulaExpressionEvaluator();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // Public: ดึงรายการ eligible แยก panel_a / panel_b
     // ═══════════════════════════════════════════════════════════════════════
 
-    public function getEligibleItems(int $projectId, int $unitId, string $saleDate): array
+    public function getEligibleItems(int $projectId, int $unitId, string $saleDate, ?float $contractPrice = null): array
     {
-        // โหลดข้อมูลยูนิต
+        // โหลดข้อมูลยูนิต + project-level vars (สำหรับ expression formulas)
         $unit = $this->db->table('project_units pu')
-            ->select('pu.*, pr.project_type, pr.approval_required')
+            ->select('pu.*, pr.project_type, pr.approval_required, pr.common_fee_rate, pr.electric_meter_fee, pr.water_meter_fee, pr.pool_budget_amount')
             ->join('projects pr', 'pr.id = pu.project_id', 'left')
             ->where('pu.id', $unitId)
             ->get()->getRowArray();
@@ -66,7 +68,7 @@ class EligiblePromotionService
             }
 
             // สร้าง response item
-            $responseItem = $this->buildResponseItem($item, $unit, $saleDate, $formulaMap[$id] ?? null);
+            $responseItem = $this->buildResponseItem($item, $unit, $saleDate, $formulaMap[$id] ?? null, $contractPrice);
 
             if ($item['is_unit_standard']) {
                 $panelA[] = $responseItem;
@@ -210,7 +212,7 @@ class EligiblePromotionService
     // Private: Build response item
     // ═══════════════════════════════════════════════════════════════════════
 
-    private function buildResponseItem(array $item, array $unit, string $saleDate, ?array $formula): array
+    private function buildResponseItem(array $item, array $unit, string $saleDate, ?array $formula, ?float $contractPrice = null): array
     {
         $result = [
             'id'                 => (int) $item['id'],
@@ -227,7 +229,7 @@ class EligiblePromotionService
 
         // สำหรับ calculated items — pre-calculate ค่า
         if ($item['value_mode'] === 'calculated' && $formula) {
-            $calcResult = $this->calculateFormula($formula, $unit, $saleDate);
+            $calcResult = $this->calculateFormula($formula, $unit, $saleDate, $contractPrice);
             $result['fee_formula']            = $calcResult['fee_formula'];
             $result['calculated_value']       = $calcResult['calculated_value'];
             $result['effective_rate']         = $calcResult['effective_rate'];
@@ -250,7 +252,7 @@ class EligiblePromotionService
     // Private: Calculate formula + policy matching
     // ═══════════════════════════════════════════════════════════════════════
 
-    private function calculateFormula(array $formula, array $unit, string $saleDate): array
+    private function calculateFormula(array $formula, array $unit, string $saleDate, ?float $contractPrice = null): array
     {
         $warnings = [];
         $baseField = $formula['base_field'];
@@ -259,6 +261,8 @@ class EligiblePromotionService
         $baseAmount = 0;
         $baseLabel = '';
         $needsManualInput = false;
+        $isExpression = false;
+        $expressionResult = null;
 
         switch ($baseField) {
             case 'appraisal_price':
@@ -288,6 +292,31 @@ class EligiblePromotionService
                 $needsManualInput = true;
                 $baseAmount = 0;
                 break;
+
+            case 'expression':
+                $isExpression = true;
+                $baseLabel = 'นิพจน์';
+                $expr = trim((string) ($formula['formula_expression'] ?? ''));
+                $usedVars = $this->evaluator->extractVariables($expr);
+                $needsContract = in_array('contract_price', $usedVars, true);
+
+                // ถ้าสูตรใช้ contract_price แต่ยังไม่มี → mark warning
+                if ($needsContract && ($contractPrice === null || $contractPrice <= 0)) {
+                    $warnings[] = 'รอกรอกราคาหน้าสัญญา';
+                    $expressionResult = null;
+                    $baseAmount = 0;
+                } else {
+                    try {
+                        $context = $this->buildExpressionContext($unit, $contractPrice);
+                        $expressionResult = $this->evaluator->evaluate($expr, $context);
+                        $baseAmount = $expressionResult;
+                    } catch (\Throwable $e) {
+                        $warnings[] = 'คำนวณสูตรไม่สำเร็จ: ' . $e->getMessage();
+                        $expressionResult = null;
+                        $baseAmount = 0;
+                    }
+                }
+                break;
         }
 
         // 2. Match policies — ตรวจทุก policy แล้วระบุ is_matched
@@ -303,7 +332,7 @@ class EligiblePromotionService
             // ตรวจช่วงเวลา
             $inDateRange = ($saleDate >= $policy['effective_from'] && $saleDate <= $policy['effective_to']);
 
-            // ตรวจ conditions
+            // ตรวจ conditions — รองรับทั้ง expression และ legacy JSON
             $conditions = json_decode($policy['conditions'] ?? '{}', true) ?: [];
             $conditionsPassed = true;
             $matchReasons = [];
@@ -315,24 +344,43 @@ class EligiblePromotionService
                 $matchReasons[] = "ช่วงเวลาไม่ตรง ({$policy['effective_from']} ~ {$policy['effective_to']}) ✗";
             }
 
-            if (isset($conditions['max_base_price'])) {
-                $threshold = (float) $conditions['max_base_price'];
-                $actual    = (float) $unit['base_price'];
-                if ($actual <= $threshold) {
-                    $matchReasons[] = 'base_price ' . number_format($actual, 0, '.', ',') . ' ≤ ' . number_format($threshold, 0, '.', ',') . ' ✓';
-                } else {
+            // Expression-based condition (มาก่อน — ถ้ามีจะข้าม legacy)
+            if (!empty($policy['condition_expression'])) {
+                $condExpr = $policy['condition_expression'];
+                try {
+                    $exprContext = $this->buildExpressionContext($unit, $contractPrice);
+                    $boolResult = $this->evaluator->evaluateBoolean($condExpr, $exprContext);
+                    if ($boolResult) {
+                        $matchReasons[] = "เงื่อนไข [{$condExpr}] = true ✓";
+                    } else {
+                        $conditionsPassed = false;
+                        $matchReasons[] = "เงื่อนไข [{$condExpr}] = false ✗";
+                    }
+                } catch (\Throwable $e) {
                     $conditionsPassed = false;
-                    $matchReasons[] = 'base_price ' . number_format($actual, 0, '.', ',') . ' > ' . number_format($threshold, 0, '.', ',') . ' ✗';
+                    $matchReasons[] = 'เงื่อนไข error: ' . $e->getMessage();
                 }
-            }
+            } else {
+                // Legacy JSON conditions
+                if (isset($conditions['max_base_price'])) {
+                    $threshold = (float) $conditions['max_base_price'];
+                    $actual    = (float) $unit['base_price'];
+                    if ($actual <= $threshold) {
+                        $matchReasons[] = 'base_price ' . number_format($actual, 0, '.', ',') . ' ≤ ' . number_format($threshold, 0, '.', ',') . ' ✓';
+                    } else {
+                        $conditionsPassed = false;
+                        $matchReasons[] = 'base_price ' . number_format($actual, 0, '.', ',') . ' > ' . number_format($threshold, 0, '.', ',') . ' ✗';
+                    }
+                }
 
-            if (isset($conditions['project_types']) && is_array($conditions['project_types'])) {
-                $projectType = $unit['project_type'] ?? '';
-                if (in_array($projectType, $conditions['project_types'], true)) {
-                    $matchReasons[] = "project_type '{$projectType}' ตรง ✓";
-                } else {
-                    $conditionsPassed = false;
-                    $matchReasons[] = "project_type '{$projectType}' ไม่ตรง ✗";
+                if (isset($conditions['project_types']) && is_array($conditions['project_types'])) {
+                    $projectType = $unit['project_type'] ?? '';
+                    if (in_array($projectType, $conditions['project_types'], true)) {
+                        $matchReasons[] = "project_type '{$projectType}' ตรง ✓";
+                    } else {
+                        $conditionsPassed = false;
+                        $matchReasons[] = "project_type '{$projectType}' ไม่ตรง ✗";
+                    }
                 }
             }
 
@@ -343,6 +391,8 @@ class EligiblePromotionService
                 'policy_name'          => $policy['policy_name'],
                 'override_rate'        => (float) $policy['override_rate'],
                 'override_buyer_share' => $policy['override_buyer_share'] !== null ? (float) $policy['override_buyer_share'] : null,
+                'override_expression'  => $policy['override_expression'] ?? null,
+                'condition_expression' => $policy['condition_expression'] ?? null,
                 'priority'             => (int) $policy['priority'],
                 'effective_from'       => $policy['effective_from'],
                 'effective_to'         => $policy['effective_to'],
@@ -357,14 +407,29 @@ class EligiblePromotionService
             }
         }
 
-        // 3. Effective rate
+        // 3. Effective rate (legacy — ใช้กรณี expression mode หรือ override_rate ถ้าไม่มี override_expression)
         $effectiveRate = $appliedPolicy ? (float) $appliedPolicy['override_rate'] : $defaultRate;
         $effectiveBuyerShare = ($appliedPolicy && $appliedPolicy['override_buyer_share'] !== null)
             ? (float) $appliedPolicy['override_buyer_share']
             : $buyerShare;
 
         // 4. คำนวณ
-        $calculatedValue = $baseAmount * $effectiveRate * $effectiveBuyerShare;
+        if ($isExpression) {
+            // expression mode: ใช้ override_expression ของ policy ถ้ามี + matched
+            if ($appliedPolicy && !empty($appliedPolicy['override_expression'])) {
+                try {
+                    $exprContext = $this->buildExpressionContext($unit, $contractPrice);
+                    $calculatedValue = $this->evaluator->evaluate($appliedPolicy['override_expression'], $exprContext);
+                } catch (\Throwable $e) {
+                    $warnings[] = 'override expression error: ' . $e->getMessage();
+                    $calculatedValue = $expressionResult ?? 0;
+                }
+            } else {
+                $calculatedValue = $expressionResult ?? 0;
+            }
+        } else {
+            $calculatedValue = $baseAmount * $effectiveRate * $effectiveBuyerShare;
+        }
 
         // 5. Cap ที่ max_value
         $maxValue = $formula['item_max_value'] ?? null;
@@ -384,10 +449,21 @@ class EligiblePromotionService
         $calculatedValue = round($calculatedValue, 2);
 
         // 6. สร้าง formula_display (ภาษาไทย)
-        $formulaDisplay = $this->buildFormulaDisplay(
-            $baseLabel, $baseAmount, $effectiveRate, $effectiveBuyerShare,
-            $calculatedValue, $appliedPolicy, $needsManualInput, $capped, $maxValue
-        );
+        if ($isExpression) {
+            $formulaDisplay = $this->buildExpressionDisplay(
+                $formula['formula_expression'] ?? '',
+                $expressionResult,
+                $calculatedValue,
+                $capped,
+                $maxValue,
+                count($warnings) > 0
+            );
+        } else {
+            $formulaDisplay = $this->buildFormulaDisplay(
+                $baseLabel, $baseAmount, $effectiveRate, $effectiveBuyerShare,
+                $calculatedValue, $appliedPolicy, $needsManualInput, $capped, $maxValue
+            );
+        }
 
         return [
             'fee_formula' => [
@@ -396,6 +472,7 @@ class EligiblePromotionService
                 'default_rate'       => $defaultRate,
                 'buyer_share'        => $buyerShare,
                 'manual_input_label' => $formula['manual_input_label'] ?? null,
+                'formula_expression' => $formula['formula_expression'] ?? null,
                 'description'        => $formula['description'] ?? null,
                 'policies'           => $policiesResult,
             ],
@@ -451,5 +528,51 @@ class EligiblePromotionService
             return number_format($percent, 0) . '%';
         }
         return rtrim(rtrim(number_format($percent, 4, '.', ''), '0'), '.') . '%';
+    }
+
+    /**
+     * สร้าง context ของตัวแปรทั้งหมดสำหรับ evaluator
+     * — รวม project + unit + transaction
+     */
+    private function buildExpressionContext(array $unit, ?float $contractPrice): array
+    {
+        return [
+            // Project-level
+            'common_fee_rate'    => (float) ($unit['common_fee_rate'] ?? 0),
+            'electric_meter_fee' => (float) ($unit['electric_meter_fee'] ?? 0),
+            'water_meter_fee'    => (float) ($unit['water_meter_fee'] ?? 0),
+            'pool_budget_amount' => (float) ($unit['pool_budget_amount'] ?? 0),
+
+            // Unit-level
+            'base_price'      => (float) ($unit['base_price'] ?? 0),
+            'unit_cost'       => (float) ($unit['unit_cost'] ?? 0),
+            'appraisal_price' => (float) ($unit['appraisal_price'] ?? 0),
+            'land_area_sqw'   => (float) ($unit['land_area_sqw'] ?? 0),
+            'area_sqm'        => (float) ($unit['area_sqm'] ?? 0),
+            'standard_budget' => (float) ($unit['standard_budget'] ?? 0),
+
+            // Transaction-level
+            'contract_price' => (float) ($contractPrice ?? 0),
+            'net_price'      => (float) ($unit['base_price'] ?? 0), // fallback ใช้ราคาขาย
+        ];
+    }
+
+    /**
+     * สร้างข้อความแสดงสูตรสำหรับโหมด expression
+     */
+    private function buildExpressionDisplay(
+        string $expression,
+        ?float $result,
+        float $calculatedValue,
+        bool $capped,
+        $maxValue,
+        bool $hasWarning
+    ): string {
+        if ($hasWarning || $result === null) {
+            return "นิพจน์: {$expression} — รอข้อมูลครบ";
+        }
+        $valueFormatted = number_format($calculatedValue, 0, '.', ',');
+        $cappedText = $capped ? ' [จำกัดเพดาน ' . number_format((float) $maxValue, 0, '.', ',') . ']' : '';
+        return "{$expression} = {$valueFormatted}{$cappedText}";
     }
 }

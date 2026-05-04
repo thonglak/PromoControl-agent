@@ -53,10 +53,11 @@ export class FeeFormulaTesterComponent implements OnInit {
 
   // ── Single Test ──
   singleForm = this.fb.group({
-    formulaId:   [null as number | null],
-    unitId:      [null as number | null, Validators.required],
-    saleDate:    [new Date() as Date | null, Validators.required],
-    manualInput: [null as number | null],
+    formulaId:     [null as number | null],
+    unitId:        [null as number | null, Validators.required],
+    saleDate:      [new Date() as Date | null, Validators.required],
+    manualInput:   [null as number | null],
+    contractPrice: [null as number | null],
   });
   testResult  = signal<TestResult | null>(null);
   calculating = signal(false);
@@ -82,6 +83,18 @@ export class FeeFormulaTesterComponent implements OnInit {
     return f?.base_field === 'manual_input';
   });
 
+  /** ตรวจว่ามีสูตร expression ที่ใช้ contract_price ไหม → ต้องแสดงช่องกรอก */
+  needsContractPrice = computed(() => {
+    const fid = this.singleForm.get('formulaId')?.value;
+    const formulas = fid
+      ? this.formulas().filter(f => f.id === fid)
+      : this.formulas();
+    return formulas.some(f =>
+      f.base_field === 'expression' &&
+      (f.formula_expression ?? '').includes('contract_price')
+    );
+  });
+
   get projectId(): number { return Number(this.project.selectedProject()?.id ?? 0); }
 
   ngOnInit(): void {
@@ -104,6 +117,7 @@ export class FeeFormulaTesterComponent implements OnInit {
     };
     if (v.formulaId) params.formula_id = v.formulaId;
     if (v.manualInput) params.manual_input = v.manualInput;
+    if (v.contractPrice) params.contract_price = v.contractPrice;
 
     this.api.test(params).subscribe({
       next: result => { this.testResult.set(result); this.calculating.set(false); },
@@ -140,6 +154,14 @@ export class FeeFormulaTesterComponent implements OnInit {
 
   formatCurrency(v: number): string {
     return '฿' + v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  formatNumber(v: number): string {
+    // ตัวเลขเต็ม → ไม่มีทศนิยม, ทศนิยม → 2 หลัก
+    if (Number.isInteger(v)) {
+      return v.toLocaleString('th-TH');
+    }
+    return v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   formatRate(decimal: number): string {

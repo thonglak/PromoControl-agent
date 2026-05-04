@@ -45,6 +45,15 @@
               </mat-form-field>
             }
 
+            @if (needsContractPrice()) {
+              <mat-form-field appearance="outline" class="w-48">
+                <mat-label>ราคาหน้าสัญญา</mat-label>
+                <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+                <input matInput currencyMask formControlName="contractPrice" />
+                <mat-hint class="!text-xs">สำหรับสูตร expression ที่ใช้ตัวแปรนี้</mat-hint>
+              </mat-form-field>
+            }
+
             <button mat-flat-button color="primary" (click)="calculate()" [disabled]="calculating()" class="h-14">
               @if (calculating()) { <mat-spinner diameter="18" class="!inline-block mr-1" /> }
               คำนวณ
@@ -75,20 +84,75 @@
             <div class="divide-y divide-slate-100">
               @for (item of testResult()!.results; track item.promotion_item_id) {
                 <div class="p-4">
-                  <div class="flex items-center justify-between mb-2">
+                  <!-- Header: ชื่อรายการ + ผลรวม -->
+                  <div class="flex items-center justify-between mb-3">
                     <span class="font-medium text-slate-800">{{ item.promotion_item_name }}</span>
-                    <span class="text-lg font-semibold text-slate-800">{{ formatCurrency(item.calculated_value) }}</span>
+                    <span class="text-xl font-bold tabular-nums" [class.text-slate-800]="!item.expression_detail?.error" [class.text-red-600]="item.expression_detail?.error">
+                      {{ formatCurrency(item.calculated_value) }}
+                    </span>
                   </div>
-                  <div class="flex flex-wrap gap-4 text-xs text-slate-500">
-                    <span>ฐาน: {{ formatCurrency(item.formula.base_amount) }}</span>
-                    <span>อัตรา: {{ formatRate(item.effective_rate) }}</span>
-                    <span>สัดส่วน: {{ formatShare(item.effective_buyer_share) }}</span>
-                    @if (item.applied_policy) {
-                      <span class="text-blue-600">Policy: {{ item.applied_policy.policy_name }}</span>
+
+                  <!-- ── Expression mode: แสดงการแทนค่าแบบขั้นตอน ── -->
+                  @if (item.formula.base_field === 'expression' && item.expression_detail; as ed) {
+                    @if (ed.error) {
+                      <div class="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+                        ✗ {{ ed.error }}
+                      </div>
                     } @else {
-                      <span class="text-slate-400">ไม่มี Policy</span>
+                      <!-- การคำนวณแบบขั้นตอน -->
+                      <div class="bg-gradient-to-r from-indigo-50/50 to-blue-50/50 border border-indigo-100 rounded-lg overflow-hidden">
+                        <table class="w-full text-sm">
+                          <tbody>
+                            <tr class="border-b border-indigo-100">
+                              <td class="px-3 py-2 text-xs font-semibold text-indigo-700 uppercase tracking-wide w-24 align-top">สูตร</td>
+                              <td class="px-3 py-2 font-mono text-sm text-slate-800">{{ ed.expression }}</td>
+                            </tr>
+                            <tr class="border-b border-indigo-100">
+                              <td class="px-3 py-2 text-xs font-semibold text-indigo-700 uppercase tracking-wide align-top">แทนค่า</td>
+                              <td class="px-3 py-2 font-mono text-sm text-slate-800">{{ ed.substituted }}</td>
+                            </tr>
+                            <tr>
+                              <td class="px-3 py-2 text-xs font-semibold text-indigo-700 uppercase tracking-wide">ผลลัพธ์</td>
+                              <td class="px-3 py-2 font-mono text-base font-bold text-indigo-700 num">= {{ formatCurrency(item.calculated_value) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <!-- ตัวแปรที่ใช้ -->
+                      @if (ed.variables_used.length > 0) {
+                        <div class="mt-3">
+                          <div class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">ตัวแปรที่ใช้ในสูตร</div>
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                            @for (v of ed.variables_used; track v.name) {
+                              <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs">
+                                <div class="flex items-center gap-2 min-w-0">
+                                  <code class="font-mono text-indigo-700 flex-shrink-0">{{ v.name }}</code>
+                                  <span class="text-slate-500 truncate">{{ v.label }}</span>
+                                </div>
+                                <span class="font-semibold text-slate-800 num flex-shrink-0">
+                                  {{ formatNumber(v.value) }}
+                                  <span class="text-slate-400 font-normal text-[10px] ml-0.5">{{ v.unit }}</span>
+                                </span>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      }
                     }
-                  </div>
+                  } @else {
+                    <!-- ── Legacy mode: แสดงรูปแบบเดิม ── -->
+                    <div class="flex flex-wrap gap-4 text-xs text-slate-500">
+                      <span>ฐาน: {{ formatCurrency(item.formula.base_amount) }}</span>
+                      <span>อัตรา: {{ formatRate(item.effective_rate) }}</span>
+                      <span>สัดส่วน: {{ formatShare(item.effective_buyer_share) }}</span>
+                      @if (item.applied_policy) {
+                        <span class="text-blue-600">Policy: {{ item.applied_policy.policy_name }}</span>
+                      } @else {
+                        <span class="text-slate-400">ไม่มี Policy</span>
+                      }
+                    </div>
+                  }
                 </div>
               }
             </div>

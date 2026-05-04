@@ -77,8 +77,11 @@ $routes->group('api', static function (RouteCollection $routes): void {
 
     // Fee Formulas (สูตรคำนวณ)
     $routes->group('fee-formulas', static function (RouteCollection $routes): void {
-        $routes->get('/',        'FeeFormulaController::index');
-        $routes->get('(:num)',   'FeeFormulaController::show/$1');
+        $routes->get('/',          'FeeFormulaController::index');
+        $routes->get('variables',  'FeeFormulaController::variables');
+        $routes->post('validate-expression', 'FeeFormulaController::validateExpression');
+        $routes->post('validate-boolean-expression', 'FeeFormulaController::validateBooleanExpression');
+        $routes->get('(:num)',     'FeeFormulaController::show/$1');
     });
     $routes->group('fee-formulas', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->post('/',         'FeeFormulaController::create');

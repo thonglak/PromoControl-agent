@@ -98,6 +98,35 @@ export interface ProjectFormDialogData {
           }
         </mat-form-field>
 
+        <!-- Common fee rate -->
+        <mat-form-field appearance="outline">
+          <mat-label>อัตราค่าส่วนกลาง</mat-label>
+          <input matInput currencyMask [options]="{ precision: 2 }" formControlName="common_fee_rate" placeholder="0.00">
+          @if (form.get('common_fee_rate')?.hasError('min')) {
+            <mat-error>อัตราค่าส่วนกลางต้องไม่ติดลบ</mat-error>
+          }
+        </mat-form-field>
+
+        <!-- Electric meter install fee -->
+        <mat-form-field appearance="outline">
+          <mat-label>ค่าติดตั้งมิเตอร์ไฟฟ้า</mat-label>
+          <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+          <input matInput currencyMask [options]="{ precision: 2 }" formControlName="electric_meter_fee" placeholder="0.00">
+          @if (form.get('electric_meter_fee')?.hasError('min')) {
+            <mat-error>ค่าติดตั้งมิเตอร์ไฟฟ้าต้องไม่ติดลบ</mat-error>
+          }
+        </mat-form-field>
+
+        <!-- Water meter install fee -->
+        <mat-form-field appearance="outline">
+          <mat-label>ค่าติดตั้งมิเตอร์ประปา</mat-label>
+          <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+          <input matInput currencyMask [options]="{ precision: 2 }" formControlName="water_meter_fee" placeholder="0.00">
+          @if (form.get('water_meter_fee')?.hasError('min')) {
+            <mat-error>ค่าติดตั้งมิเตอร์ประปาต้องไม่ติดลบ</mat-error>
+          }
+        </mat-form-field>
+
         <!-- Approval required -->
         <div class="flex items-center gap-2">
           <mat-checkbox formControlName="approval_required" color="primary">
@@ -147,6 +176,9 @@ export class ProjectFormDialogComponent {
     status:       [this.data.project?.status ?? 'active'],
     location:     [this.data.project?.location ?? ''],
     pool_budget_amount:  [this.data.project?.pool_budget_amount ?? 0, Validators.min(0)],
+    common_fee_rate:     [this.data.project?.common_fee_rate ?? 0, Validators.min(0)],
+    electric_meter_fee:  [this.data.project?.electric_meter_fee ?? 0, Validators.min(0)],
+    water_meter_fee:     [this.data.project?.water_meter_fee ?? 0, Validators.min(0)],
     approval_required:   [!!Number(this.data.project?.approval_required)],
     allow_over_budget:   [!!Number(this.data.project?.allow_over_budget)],
   });
@@ -168,6 +200,9 @@ export class ProjectFormDialogComponent {
           project_type:       val.project_type!,
           location:           val.location || undefined,
           pool_budget_amount: val.pool_budget_amount ?? 0,
+          common_fee_rate:    val.common_fee_rate ?? 0,
+          electric_meter_fee: val.electric_meter_fee ?? 0,
+          water_meter_fee:    val.water_meter_fee ?? 0,
           approval_required:  !!val.approval_required,
           allow_over_budget:  !!val.allow_over_budget,
         })
@@ -177,6 +212,9 @@ export class ProjectFormDialogComponent {
           status:             val.status!,
           location:           val.location || undefined,
           pool_budget_amount: val.pool_budget_amount ?? 0,
+          common_fee_rate:    val.common_fee_rate ?? 0,
+          electric_meter_fee: val.electric_meter_fee ?? 0,
+          water_meter_fee:    val.water_meter_fee ?? 0,
           approval_required:  !!val.approval_required,
           allow_over_budget:  !!val.allow_over_budget,
         });

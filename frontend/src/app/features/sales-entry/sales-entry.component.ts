@@ -48,7 +48,8 @@ function toISODateStr(d: any): string {
           <!-- Section 1: ข้อมูลยูนิต -->
           <app-unit-info-section
             (unitSelected)="onUnitSelected($event)"
-            (saleDateChanged)="onSaleDateChanged($event)" />
+            (saleDateChanged)="onSaleDateChanged($event)"
+            (contractPriceChanged)="onContractPriceChanged($event)" />
 
           <!-- Section 2: งบประมาณ -->
           <app-budget-overview-section [unitId]="selectedUnitId()" [editReversal]="editReversal()" />
@@ -138,9 +139,11 @@ export class SalesEntryComponent implements OnInit {
   readonly selectedUnit = signal<Unit | null>(null);
   readonly selectedUnitId = computed(() => this.selectedUnit()?.id ?? 0);
   readonly saleDate = signal<string>(this.formatToday());
+  readonly contractPrice = signal<number | null>(null);
   readonly eligibleData = signal<EligibleResponse | null>(null);
   readonly loadingEligible = signal(false);
   readonly saving = signal(false);
+  private contractPriceRecalcTimer: any = null;
 
   // Panel rows
   readonly currentPanelARows = signal<PanelARow[]>([]);
@@ -324,7 +327,7 @@ export class SalesEntryComponent implements OnInit {
     this.currentPanelARows.set([]);
     this.currentPanelBRows.set([]);
     if (unit) {
-      this.loadEligibleItems(unit.id, this.saleDate());
+      this.loadEligibleItems(unit.id, this.saleDate(), this.contractPrice());
     }
   }
 
@@ -332,8 +335,31 @@ export class SalesEntryComponent implements OnInit {
     this.saleDate.set(date);
     const uid = this.selectedUnitId();
     if (uid > 0) {
-      this.loadEligibleItems(uid, date);
+      this.loadEligibleItems(uid, date, this.contractPrice());
     }
+  }
+
+  /** เรียกเมื่อผู้ใช้เปลี่ยน ราคาหน้าสัญญา — debounce 500ms กัน spam */
+  onContractPriceChanged(price: number | null): void {
+    this.contractPrice.set(price);
+    const uid = this.selectedUnitId();
+    if (uid <= 0) return;
+    if (!this.eligibleHasExpressionWithContract()) return; // ไม่มี formula ที่ใช้ contract_price → ไม่ต้อง recalc
+    if (this.contractPriceRecalcTimer) clearTimeout(this.contractPriceRecalcTimer);
+    this.contractPriceRecalcTimer = setTimeout(() => {
+      this.loadEligibleItems(uid, this.saleDate(), price);
+    }, 500);
+  }
+
+  /** ตรวจว่า eligible items ที่โหลดอยู่ มีอันไหนใช้ expression + contract_price ไหม */
+  private eligibleHasExpressionWithContract(): boolean {
+    const data = this.eligibleData();
+    if (!data) return false;
+    const items = [...(data.panel_a ?? []), ...(data.panel_b ?? [])];
+    return items.some((it: any) =>
+      it.fee_formula?.base_field === 'expression' &&
+      (it.fee_formula?.formula_expression ?? '').includes('contract_price')
+    );
   }
 
   onPanelAItemsChanged(rows: PanelARow[]): void {
@@ -413,13 +439,14 @@ export class SalesEntryComponent implements OnInit {
 
   private executeSave(
     unit: Unit,
-    formValues: { sale_date: string },
+    formValues: { sale_date: string; contract_price: number | null },
     items: any[]
   ): void {
     const payload = {
       project_id: this.projectId(),
       unit_id: unit.id,
       sale_date: formValues.sale_date,
+      contract_price: formValues.contract_price,
       items: items.map(i => ({
         promotion_item_id: i.promotion_item_id,
         used_value: i.used_value,
@@ -504,12 +531,12 @@ export class SalesEntryComponent implements OnInit {
     budgetSection.updatePendingUsed(pending);
   }
 
-  private loadEligibleItems(unitId: number, saleDate: string): void {
+  private loadEligibleItems(unitId: number, saleDate: string, contractPrice: number | null = null): void {
     const pid = this.projectId();
     if (pid <= 0) return;
 
     this.loadingEligible.set(true);
-    this.salesSvc.getEligibleItems(pid, unitId, saleDate).subscribe({
+    this.salesSvc.getEligibleItems(pid, unitId, saleDate, contractPrice).subscribe({
       next: data => {
         this.eligibleData.set(data);
         this.loadingEligible.set(false);
@@ -550,6 +577,11 @@ export class SalesEntryComponent implements OnInit {
           if (tx.sale_date) {
             unitInfo.saleDateControl.setValue(new Date(tx.sale_date + 'T00:00:00'));
             this.saleDate.set(tx.sale_date);
+          }
+
+          // pre-fill ราคาหน้าสัญญา (edit mode)
+          if (tx.contract_price != null) {
+            unitInfo.contractPriceControl.setValue(Number(tx.contract_price));
           }
 
           // เซ็ต unit_id (Number) ก่อน loadUnitsForProject เพื่อซิงค์ selectedUnit + display text
