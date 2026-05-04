@@ -3,12 +3,32 @@
   <!-- Page header -->
   <app-page-header title="ตั้งค่า API Config" subtitle="จัดการการเชื่อมต่อ API ภายนอก (Narai Connect)">
     <div actions class="flex items-center gap-2">
+      <button mat-stroked-button (click)="exportJson()"
+              matTooltip="ส่งออก API Config ของโครงการเป็นไฟล์ JSON"
+              class="flex items-center gap-2">
+        <app-icon name="arrow-down-tray" class="w-4 h-4" /> ส่งออก JSON
+      </button>
       @if (canWrite()) {
+        <button mat-stroked-button (click)="triggerImport()"
+                [disabled]="importing()"
+                matTooltip="นำเข้า API Config จากไฟล์ JSON"
+                class="flex items-center gap-2">
+          @if (importing()) {
+            <mat-spinner diameter="16" class="!inline-block" />
+          } @else {
+            <app-icon name="arrow-up-tray" class="w-4 h-4" />
+          }
+          นำเข้า JSON
+        </button>
         <button mat-flat-button color="primary" (click)="openCreate()" class="flex items-center gap-2">
           <app-icon name="plus" class="w-4 h-4" />
           เพิ่ม API Config
         </button>
       }
+
+      <!-- Hidden file input สำหรับนำเข้า JSON -->
+      <input #importInput type="file" accept="application/json,.json"
+             class="hidden" (change)="onImportFileSelected($event)" />
     </div>
   </app-page-header>
 
