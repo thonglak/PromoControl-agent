@@ -148,6 +148,10 @@ class SalesTransactionController extends BaseController
         $poolBreakdown = $bd['PROJECT_POOL']       ?? ['used' => 0, 'remaining' => 0];
         $mgmtBreakdown = $bd['MANAGEMENT_SPECIAL'] ?? ['used' => 0, 'remaining' => 0];
 
+        // งบส่วนกลาง (Pool) คงเหลือ — ใช้ getPoolBalance เพราะ breakdown['PROJECT_POOL']['remaining']
+        // คำนวณแบบ unit-level (allocated − used − returned) ทำให้ RETURN กลับ Pool ไม่สะท้อนยอดเหลือ
+        $poolRemaining = $this->budgetSvc->getPoolBalance($pid);
+
         // งบผู้บริหารที่คืนแล้ว — project-wide (รวมที่คืนจากการยกเลิกขายและคืนแบบ manual)
         $mgmtReturnedRow = $this->db()->table('budget_movements')
             ->selectSum('amount', 'total')
@@ -169,7 +173,7 @@ class SalesTransactionController extends BaseController
                 'unit_budget_remaining'       => $unitBreakdown['remaining'],
                 // งบส่วนกลาง (Pool) — ทั้งโครงการ
                 'pool_budget_used'            => $poolBreakdown['used'],
-                'pool_budget_remaining'       => $poolBreakdown['remaining'],
+                'pool_budget_remaining'       => $poolRemaining,
                 // งบผู้บริหาร — ทั้งโครงการ
                 'management_budget_used'      => $mgmtBreakdown['used'],
                 'management_budget_remaining' => $mgmtBreakdown['remaining'],
