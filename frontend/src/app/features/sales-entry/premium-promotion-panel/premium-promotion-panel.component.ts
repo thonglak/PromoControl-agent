@@ -24,6 +24,7 @@ export interface PanelARow {
   convert_to_discount: boolean;
   funding_source_type: 'UNIT_STANDARD';
   formula_display: string | null;
+  applied_policy_name: string | null;
   fee_formula: any | null;
   effective_rate: number | null;
   effective_buyer_share: number | null;
@@ -72,6 +73,12 @@ export interface PanelARow {
                   [class]="categoryClass(row.category)">
                   {{ categoryLabel(row.category) }}
                 </span>
+                @if (row.applied_policy_name) {
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 border border-green-200"
+                        [matTooltip]="'มาตรการที่ใช้: ' + row.applied_policy_name">
+                    🏷 {{ row.applied_policy_name }}
+                  </span>
+                }
                 @if (row.formula_display) {
                   <span class="text-xs" style="color: var(--color-primary-500)" [matTooltip]="row.formula_display">
                     ↳ {{ row.formula_display }}
@@ -271,6 +278,7 @@ export class PremiumPromotionPanelComponent implements OnInit {
       convert_to_discount: false,
       funding_source_type: 'UNIT_STANDARD',
       formula_display: item.formula_display,
+      applied_policy_name: item.applied_policy_name,
       fee_formula: item.fee_formula,
       effective_rate: item.effective_rate,
       effective_buyer_share: item.effective_buyer_share,

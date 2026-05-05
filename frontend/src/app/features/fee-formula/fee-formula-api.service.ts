@@ -29,6 +29,7 @@ export interface FeeRatePolicy {
   override_buyer_share: number | null;
   override_expression: string | null;
   condition_expression: string | null;
+  note: string | null;
   conditions: any;
   effective_from: string;
   effective_to: string;
@@ -57,6 +58,33 @@ export interface ExpressionDetail {
   substituted: string | null;
   variables_used: ExpressionVariableUsed[];
   error: string | null;
+  override_expression?: string;
+  override_substituted?: string;
+  override_variables_used?: ExpressionVariableUsed[];
+  override_result?: number;
+  override_error?: string | null;
+}
+
+export interface PolicyConditionResult {
+  condition: string;
+  threshold: any;
+  actual: any;
+  passed: boolean;
+}
+
+export interface PolicyCheck {
+  id: number;
+  policy_name: string;
+  priority: number;
+  effective_from: string;
+  effective_to: string;
+  override_rate: number;
+  override_buyer_share: number | null;
+  override_expression: string | null;
+  matched: boolean;
+  is_applied: boolean;
+  reason: string;
+  conditions_met: PolicyConditionResult[];
 }
 
 export interface TestResultItem {
@@ -70,6 +98,7 @@ export interface TestResultItem {
   effective_buyer_share: number;
   calculated_value: number;
   savings: number;
+  all_policies_checked?: PolicyCheck[];
 }
 
 export interface BatchResultItem {
@@ -163,6 +192,7 @@ export interface FeeRatePolicyJson {
   override_buyer_share: number | null;
   override_expression: string | null;
   condition_expression: string | null;
+  note?: string | null;
   conditions: Record<string, any>;
   effective_from: string | null;
   effective_to: string | null;

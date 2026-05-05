@@ -19,6 +19,7 @@ export interface EligibleItem {
   effective_rate: number | null;
   effective_buyer_share: number | null;
   formula_display: string | null;
+  applied_policy_name: string | null;
   fee_formula: {
     id: number;
     base_field: string;

@@ -32,6 +32,7 @@ export interface PanelBRow {
   used_value: number;
   funding_source_type: string;
   formula_display: string | null;
+  applied_policy_name: string | null;
   fee_formula: any | null;
   effective_rate: number | null;
   effective_buyer_share: number | null;
@@ -100,6 +101,12 @@ const FUNDING_SOURCES = [
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
                           [class]="categoryClass(row.category)">
                           {{ categoryLabel(row.category) }}
+                        </span>
+                      }
+                      @if (row.applied_policy_name) {
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 border border-green-200"
+                              [matTooltip]="'มาตรการที่ใช้: ' + row.applied_policy_name">
+                          🏷 {{ row.applied_policy_name }}
                         </span>
                       }
                     </div>
@@ -322,6 +329,7 @@ export class AdditionalPromotionPanelComponent implements OnInit {
         // server-derived
         max_value:             item.max_value,
         formula_display:       item.formula_display,
+        applied_policy_name:   item.applied_policy_name,
         fee_formula:           item.fee_formula,
         effective_rate:        item.effective_rate,
         effective_buyer_share: item.effective_buyer_share,
@@ -342,6 +350,7 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       ...row,
       max_value:             item.max_value,
       formula_display:       item.formula_display,
+      applied_policy_name:   item.applied_policy_name,
       fee_formula:           item.fee_formula,
       effective_rate:        item.effective_rate,
       effective_buyer_share: item.effective_buyer_share,
@@ -504,6 +513,7 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       used_value: 0,
       funding_source_type: this.getDefaultFundingSource(),
       formula_display: null,
+      applied_policy_name: null,
       fee_formula: null,
       effective_rate: null,
       effective_buyer_share: null,
@@ -532,6 +542,7 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       used_value: usedValue,
       funding_source_type: this.getDefaultFundingSource(),
       formula_display: item.formula_display,
+      applied_policy_name: item.applied_policy_name,
       fee_formula: item.fee_formula,
       effective_rate: item.effective_rate,
       effective_buyer_share: item.effective_buyer_share,

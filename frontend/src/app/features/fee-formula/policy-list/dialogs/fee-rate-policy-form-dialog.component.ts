@@ -177,6 +177,7 @@ export class FeeRatePolicyFormDialogComponent implements OnInit {
 
   form = this.fb.group({
     policy_name:           [this.policy?.policy_name ?? '', Validators.required],
+    note:                  [this.policy?.note ?? ''],
     override_expression:   [this.policy?.override_expression ?? this.buildLegacyOverride(), Validators.required],
     condition_expression:  [this.policy?.condition_expression ?? this.buildLegacyCondition()],
     priority:              [this.policy?.priority ?? 0, Validators.required],
@@ -337,9 +338,11 @@ export class FeeRatePolicyFormDialogComponent implements OnInit {
     this.serverError.set(null);
 
     const v = this.form.value;
+    const noteVal = (v.note ?? '').toString().trim();
     const payload: any = {
       fee_formula_id:        this.data.formulaId,
       policy_name:           v.policy_name,
+      note:                  noteVal !== '' ? noteVal : null,
       override_expression:   overrideExpr,
       condition_expression:  condExpr || null,
       override_rate:         0,    // legacy fields — ไม่ใช้แล้วในโหมด expression

@@ -235,6 +235,7 @@ class EligiblePromotionService
             $result['effective_rate']         = $calcResult['effective_rate'];
             $result['effective_buyer_share']  = $calcResult['effective_buyer_share'];
             $result['formula_display']        = $calcResult['formula_display'];
+            $result['applied_policy_name']    = $calcResult['applied_policy_name'] ?? null;
             $result['warnings']               = $calcResult['warnings'];
         } else {
             $result['fee_formula']            = null;
@@ -242,6 +243,7 @@ class EligiblePromotionService
             $result['effective_rate']         = null;
             $result['effective_buyer_share']  = null;
             $result['formula_display']        = null;
+            $result['applied_policy_name']    = null;
             $result['warnings']               = [];
         }
 
@@ -460,7 +462,8 @@ class EligiblePromotionService
                 $calculatedValue,
                 $capped,
                 $maxValue,
-                count($warnings) > 0
+                count($warnings) > 0,
+                $appliedPolicy
             );
         } else {
             $formulaDisplay = $this->buildFormulaDisplay(
@@ -484,6 +487,7 @@ class EligiblePromotionService
             'effective_rate'         => $effectiveRate,
             'effective_buyer_share'  => $effectiveBuyerShare,
             'formula_display'        => $formulaDisplay,
+            'applied_policy_name'    => $appliedPolicy ? (string) $appliedPolicy['policy_name'] : null,
             'warnings'               => $warnings,
         ];
     }
@@ -566,6 +570,7 @@ class EligiblePromotionService
 
     /**
      * สร้างข้อความแสดงสูตรสำหรับโหมด expression
+     * - ถ้ามี policy match + override_expression → แสดงทั้งสูตรเดิม + override
      */
     private function buildExpressionDisplay(
         string $expression,
@@ -573,13 +578,21 @@ class EligiblePromotionService
         float $calculatedValue,
         bool $capped,
         $maxValue,
-        bool $hasWarning
+        bool $hasWarning,
+        ?array $appliedPolicy = null
     ): string {
         if ($hasWarning || $result === null) {
             return "นิพจน์: {$expression} — รอข้อมูลครบ";
         }
         $valueFormatted = number_format($calculatedValue, 0, '.', ',');
         $cappedText = $capped ? ' [จำกัดเพดาน ' . number_format((float) $maxValue, 0, '.', ',') . ']' : '';
+
+        // มี override_expression จาก policy → แสดงทั้งสูตรเดิม + override
+        if ($appliedPolicy && !empty($appliedPolicy['override_expression'])) {
+            $overrideExpr = (string) $appliedPolicy['override_expression'];
+            return "สูตรเดิม: {$expression} → Override: {$overrideExpr} = {$valueFormatted}{$cappedText}";
+        }
+
         return "{$expression} = {$valueFormatted}{$cappedText}";
     }
 }

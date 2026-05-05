@@ -195,6 +195,7 @@ class FeeFormulaService
         }
 
         $now = date('Y-m-d H:i:s');
+        $note = isset($data['note']) ? trim((string) $data['note']) : '';
         $this->db->table('fee_rate_policies')->insert([
             'fee_formula_id'       => (int) $data['fee_formula_id'],
             'policy_name'          => trim($data['policy_name']),
@@ -202,6 +203,7 @@ class FeeFormulaService
             'override_buyer_share' => isset($data['override_buyer_share']) ? (float) $data['override_buyer_share'] : null,
             'override_expression'  => $overrideExpr !== '' ? $overrideExpr : null,
             'condition_expression' => $conditionExpr !== '' ? $conditionExpr : null,
+            'note'                 => $note !== '' ? $note : null,
             'conditions'           => json_encode($data['conditions'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE),
             'effective_from'       => $data['effective_from'],
             'effective_to'         => $data['effective_to'],
@@ -240,12 +242,17 @@ class FeeFormulaService
             }
         }
 
+        $note = array_key_exists('note', $data)
+            ? (isset($data['note']) ? trim((string) $data['note']) : '')
+            : ($existing['note'] ?? '');
+
         $this->db->table('fee_rate_policies')->where('id', $id)->update([
             'policy_name'          => trim($data['policy_name'] ?? $existing['policy_name']),
             'override_rate'        => (float) ($data['override_rate'] ?? $existing['override_rate']),
             'override_buyer_share' => array_key_exists('override_buyer_share', $data) ? (isset($data['override_buyer_share']) ? (float) $data['override_buyer_share'] : null) : $existing['override_buyer_share'],
             'override_expression'  => $overrideExpr !== '' ? $overrideExpr : null,
             'condition_expression' => $conditionExpr !== '' ? $conditionExpr : null,
+            'note'                 => $note !== '' ? $note : null,
             'conditions'           => isset($data['conditions']) ? json_encode($data['conditions'], JSON_UNESCAPED_UNICODE) : $existing['conditions'],
             'effective_from'       => $data['effective_from'] ?? $existing['effective_from'],
             'effective_to'         => $data['effective_to'] ?? $existing['effective_to'],
@@ -309,6 +316,7 @@ class FeeFormulaService
                 'override_buyer_share' => $p['override_buyer_share'] !== null ? (float) $p['override_buyer_share'] : null,
                 'override_expression'  => $p['override_expression'],
                 'condition_expression' => $p['condition_expression'],
+                'note'                 => $p['note'] ?? null,
                 'conditions'           => $this->decodeConditions($p['conditions']),
                 'effective_from'       => $p['effective_from'],
                 'effective_to'         => $p['effective_to'],
@@ -444,6 +452,7 @@ class FeeFormulaService
                         }
                     }
 
+                    $polNote = isset($pol['note']) ? trim((string) $pol['note']) : '';
                     $this->db->table('fee_rate_policies')->insert([
                         'fee_formula_id'       => $newFormulaId,
                         'policy_name'          => $polName,
@@ -451,6 +460,7 @@ class FeeFormulaService
                         'override_buyer_share' => isset($pol['override_buyer_share']) && $pol['override_buyer_share'] !== null ? (float) $pol['override_buyer_share'] : null,
                         'override_expression'  => $polOverrideExpr !== '' ? $polOverrideExpr : null,
                         'condition_expression' => $polConditionExpr !== '' ? $polConditionExpr : null,
+                        'note'                 => $polNote !== '' ? $polNote : null,
                         'conditions'           => json_encode($pol['conditions'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE),
                         'effective_from'       => $pol['effective_from'] ?? null,
                         'effective_to'         => $pol['effective_to'] ?? null,
@@ -625,6 +635,23 @@ class FeeFormulaService
 
     private function calculateOne(array $formula, array $unitData, string $saleDate, array $manualInputs, ?float $contractPrice = null): array
     {
+        // Build context สำหรับทั้ง expression evaluation + policy condition_expression
+        $context = [
+            'common_fee_rate'    => $unitData['common_fee_rate'] ?? 0,
+            'electric_meter_fee' => $unitData['electric_meter_fee'] ?? 0,
+            'water_meter_fee'    => $unitData['water_meter_fee'] ?? 0,
+            'pool_budget_amount' => $unitData['pool_budget_amount'] ?? 0,
+            'base_price'         => $unitData['base_price'] ?? 0,
+            'unit_cost'          => $unitData['unit_cost'] ?? 0,
+            'appraisal_price'    => $unitData['appraisal_price'] ?? 0,
+            'land_area_sqw'      => $unitData['land_area_sqw'] ?? 0,
+            'area_sqm'           => $unitData['area_sqm'] ?? 0,
+            'standard_budget'    => $unitData['standard_budget'] ?? 0,
+            'contract_price'     => $contractPrice ?? 0,
+            'net_price'          => $unitData['net_price'] ?? $unitData['base_price'] ?? 0,
+            'project_type'       => $unitData['project_type'] ?? '',
+        ];
+
         // Determine base_amount
         $baseAmount = 0;
         $isExpression = false;
@@ -639,20 +666,6 @@ class FeeFormulaService
             case 'expression':
                 $isExpression = true;
                 $expr = (string) ($formula['formula_expression'] ?? '');
-                $context = [
-                    'common_fee_rate'    => $unitData['common_fee_rate'] ?? 0,
-                    'electric_meter_fee' => $unitData['electric_meter_fee'] ?? 0,
-                    'water_meter_fee'    => $unitData['water_meter_fee'] ?? 0,
-                    'pool_budget_amount' => $unitData['pool_budget_amount'] ?? 0,
-                    'base_price'         => $unitData['base_price'] ?? 0,
-                    'unit_cost'          => $unitData['unit_cost'] ?? 0,
-                    'appraisal_price'    => $unitData['appraisal_price'] ?? 0,
-                    'land_area_sqw'      => $unitData['land_area_sqw'] ?? 0,
-                    'area_sqm'           => $unitData['area_sqm'] ?? 0,
-                    'standard_budget'    => $unitData['standard_budget'] ?? 0,
-                    'contract_price'     => $contractPrice ?? 0,
-                    'net_price'          => $unitData['net_price'] ?? $unitData['base_price'] ?? 0,
-                ];
                 try {
                     $expressionResult = $this->evaluator->evaluate($expr, $context);
                     $baseAmount = $expressionResult;
@@ -677,7 +690,7 @@ class FeeFormulaService
 
         $defaultRate  = (float) $formula['default_rate'];
         $buyerShare   = (float) $formula['buyer_share'];
-        // expression mode: ผลลัพธ์ของสูตรเป็น final value — normal_value = expressionResult
+        // normal_value = ผลตามสูตรเดิม (ไม่มี policy override) — ใช้คำนวณ savings
         $normalValue  = $isExpression ? ($expressionResult ?? 0) : ($baseAmount * $defaultRate * $buyerShare);
 
         // Match policies
@@ -694,39 +707,70 @@ class FeeFormulaService
         $allChecked = [];
 
         foreach ($policies as $policy) {
-            $conditions = json_decode($policy['conditions'] ?? '{}', true) ?: [];
             $matched = true;
             $conditionResults = [];
 
-            // max_base_price
-            if (isset($conditions['max_base_price'])) {
-                $passed = $unitData['base_price'] <= (float) $conditions['max_base_price'];
-                $conditionResults[] = [
-                    'condition' => 'max_base_price',
-                    'threshold' => $conditions['max_base_price'],
-                    'actual'    => $unitData['base_price'],
-                    'passed'    => $passed,
-                ];
-                if (!$passed) $matched = false;
-            }
+            if (!empty($policy['condition_expression'])) {
+                // เช็คด้วย boolean expression (ใช้ก่อน — รองรับสูตร expression mode)
+                $boolExpr = (string) $policy['condition_expression'];
+                try {
+                    $passed = $this->evaluator->evaluateBoolean($boolExpr, $context);
+                    $conditionResults[] = [
+                        'condition' => 'condition_expression',
+                        'threshold' => $boolExpr,
+                        'actual'    => $this->evaluator->substitute($boolExpr, $context),
+                        'passed'    => $passed,
+                    ];
+                    if (!$passed) $matched = false;
+                } catch (\Throwable $e) {
+                    $conditionResults[] = [
+                        'condition' => 'condition_expression',
+                        'threshold' => $boolExpr,
+                        'actual'    => 'error: ' . $e->getMessage(),
+                        'passed'    => false,
+                    ];
+                    $matched = false;
+                }
+            } else {
+                // Legacy JSON conditions (backward compat)
+                $conditions = json_decode($policy['conditions'] ?? '{}', true) ?: [];
 
-            // project_types
-            if (isset($conditions['project_types']) && is_array($conditions['project_types'])) {
-                $passed = in_array($unitData['project_type'], $conditions['project_types'], true);
-                $conditionResults[] = [
-                    'condition' => 'project_types',
-                    'threshold' => $conditions['project_types'],
-                    'actual'    => $unitData['project_type'],
-                    'passed'    => $passed,
-                ];
-                if (!$passed) $matched = false;
+                if (isset($conditions['max_base_price'])) {
+                    $passed = $unitData['base_price'] <= (float) $conditions['max_base_price'];
+                    $conditionResults[] = [
+                        'condition' => 'max_base_price',
+                        'threshold' => $conditions['max_base_price'],
+                        'actual'    => $unitData['base_price'],
+                        'passed'    => $passed,
+                    ];
+                    if (!$passed) $matched = false;
+                }
+
+                if (isset($conditions['project_types']) && is_array($conditions['project_types'])) {
+                    $passed = in_array($unitData['project_type'], $conditions['project_types'], true);
+                    $conditionResults[] = [
+                        'condition' => 'project_types',
+                        'threshold' => $conditions['project_types'],
+                        'actual'    => $unitData['project_type'],
+                        'passed'    => $passed,
+                    ];
+                    if (!$passed) $matched = false;
+                }
             }
 
             $allChecked[] = [
-                'id'          => (int) $policy['id'],
-                'policy_name' => $policy['policy_name'],
-                'matched'     => $matched,
-                'reason'      => $matched ? 'ตรงทุกเงื่อนไข' : 'ไม่ผ่านเงื่อนไข',
+                'id'                   => (int) $policy['id'],
+                'policy_name'          => $policy['policy_name'],
+                'priority'             => (int) $policy['priority'],
+                'effective_from'       => $policy['effective_from'],
+                'effective_to'         => $policy['effective_to'],
+                'override_rate'        => (float) $policy['override_rate'],
+                'override_buyer_share' => $policy['override_buyer_share'] !== null ? (float) $policy['override_buyer_share'] : null,
+                'override_expression'  => $policy['override_expression'] ?? null,
+                'matched'              => $matched,
+                'is_applied'           => $matched && !$appliedPolicy,
+                'reason'               => $matched ? 'ตรงทุกเงื่อนไข' : 'ไม่ผ่านเงื่อนไข',
+                'conditions_met'       => $conditionResults,
             ];
 
             if ($matched && !$appliedPolicy) {
@@ -735,6 +779,7 @@ class FeeFormulaService
                     'policy_name'          => $policy['policy_name'],
                     'override_rate'        => (float) $policy['override_rate'],
                     'override_buyer_share' => $policy['override_buyer_share'] !== null ? (float) $policy['override_buyer_share'] : null,
+                    'override_expression'  => $policy['override_expression'] ?? null,
                     'conditions_met'       => $conditionResults,
                 ];
             }
@@ -746,10 +791,28 @@ class FeeFormulaService
             ? $appliedPolicy['override_buyer_share']
             : $buyerShare;
 
-        // expression mode: ใช้ผลของ expression เป็น final value (ไม่คูณ rate/share อีก)
-        $calculatedValue = $isExpression
-            ? ($expressionResult ?? 0)
-            : ($baseAmount * $effectiveRate * $effectiveBuyerShare);
+        // คำนวณค่าจริง
+        if ($isExpression) {
+            // expression mode: ถ้า policy มี override_expression → re-evaluate ด้วยสูตรนั้น
+            $finalExprResult = $expressionResult ?? 0;
+            if ($appliedPolicy && !empty($appliedPolicy['override_expression'])) {
+                $overrideExpr = (string) $appliedPolicy['override_expression'];
+                try {
+                    $finalExprResult = $this->evaluator->evaluate($overrideExpr, $context);
+                    $expressionData['override_expression'] = $overrideExpr;
+                    $expressionData['override_substituted'] = $this->evaluator->substitute($overrideExpr, $context);
+                    $expressionData['override_variables_used'] = $this->evaluator->getUsedVariablesWithValues($overrideExpr, $context);
+                    $expressionData['override_result'] = $finalExprResult;
+                    $expressionData['override_error'] = null;
+                } catch (\Throwable $e) {
+                    $expressionData['override_expression'] = $overrideExpr;
+                    $expressionData['override_error'] = $e->getMessage();
+                }
+            }
+            $calculatedValue = $finalExprResult;
+        } else {
+            $calculatedValue = $baseAmount * $effectiveRate * $effectiveBuyerShare;
+        }
 
         // Cap at max_value
         $maxValue = $formula['item_max_value'] ?? null;

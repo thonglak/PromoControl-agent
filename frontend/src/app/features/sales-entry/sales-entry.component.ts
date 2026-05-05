@@ -181,6 +181,7 @@ export class SalesEntryComponent implements OnInit {
         convert_to_discount: s.convert_to_discount === '1' || s.convert_to_discount === true,
         funding_source_type: 'UNIT_STANDARD' as const,
         formula_display: null,
+        applied_policy_name: null,
         fee_formula: null,
         effective_rate: null,
         effective_buyer_share: null,
@@ -213,6 +214,7 @@ export class SalesEntryComponent implements OnInit {
         effective_buyer_share: null,
         fee_formula: null,
         formula_display: null,
+        applied_policy_name: null,
         warnings: [],
       }));
   });
