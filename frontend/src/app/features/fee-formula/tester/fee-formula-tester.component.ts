@@ -111,8 +111,8 @@ export class FeeFormulaTesterComponent implements OnInit {
   get projectId(): number { return Number(this.project.selectedProject()?.id ?? 0); }
 
   ngOnInit(): void {
-    this.api.getFormulas().subscribe({ next: f => this.formulas.set(f) });
     if (this.projectId) {
+      this.api.getFormulas(this.projectId).subscribe({ next: f => this.formulas.set(f) });
       this.unitApi.getList(this.projectId).subscribe({ next: u => this.units.set(u) });
     }
   }
