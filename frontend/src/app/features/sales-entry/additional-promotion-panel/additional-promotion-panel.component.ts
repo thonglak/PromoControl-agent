@@ -298,6 +298,7 @@ export class AdditionalPromotionPanelComponent implements OnInit {
   // - First load (rows ว่าง): edit mode → ใช้ initialRows + enrich จาก eligibleItems; ปกติ → ว่าง
   // - Subsequent (recalc จาก parent): preserve rows ที่ user กรอก แต่ refresh fee_formula
   //   ของแถวที่อ้างถึง item ที่ค่าเปลี่ยน (calculated_value/formula_display/warnings)
+  // กันกระตุก: reuse reference ของ row เดิมถ้า server-derived ไม่เปลี่ยน + skip set+emit ถ้าทั้ง array เหมือนเดิม
   private resetEffect = effect(() => {
     const items = this.eligibleItems();
     const init = this.initialRows();
@@ -324,6 +325,25 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       if (row.promotion_item_id == null) return row;
       const item = itemMap.get(row.promotion_item_id);
       if (!item) return row; // item ไม่อยู่ในรายการ eligible แล้ว — คงค่าเดิม
+
+      const newCalc = item.value_mode === 'calculated' ? (item.calculated_value ?? null) : row.calculated_value;
+      const newUsed = item.value_mode === 'calculated' ? (item.calculated_value ?? 0) : row.used_value;
+
+      // ถ้า server-derived ไม่มีอะไรเปลี่ยน → reuse row เดิม กัน Material rebuild
+      if (
+        row.max_value === item.max_value
+        && row.formula_display === item.formula_display
+        && row.applied_policy_name === item.applied_policy_name
+        && row.fee_formula === item.fee_formula
+        && row.effective_rate === item.effective_rate
+        && row.effective_buyer_share === item.effective_buyer_share
+        && (row.warnings?.length ?? 0) === (item.warnings?.length ?? 0)
+        && row.calculated_value === newCalc
+        && row.used_value === newUsed
+      ) {
+        return row;
+      }
+
       return {
         ...row,
         // server-derived
@@ -334,11 +354,16 @@ export class AdditionalPromotionPanelComponent implements OnInit {
         effective_rate:        item.effective_rate,
         effective_buyer_share: item.effective_buyer_share,
         warnings:              item.warnings ?? [],
-        // ถ้าเป็น calculated → ใช้ค่าใหม่; ถ้าไม่ใช่ → คงค่า user
-        calculated_value:      item.value_mode === 'calculated' ? (item.calculated_value ?? null) : row.calculated_value,
-        used_value:            item.value_mode === 'calculated' ? (item.calculated_value ?? 0) : row.used_value,
+        calculated_value:      newCalc,
+        used_value:            newUsed,
       };
     });
+
+    // ถ้าทุก row ยังเป็น reference เดิม → ไม่ต้อง set/emit (Section 4 + Section 2 ไม่ recompute ฟรีๆ)
+    const allSameRefs = updated.length === inFlight.length
+      && updated.every((r, i) => r === inFlight[i]);
+    if (allSameRefs) return;
+
     this.rows.set(updated);
     this.emitChanges(updated);
   });

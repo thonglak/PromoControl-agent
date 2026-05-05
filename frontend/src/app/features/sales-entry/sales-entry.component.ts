@@ -65,7 +65,8 @@ function toISODateStr(d: any): string {
 
           <!-- Section 3A/3B -->
           @if (selectedUnitId() > 0) {
-            @if (loadingEligible()) {
+            <!-- สปินเนอร์ใหญ่: แสดงเฉพาะตอน first load (ยังไม่มี eligibleData) -->
+            @if (loadingEligible() && !eligibleData()) {
               <div class="section-card text-center">
                 <mat-spinner diameter="32" class="mx-auto mb-2"></mat-spinner>
                 <div class="text-sm" style="color: var(--color-gray-500)">กำลังโหลดรายการโปรโมชั่น...</div>
@@ -592,6 +593,9 @@ export class SalesEntryComponent implements OnInit {
 
   // ─── Private ─────────────────────────────────────────────────────────
 
+  /** เก็บ pending ที่ส่งให้ budget section ครั้งล่าสุด — ใช้กัน update ซ้ำเมื่อค่าไม่เปลี่ยน */
+  private lastPendingSent: Record<string, number> = {};
+
   private syncBudgetPendingUsed(): void {
     const budgetSection = this.budgetSection();
     if (!budgetSection) return;
@@ -605,6 +609,15 @@ export class SalesEntryComponent implements OnInit {
       }
     }
 
+    // กัน budget table recompute เมื่อ pending ไม่เปลี่ยน (เช่น ตอน toggle convert_to_discount ที่ไม่กระทบยอด)
+    const keys = new Set([...Object.keys(this.lastPendingSent), ...Object.keys(pending)]);
+    let changed = false;
+    for (const k of keys) {
+      if ((this.lastPendingSent[k] ?? 0) !== (pending[k] ?? 0)) { changed = true; break; }
+    }
+    if (!changed) return;
+
+    this.lastPendingSent = pending;
     budgetSection.updatePendingUsed(pending);
   }
 

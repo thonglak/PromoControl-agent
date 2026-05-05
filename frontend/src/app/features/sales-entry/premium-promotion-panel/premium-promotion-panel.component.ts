@@ -208,15 +208,24 @@ export class PremiumPromotionPanelComponent implements OnInit {
   // หมายเหตุ: เมื่อ parent ทำ recalc (เช่น contract_price/net_price เปลี่ยน) eligibleItems จะถูก
   // โหลดใหม่ — เราต้องคงค่าที่ user กรอกไว้ (used_value ของ manual/fixed, convert_to_discount, remark)
   // แต่ปรับ calculated_value/formula_display/warnings ให้ตรงกับ BE ใหม่
+  // กันกระตุก: reuse reference ของ row เดิมถ้า content ไม่เปลี่ยน + skip set+emit ถ้าทั้ง array เหมือนเดิม
+  // (Material form field จะไม่ rebuild เพราะ binding อ้างอิง object เดิม)
   private rebuildEffect = effect(() => {
     const items = this.eligibleItems();
     const initRows = this.initialRows();
     if (items.length === 0) {
-      this.rows.set([]);
+      if (untracked(() => this.rows()).length > 0) {
+        this.rows.set([]);
+        this.emitChanges([]);
+      }
       return;
     }
     // อ่าน rows ปัจจุบันแบบไม่ติดตาม (กัน infinite loop)
     const inFlight = untracked(() => this.rows());
+    const inFlightById = new Map<number, PanelARow>();
+    for (const r of inFlight) {
+      if (r.promotion_item_id) inFlightById.set(r.promotion_item_id, r);
+    }
 
     // ลำดับความสำคัญของค่าที่จะ merge (last-write-wins):
     // 1) initRows ก่อน — seed ค่าจากรายการเดิมตอน first load (inFlight ยังว่าง)
@@ -237,7 +246,7 @@ export class PremiumPromotionPanelComponent implements OnInit {
         return initRows.length > 0 ? { ...fresh, used_value: 0 } : fresh;
       }
       // มีค่าเดิม — preserve user input + อัปเดต server-derived fields
-      return {
+      const merged: PanelARow = {
         ...fresh,
         // value_mode='calculated' → ใช้ค่าใหม่จาก BE; โหมดอื่น → คงค่าที่ user กรอก
         used_value:           item.value_mode === 'calculated' ? fresh.used_value : saved.used_value,
@@ -245,10 +254,40 @@ export class PremiumPromotionPanelComponent implements OnInit {
         remark:               saved.remark,
         manual_input_value:   saved.manual_input_value,
       };
+      // ถ้า row เดิมเหมือน merged ทุกประการ → reuse reference เดิม กัน Material rebuild
+      const existing = inFlightById.get(item.id);
+      if (existing && this.rowsEqual(existing, merged)) return existing;
+      return merged;
     });
+
+    // ถ้าทุก row ยังเป็น reference เดิม + length เท่าเดิม → ไม่ต้อง set/emit
+    const allSameRefs = newRows.length === inFlight.length
+      && newRows.every((r, i) => r === inFlight[i]);
+    if (allSameRefs) return;
+
     this.rows.set(newRows);
     this.emitChanges(newRows);
   });
+
+  /** เปรียบเทียบ row 2 ตัวระดับ field ที่กระทบ render (shallow) */
+  private rowsEqual(a: PanelARow, b: PanelARow): boolean {
+    return a.promotion_item_id === b.promotion_item_id
+      && a.used_value === b.used_value
+      && a.convert_to_discount === b.convert_to_discount
+      && a.remark === b.remark
+      && a.manual_input_value === b.manual_input_value
+      && a.calculated_value === b.calculated_value
+      && a.max_value === b.max_value
+      && a.formula_display === b.formula_display
+      && a.applied_policy_name === b.applied_policy_name
+      && a.effective_rate === b.effective_rate
+      && a.effective_buyer_share === b.effective_buyer_share
+      && a.value_mode === b.value_mode
+      && a.category === b.category
+      && a.discount_convert_value === b.discount_convert_value
+      && a.fee_formula === b.fee_formula
+      && (a.warnings?.length ?? 0) === (b.warnings?.length ?? 0);
+  }
 
   ngOnInit(): void {}
 
