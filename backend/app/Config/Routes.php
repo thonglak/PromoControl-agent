@@ -96,13 +96,16 @@ $routes->group('api', static function (RouteCollection $routes): void {
 
     // Fee Rate Policies (มาตรการ/นโยบาย)
     $routes->group('fee-rate-policies', static function (RouteCollection $routes): void {
-        $routes->get('/',        'FeeRatePolicyController::index');
+        $routes->get('/',           'FeeRatePolicyController::index');
+        $routes->get('export-json', 'FeeRatePolicyController::exportJson');
     });
     $routes->group('fee-rate-policies', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->post('/',                  'FeeRatePolicyController::create');
         $routes->put('(:num)',              'FeeRatePolicyController::update/$1');
         $routes->delete('(:num)',           'FeeRatePolicyController::delete/$1');
         $routes->patch('(:num)/toggle',     'FeeRatePolicyController::toggle/$1');
+        $routes->post('import-json',         'FeeRatePolicyController::importJson');
+        $routes->post('import-json-by-code', 'FeeRatePolicyController::importJsonByCode');
     });
 
     // Unit Types (ประเภทยูนิต — เฉพาะ mixed project)

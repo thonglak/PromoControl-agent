@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
@@ -11,7 +11,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
-import { FeeFormulaApiService, FeeFormula, FeeRatePolicy } from '../fee-formula-api.service';
+import {
+  FeeFormulaApiService, FeeFormula, FeeRatePolicy,
+  FeeRatePolicyJson, FeeRatePoliciesExportFile,
+} from '../fee-formula-api.service';
 import { FeeRatePolicyFormDialogComponent } from './dialogs/fee-rate-policy-form-dialog.component';
 import { ProjectService } from '../../../core/services/project.service';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
@@ -78,6 +81,10 @@ export class FeeRatePolicyListComponent implements OnInit {
 
   dataSource = new MatTableDataSource<FeeRatePolicy>([]);
   loading    = signal(false);
+  exporting  = signal(false);
+  importing  = signal(false);
+
+  @ViewChild('importInput') importInput!: ElementRef<HTMLInputElement>;
 
   canWrite = computed(() => this.project.canEdit());
 
@@ -200,5 +207,202 @@ export class FeeRatePolicyListComponent implements OnInit {
       case 'manual_input':    return 'กำหนดเอง';
       default:                return bf;
     }
+  }
+
+  // ── Export / Import (per formula) ───────────────────────────────────────
+
+  /** ส่งออกมาตรการของสูตรนี้เป็นไฟล์ JSON */
+  exportJson(): void {
+    if (this.formulaId <= 0) return;
+    this.exporting.set(true);
+    this.api.exportPoliciesJson(this.formulaId).subscribe({
+      next: res => {
+        this.exporting.set(false);
+        if (!res.items || res.items.length === 0) {
+          this.snack.open('ไม่มีมาตรการให้ส่งออก', 'ปิด', { duration: 3000 });
+          return;
+        }
+        const payload: FeeRatePoliciesExportFile = {
+          format:              'fee-rate-policies.v1',
+          exported_at:         new Date().toISOString(),
+          count:               res.items.length,
+          fee_formula_id:      res.fee_formula_id,
+          promotion_item_code: res.promotion_item_code,
+          promotion_item_name: res.promotion_item_name,
+          items:               res.items,
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        const ts   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const safe = (res.promotion_item_code ?? 'formula').replace(/[^a-zA-Z0-9ก-๙_-]+/g, '_').slice(0, 60);
+        a.href     = url;
+        a.download = `fee-policies_${safe}_${ts}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.snack.open(`ส่งออก ${res.items.length} มาตรการสำเร็จ`, 'ปิด', { duration: 3000 });
+      },
+      error: err => {
+        this.exporting.set(false);
+        this.snack.open(err?.error?.error ?? 'ส่งออกไม่สำเร็จ', 'ปิด', { duration: 4000 });
+      },
+    });
+  }
+
+  triggerImport(): void {
+    this.importInput.nativeElement.value = '';
+    this.importInput.nativeElement.click();
+  }
+
+  onImportFileSelected(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const file  = input.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? ''));
+        const items  = this.normalizeImport(parsed);
+        if (items.length === 0) {
+          this.snack.open('ไฟล์ไม่มีรายการที่นำเข้าได้', 'ปิด', { duration: 3000 });
+          return;
+        }
+        const fileCode = this.extractCodeFromFile(parsed);
+        const fileName = this.extractNameFromFile(parsed);
+        this.confirmAndImport(items, fileCode, fileName);
+      } catch {
+        this.snack.open('ไฟล์ JSON ไม่ถูกต้อง', 'ปิด', { duration: 3000 });
+      }
+    };
+    reader.onerror = () => this.snack.open('อ่านไฟล์ไม่สำเร็จ', 'ปิด', { duration: 3000 });
+    reader.readAsText(file);
+  }
+
+  private extractCodeFromFile(parsed: unknown): string | null {
+    const code = (parsed as FeeRatePoliciesExportFile)?.promotion_item_code;
+    return code && typeof code === 'string' && code.trim() !== '' ? code.trim() : null;
+  }
+
+  private extractNameFromFile(parsed: unknown): string | null {
+    const name = (parsed as FeeRatePoliciesExportFile)?.promotion_item_name;
+    return name && typeof name === 'string' && name.trim() !== '' ? name.trim() : null;
+  }
+
+  /** รองรับทั้ง wrapper format (`{format, items}`) และ array ดิบ */
+  private normalizeImport(parsed: unknown): FeeRatePolicyJson[] {
+    const raw = Array.isArray(parsed)
+      ? parsed
+      : (parsed as FeeRatePoliciesExportFile)?.items;
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((row): FeeRatePolicyJson | null => {
+        const name = String((row as any)?.policy_name ?? '').trim();
+        if (!name) return null;
+        return {
+          policy_name:           name,
+          override_rate:         Number((row as any).override_rate ?? 0),
+          override_buyer_share:  (row as any).override_buyer_share != null ? Number((row as any).override_buyer_share) : null,
+          override_expression:   (row as any).override_expression ?? null,
+          condition_expression:  (row as any).condition_expression ?? null,
+          note:                  (row as any).note ?? null,
+          conditions:            (row as any).conditions ?? {},
+          effective_from:        (row as any).effective_from ?? null,
+          effective_to:          (row as any).effective_to ?? null,
+          is_active:             !!(row as any).is_active,
+          priority:              Number((row as any).priority ?? 0),
+        };
+      })
+      .filter((x): x is FeeRatePolicyJson => x !== null);
+  }
+
+  /**
+   * confirm + import — เลือก mode ตามว่า code ในไฟล์ตรงกับสูตรปัจจุบันไหม
+   * - ตรง / ไม่มี code → ใส่เข้าสูตรปัจจุบัน (by formula_id) ตามเดิม
+   * - ไม่ตรง → ถาม user: resolve โดย code (default) / ใส่เข้าสูตรนี้อยู่ดี / ยกเลิก
+   */
+  private confirmAndImport(items: FeeRatePolicyJson[], fileCode: string | null, fileName: string | null): void {
+    const currentCode = this.formula()?.promotion_item_code ?? '';
+    const currentName = this.formula()?.promotion_item_name ?? '';
+
+    // ไม่มี code ในไฟล์ → import ตามเดิม (by formula_id)
+    if (!fileCode) {
+      if (!confirm(`นำเข้า ${items.length} มาตรการเข้าสูตร "${currentName}" ?\n(มาตรการชื่อซ้ำจะถูกข้าม)`)) return;
+      this.runImportByFormula(items);
+      return;
+    }
+
+    // code ตรงกับสูตรปัจจุบัน → import ตามเดิม
+    if (fileCode === currentCode) {
+      if (!confirm(`นำเข้า ${items.length} มาตรการจากไฟล์ "${fileName ?? fileCode}" → สูตร "${currentName}" ?\n(มาตรการชื่อซ้ำจะถูกข้าม)`)) return;
+      this.runImportByFormula(items);
+      return;
+    }
+
+    // code ต่าง → ถาม user
+    const projectId = Number(this.project.selectedProject()?.id ?? 0);
+    if (projectId <= 0) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+
+    const msg =
+      `ไฟล์มาจากสูตร: ${fileName ?? '-'} (${fileCode})\n` +
+      `สูตรปัจจุบัน: ${currentName} (${currentCode})\n\n` +
+      `รหัสไม่ตรงกัน — ต้องการลิงค์โดยรหัส (resolve) เพื่อใส่เข้าสูตรของรหัส "${fileCode}" ในโครงการนี้ใช่ไหม?\n\n` +
+      `[ตกลง] = ลิงค์โดยรหัส (resolve)\n` +
+      `[ยกเลิก] = ใส่เข้าสูตรปัจจุบัน "${currentName}" อยู่ดี`;
+
+    if (confirm(msg)) {
+      this.runImportByCode(projectId, fileCode, items);
+    } else {
+      // user เลือก "ยกเลิก" — ถามอีกครั้งก่อนใส่ผิดสูตร
+      if (!confirm(`ยืนยันใส่ ${items.length} มาตรการเข้าสูตร "${currentName}" (รหัสต่างกัน)?`)) return;
+      this.runImportByFormula(items);
+    }
+  }
+
+  private runImportByFormula(items: FeeRatePolicyJson[]): void {
+    this.importing.set(true);
+    this.api.importPoliciesJson({ fee_formula_id: this.formulaId, items }).subscribe({
+      next: res => this.handleImportResult(res, this.formula()?.promotion_item_name ?? ''),
+      error: err => this.handleImportError(err),
+    });
+  }
+
+  private runImportByCode(projectId: number, code: string, items: FeeRatePolicyJson[]): void {
+    this.importing.set(true);
+    this.api.importPoliciesJsonByCode({ project_id: projectId, promotion_item_code: code, items }).subscribe({
+      next: res => {
+        this.handleImportResult(res, `${res.promotion_item_name} (${res.promotion_item_code})`);
+        // ถ้า import เข้าสูตรอื่นที่ไม่ใช่หน้าปัจจุบัน → ไม่ reload table นี้ก็ได้
+        // (loadData() ใน handleImportResult ก็ไม่กระทบเพราะกรอง by formulaId เดิมอยู่แล้ว)
+      },
+      error: err => this.handleImportError(err),
+    });
+  }
+
+  private handleImportResult(res: { created: number; skipped: any[]; errors: any[] }, target: string): void {
+    this.importing.set(false);
+    const parts: string[] = [];
+    if (res.created > 0) parts.push(`สร้าง ${res.created}`);
+    if (res.skipped.length > 0) parts.push(`ข้าม ${res.skipped.length}`);
+    if (res.errors.length > 0) parts.push(`error ${res.errors.length}`);
+    const msg = (parts.length > 0 ? parts.join(', ') : 'ไม่มีรายการที่นำเข้า') + ` → ${target}`;
+    this.snack.open(msg, 'ปิด', { duration: 5000 });
+
+    if (res.skipped.length > 0 || res.errors.length > 0) {
+      console.warn('[import policies] skipped:', res.skipped, 'errors:', res.errors);
+    }
+    this.loadData();
+  }
+
+  private handleImportError(err: any): void {
+    this.importing.set(false);
+    this.snack.open(err?.error?.error ?? 'นำเข้าไม่สำเร็จ', 'ปิด', { duration: 5000 });
   }
 }

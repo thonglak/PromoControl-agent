@@ -264,6 +264,165 @@ class FeeFormulaService
         return $this->db->table('fee_rate_policies')->where('id', $id)->get()->getRowArray();
     }
 
+    /**
+     * Export policies ของ formula ตัวเดียว → JSON-friendly array
+     */
+    public function exportPoliciesForFormula(int $formulaId): array
+    {
+        $formula = $this->db->table('fee_formulas f')
+            ->select('f.id, f.promotion_item_id, p.code AS promotion_item_code, p.name AS promotion_item_name')
+            ->join('promotion_item_master p', 'p.id = f.promotion_item_id', 'inner')
+            ->where('f.id', $formulaId)->get()->getRowArray();
+        if (!$formula) throw new RuntimeException('ไม่พบสูตร');
+
+        $policies = $this->db->table('fee_rate_policies')
+            ->where('fee_formula_id', $formulaId)
+            ->orderBy('priority', 'DESC')
+            ->orderBy('effective_from', 'DESC')
+            ->get()->getResultArray();
+
+        $items = array_map(function (array $p): array {
+            return [
+                'policy_name'          => $p['policy_name'],
+                'override_rate'        => (float) $p['override_rate'],
+                'override_buyer_share' => $p['override_buyer_share'] !== null ? (float) $p['override_buyer_share'] : null,
+                'override_expression'  => $p['override_expression'],
+                'condition_expression' => $p['condition_expression'],
+                'note'                 => $p['note'] ?? null,
+                'conditions'           => $this->decodeConditions($p['conditions']),
+                'effective_from'       => $p['effective_from'],
+                'effective_to'         => $p['effective_to'],
+                'is_active'            => (bool) $p['is_active'],
+                'priority'             => (int) $p['priority'],
+            ];
+        }, $policies);
+
+        return [
+            'fee_formula_id'      => (int) $formula['id'],
+            'promotion_item_code' => $formula['promotion_item_code'],
+            'promotion_item_name' => $formula['promotion_item_name'],
+            'items'               => $items,
+        ];
+    }
+
+    /**
+     * Import policies เข้า formula ที่ระบุ
+     * - skip ถ้าชื่อ policy ซ้ำกับที่มีอยู่ใน formula เดียวกัน
+     * - validate expression ก่อน insert; ถ้า invalid → เพิ่มใน errors
+     */
+    public function importPolicies(int $formulaId, array $items): array
+    {
+        if (!$this->db->table('fee_formulas')->where('id', $formulaId)->countAllResults()) {
+            throw new RuntimeException('ไม่พบสูตร');
+        }
+
+        // ชื่อที่มีอยู่แล้วของ formula นี้ — ใช้กันซ้ำ
+        $existingNames = [];
+        foreach ($this->db->table('fee_rate_policies')->select('policy_name')->where('fee_formula_id', $formulaId)->get()->getResultArray() as $row) {
+            $existingNames[trim((string) $row['policy_name'])] = true;
+        }
+
+        $created = 0;
+        $skipped = [];
+        $errors  = [];
+        $now     = date('Y-m-d H:i:s');
+
+        foreach ($items as $idx => $raw) {
+            $name = trim((string) ($raw['policy_name'] ?? ''));
+            $ref  = $name !== '' ? $name : '#' . ($idx + 1);
+
+            try {
+                if ($name === '') {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'ไม่มีชื่อมาตรการ'];
+                    continue;
+                }
+                if (isset($existingNames[$name])) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'มีมาตรการชื่อนี้อยู่แล้ว'];
+                    continue;
+                }
+
+                $overrideExpr  = isset($raw['override_expression'])  ? trim((string) $raw['override_expression'])  : '';
+                $conditionExpr = isset($raw['condition_expression']) ? trim((string) $raw['condition_expression']) : '';
+
+                if ($overrideExpr !== '') {
+                    $check = $this->evaluator->validate($overrideExpr);
+                    if (!$check['valid']) {
+                        $errors[] = ['ref' => $ref, 'reason' => 'override_expression: ' . $check['error']];
+                        continue;
+                    }
+                }
+                if ($conditionExpr !== '') {
+                    $check = $this->evaluator->validateBoolean($conditionExpr);
+                    if (!$check['valid']) {
+                        $errors[] = ['ref' => $ref, 'reason' => 'condition_expression: ' . $check['error']];
+                        continue;
+                    }
+                }
+
+                $note = isset($raw['note']) ? trim((string) $raw['note']) : '';
+
+                $this->db->table('fee_rate_policies')->insert([
+                    'fee_formula_id'       => $formulaId,
+                    'policy_name'          => $name,
+                    'override_rate'        => (float) ($raw['override_rate'] ?? 0),
+                    'override_buyer_share' => isset($raw['override_buyer_share']) && $raw['override_buyer_share'] !== null ? (float) $raw['override_buyer_share'] : null,
+                    'override_expression'  => $overrideExpr !== '' ? $overrideExpr : null,
+                    'condition_expression' => $conditionExpr !== '' ? $conditionExpr : null,
+                    'note'                 => $note !== '' ? $note : null,
+                    'conditions'           => json_encode($raw['conditions'] ?? new \stdClass(), JSON_UNESCAPED_UNICODE),
+                    'effective_from'       => $raw['effective_from'] ?? null,
+                    'effective_to'         => $raw['effective_to'] ?? null,
+                    'is_active'            => !empty($raw['is_active']) ? 1 : 0,
+                    'priority'             => (int) ($raw['priority'] ?? 0),
+                    'created_at'           => $now,
+                    'updated_at'           => $now,
+                ]);
+
+                $existingNames[$name] = true;
+                $created++;
+            } catch (\Throwable $e) {
+                $errors[] = ['ref' => $ref, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return [
+            'created' => $created,
+            'skipped' => $skipped,
+            'errors'  => $errors,
+        ];
+    }
+
+    /**
+     * Resolve promotion_item_code → formula ของโครงการ → import policies เข้าไป
+     * ใช้กรณีไฟล์มาจากโครงการ/สูตรอื่น แล้วต้องการลิงค์กับสูตรของโครงการปัจจุบันโดย code
+     */
+    public function importPoliciesByCode(int $projectId, string $code, array $items): array
+    {
+        $code = trim($code);
+        if ($code === '') throw new RuntimeException('กรุณาระบุ promotion_item_code');
+
+        $item = $this->db->table('promotion_item_master')
+            ->where('project_id', $projectId)
+            ->where('code', $code)
+            ->get()->getRowArray();
+        if (!$item) {
+            throw new RuntimeException("ไม่พบรหัส \"{$code}\" ในโครงการนี้");
+        }
+
+        $formula = $this->db->table('fee_formulas')
+            ->where('promotion_item_id', (int) $item['id'])
+            ->get()->getRowArray();
+        if (!$formula) {
+            throw new RuntimeException("รหัส \"{$code}\" ยังไม่มีสูตรค่าธรรมเนียมในโครงการนี้");
+        }
+
+        $result = $this->importPolicies((int) $formula['id'], $items);
+        $result['fee_formula_id']      = (int) $formula['id'];
+        $result['promotion_item_code'] = $code;
+        $result['promotion_item_name'] = $item['name'];
+        return $result;
+    }
+
     public function deletePolicy(int $id): void
     {
         if (!$this->db->table('fee_rate_policies')->where('id', $id)->countAllResults()) {

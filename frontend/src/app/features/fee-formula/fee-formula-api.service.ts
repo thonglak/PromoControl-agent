@@ -182,6 +182,30 @@ export class FeeFormulaApiService {
       .post<{ message: string; data: ImportFormulaResult }>('/api/fee-formulas/import-json', payload)
       .pipe(map(r => r.data));
   }
+
+  // ── Export / Import Policies (per formula) ──────────────────────────────
+  exportPoliciesJson(formulaId: number): Observable<FeeRatePoliciesExportFile> {
+    return this.http.get<FeeRatePoliciesExportFile>('/api/fee-rate-policies/export-json', {
+      params: { fee_formula_id: formulaId },
+    });
+  }
+
+  importPoliciesJson(payload: { fee_formula_id: number; items: FeeRatePolicyJson[] }): Observable<ImportPoliciesResult> {
+    return this.http
+      .post<{ message: string; data: ImportPoliciesResult }>('/api/fee-rate-policies/import-json', payload)
+      .pipe(map(r => r.data));
+  }
+
+  /** Import policies โดย resolve promotion_item_code → formula ของโครงการที่ระบุ */
+  importPoliciesJsonByCode(payload: {
+    project_id: number;
+    promotion_item_code: string;
+    items: FeeRatePolicyJson[];
+  }): Observable<ImportPoliciesByCodeResult> {
+    return this.http
+      .post<{ message: string; data: ImportPoliciesByCodeResult }>('/api/fee-rate-policies/import-json-by-code', payload)
+      .pipe(map(r => r.data));
+  }
 }
 
 // ── Export / Import JSON types ────────────────────────────────────────────
@@ -226,4 +250,27 @@ export interface ImportFormulaResult {
   created_policies: number;
   skipped: { ref: string; reason: string }[];
   errors:  { ref: string; reason: string }[];
+}
+
+// ── Policies-only export/import (per formula) ──────────────────────────────
+export interface FeeRatePoliciesExportFile {
+  format?: 'fee-rate-policies.v1';
+  exported_at?: string;
+  count: number;
+  fee_formula_id: number;
+  promotion_item_code: string;
+  promotion_item_name: string;
+  items: FeeRatePolicyJson[];
+}
+
+export interface ImportPoliciesResult {
+  created: number;
+  skipped: { ref: string; reason: string }[];
+  errors:  { ref: string; reason: string }[];
+}
+
+export interface ImportPoliciesByCodeResult extends ImportPoliciesResult {
+  fee_formula_id: number;
+  promotion_item_code: string;
+  promotion_item_name: string;
 }
