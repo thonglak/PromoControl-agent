@@ -110,6 +110,58 @@ export class UnitApiService {
       .post<{ message: string; data: RecalculateResult }>('/api/units/bulk-recalculate', dto)
       .pipe(map(r => r.data));
   }
+
+  // ── Sync ต้นทุน + ราคาประเมิน จาก Caldiscount ────────────────────────────
+  previewCaldiscountSync(projectId: number): Observable<CaldiscountSyncPreview> {
+    return this.http.get<CaldiscountSyncPreview>('/api/units/sync-caldiscount/preview', {
+      params: { project_id: projectId },
+    });
+  }
+
+  applyCaldiscountSync(projectId: number, unitIds: number[]): Observable<CaldiscountSyncResult> {
+    return this.http
+      .post<{ message: string; data: CaldiscountSyncResult }>('/api/units/sync-caldiscount/apply', {
+        project_id: projectId,
+        unit_ids:   unitIds,
+      })
+      .pipe(map(r => r.data));
+  }
+}
+
+// ── Caldiscount sync types ─────────────────────────────────────────────────
+
+export type CaldiscountRowStatus = 'will_update' | 'no_change' | 'not_found' | 'cal_only';
+
+export interface CaldiscountSyncRow {
+  unit_id: number | null;
+  unit_code: string;
+  cal_unit_code: string | null;
+  match_type: 'exact' | 'normalized' | null;
+  current_unit_cost: number | null;
+  new_unit_cost: number | null;
+  current_appraisal_price: number | null;
+  new_appraisal_price: number | null;
+  status: CaldiscountRowStatus;
+  note: string | null;
+}
+
+export interface CaldiscountSyncPreview {
+  project_id: number;
+  project_code: string;
+  rows: CaldiscountSyncRow[];
+  summary: {
+    total: number;
+    will_update: number;
+    no_change: number;
+    not_found: number;
+    cal_only: number;
+  };
+}
+
+export interface CaldiscountSyncResult {
+  updated: number;
+  skipped: { ref: string; reason: string }[];
+  errors:  { ref: string; reason: string }[];
 }
 
 export interface PriceRule {

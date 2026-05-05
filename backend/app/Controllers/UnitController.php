@@ -4,7 +4,9 @@ namespace App\Controllers;
 
 use App\Models\UnitModel;
 use App\Models\HouseModelModel;
+use App\Services\UnitSyncService;
 use CodeIgniter\HTTP\ResponseInterface;
+use RuntimeException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -353,6 +355,50 @@ class UnitController extends BaseController
             ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->setHeader('Content-Disposition', "attachment; filename=\"{$filename}\"")
             ->setBody($content);
+    }
+
+    // ── Sync ต้นทุน + ราคาประเมิน จาก caldiscount ─────────────────────────
+
+    public function syncCaldiscountPreview(): ResponseInterface
+    {
+        $projectId = (int) ($this->request->getGet('project_id') ?? 0);
+        if ($projectId <= 0) return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        if (!$this->canAccessProject($projectId)) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
+        }
+
+        try {
+            $svc = new UnitSyncService();
+            return $this->response->setStatusCode(200)->setJSON($svc->previewSync($projectId));
+        } catch (RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function syncCaldiscountApply(): ResponseInterface
+    {
+        $body      = $this->request->getJSON(true) ?? [];
+        $projectId = (int) ($body['project_id'] ?? 0);
+        $unitIds   = is_array($body['unit_ids'] ?? null) ? $body['unit_ids'] : [];
+
+        if ($projectId <= 0) return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        if (!$this->canWriteProject($projectId)) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์แก้ไขโครงการนี้']);
+        }
+        if (empty($unitIds)) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'กรุณาเลือกยูนิตที่จะ sync']);
+        }
+
+        try {
+            $svc = new UnitSyncService();
+            $r = $svc->applySync($projectId, $unitIds);
+            return $this->response->setStatusCode(200)->setJSON([
+                'message' => "อัปเดต {$r['updated']} ยูนิตสำเร็จ",
+                'data'    => $r,
+            ]);
+        } catch (RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────

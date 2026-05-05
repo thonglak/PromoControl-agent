@@ -16,6 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UnitApiService, Unit, BulkCreateRow, BulkCreateResult } from '../unit-api.service';
 import { UnitFormDialogComponent } from '../dialogs/unit-form-dialog.component';
 import { PriceRecalculateDialogComponent, PriceRecalculateDialogData } from '../dialogs/price-recalculate-dialog.component';
+import { CaldiscountSyncDialogComponent, CaldiscountSyncDialogData } from '../dialogs/caldiscount-sync-dialog.component';
 import { HouseModelApiService, HouseModel } from '../../house-models/house-model-api.service';
 import { ProjectService } from '../../../../core/services/project.service';
 import { AuthService } from '../../../../core/services/auth.service';
@@ -218,6 +219,24 @@ export class UnitListComponent implements OnInit, AfterViewInit {
       disableClose: true,
     }).afterClosed().subscribe(result => {
       if (result) this.loadUnits();
+    });
+  }
+
+  openCaldiscountSync(): void {
+    if (!this.projectId) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+    this.dialog.open(CaldiscountSyncDialogComponent, {
+      data: {
+        projectId: this.projectId,
+        projectName: this.project.selectedProject()?.name,
+      } satisfies CaldiscountSyncDialogData,
+      width: '960px',
+      maxHeight: '90vh',
+      disableClose: true,
+    }).afterClosed().subscribe(result => {
+      if (result?.updated > 0) this.loadUnits();
     });
   }
 

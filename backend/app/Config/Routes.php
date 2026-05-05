@@ -60,17 +60,19 @@ $routes->group('api', static function (RouteCollection $routes): void {
     });
 
     $routes->group('units', static function (RouteCollection $routes): void {
-        $routes->get('/',        'UnitController::index');
-        $routes->get('export',   'UnitController::exportExcel');
-        $routes->get('(:num)',   'UnitController::show/$1');
+        $routes->get('/',                          'UnitController::index');
+        $routes->get('export',                     'UnitController::exportExcel');
+        $routes->get('sync-caldiscount/preview',   'UnitController::syncCaldiscountPreview');
+        $routes->get('(:num)',                     'UnitController::show/$1');
     });
     $routes->group('units', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
-        $routes->post('/',                    'UnitController::create');
-        $routes->put('(:num)',                'UnitController::update/$1');
-        $routes->delete('(:num)',             'UnitController::delete/$1');
-        $routes->post('bulk',                 'UnitController::bulkCreate');
-        $routes->post('preview-recalculate',  'UnitController::previewRecalculate');
-        $routes->post('bulk-recalculate',     'UnitController::bulkRecalculate');
+        $routes->post('/',                       'UnitController::create');
+        $routes->put('(:num)',                   'UnitController::update/$1');
+        $routes->delete('(:num)',                'UnitController::delete/$1');
+        $routes->post('bulk',                    'UnitController::bulkCreate');
+        $routes->post('preview-recalculate',     'UnitController::previewRecalculate');
+        $routes->post('bulk-recalculate',        'UnitController::bulkRecalculate');
+        $routes->post('sync-caldiscount/apply',  'UnitController::syncCaldiscountApply');
     });
 
 
