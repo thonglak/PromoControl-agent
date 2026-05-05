@@ -29,7 +29,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
     StatCardComponent, StatusChipComponent, ThaiDatePipe,
   ],
   template: `
-    <div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+    <div class="p-3 sm:p-6 pb-24 lg:pb-6" style="max-width: 1440px; margin: 0 auto;">
       @if (loading()) {
         <div class="section-card p-12 text-center">
           <mat-spinner diameter="36" class="mx-auto mb-3"></mat-spinner>
@@ -72,26 +72,30 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
         <app-page-header
           [title]="'รายละเอียดรายการขาย'"
           [subtitle]="tx().sale_no ? '#' + tx().sale_no : ''">
-          <div actions class="flex items-center gap-2 flex-wrap">
-            <app-status-chip type="transaction_status" [value]="tx().status" />
-            @if (tx().unit_status) {
-              <app-status-chip type="unit_status" [value]="tx().unit_status" />
-            }
-            <div class="w-px h-6 mx-1" style="background: var(--color-gray-300)"></div>
-            <button mat-stroked-button (click)="goBack()">
-              <app-icon name="arrow-left" class="w-4 h-4 mr-1" /> กลับ
-            </button>
-            @if (tx().status === 'active' && tx().unit_status === 'sold') {
-              <button mat-flat-button color="primary" (click)="openTransferDialog()">โอนกรรมสิทธิ์</button>
-            }
-            @if (tx().status === 'active' && tx().unit_status !== 'transferred') {
-              <button mat-stroked-button color="warn" (click)="openCancelDialog()">ยกเลิกขาย</button>
-            }
-            @if (canEdit()) {
-              <button mat-flat-button color="primary" (click)="goToEdit()">
-                <app-icon name="pencil" class="w-4 h-4 mr-1" /> แก้ไข
+          <div actions class="header-actions">
+            <div class="flex items-center gap-2 flex-wrap">
+              <app-status-chip type="transaction_status" [value]="tx().status" />
+              @if (tx().unit_status) {
+                <app-status-chip type="unit_status" [value]="tx().unit_status" />
+              }
+            </div>
+            <div class="hidden sm:block w-px h-6 mx-1" style="background: var(--color-gray-300)"></div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button mat-stroked-button (click)="goBack()" class="btn-back">
+                <app-icon name="arrow-left" class="w-4 h-4 sm:mr-1" /> <span class="hidden sm:inline">กลับ</span>
               </button>
-            }
+              @if (tx().status === 'active' && tx().unit_status === 'sold') {
+                <button mat-flat-button color="primary" (click)="openTransferDialog()">โอนกรรมสิทธิ์</button>
+              }
+              @if (tx().status === 'active' && tx().unit_status !== 'transferred') {
+                <button mat-stroked-button color="warn" (click)="openCancelDialog()">ยกเลิกขาย</button>
+              }
+              @if (canEdit()) {
+                <button mat-flat-button color="primary" (click)="goToEdit()">
+                  <app-icon name="pencil" class="w-4 h-4 mr-1" /> แก้ไข
+                </button>
+              }
+            </div>
           </div>
         </app-page-header>
 
@@ -103,7 +107,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
 
             <!-- ข้อมูลยูนิต -->
             <app-section-card title="ข้อมูลยูนิต" icon="building-office" class="mb-8">
-              <div class="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                 <div class="detail-field">
                   <span class="detail-label">โครงการ</span>
                   <span class="detail-value">{{ tx().project_name }}</span>
@@ -137,7 +141,34 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
             @if (unitItems().length > 0) {
               <app-section-card title="โปรโมชั่น — งบยูนิต" icon="gift" [noPadding]="true" class="mb-8">
                 <span card-actions class="badge badge--info">{{ unitItems().length }} รายการ</span>
-                <div class="overflow-x-auto">
+
+                <!-- Mobile: card list -->
+                <div class="md:hidden p-3 space-y-2">
+                  @for (item of unitItems(); track item.id; let i = $index) {
+                    <div class="m-card">
+                      <div class="m-card__head">
+                        <div class="m-card__name">{{ item.promotion_item_name || 'รายการ #' + item.promotion_item_id }}</div>
+                        <div class="tabular-nums font-semibold text-sm whitespace-nowrap">฿{{ n(item.used_value) | number:'1.0-0' }}</div>
+                      </div>
+                      <div class="m-card__chips">
+                        <app-status-chip type="promotion_category" [value]="item.promotion_category" />
+                        @if (item.convert_to_discount === '1' || item.convert_to_discount === true) {
+                          <span class="badge badge--success">แปลงส่วนลด</span>
+                        }
+                      </div>
+                      @if (item.remark) {
+                        <div class="m-card__remark">{{ item.remark }}</div>
+                      }
+                    </div>
+                  }
+                  <div class="m-card__foot">
+                    <span class="text-sm font-semibold">รวมงบยูนิต</span>
+                    <span class="tabular-nums font-bold" style="color: var(--color-primary-700); font-size: 15px">฿{{ unitTotal() | number:'1.0-0' }}</span>
+                  </div>
+                </div>
+
+                <!-- Desktop: table -->
+                <div class="hidden md:block overflow-x-auto">
                   <table class="w-full text-sm">
                     <thead>
                       <tr>
@@ -184,7 +215,35 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
             @if (otherItems().length > 0) {
               <app-section-card title="โปรโมชั่น — งบอื่นๆ" icon="gift" [noPadding]="true" class="mb-8">
                 <span card-actions class="badge badge--warn">{{ otherItems().length }} รายการ</span>
-                <div class="overflow-x-auto">
+
+                <!-- Mobile: card list -->
+                <div class="md:hidden p-3 space-y-2">
+                  @for (item of otherItems(); track item.id; let i = $index) {
+                    <div class="m-card">
+                      <div class="m-card__head">
+                        <div class="m-card__name">{{ item.promotion_item_name || 'รายการ #' + item.promotion_item_id }}</div>
+                        <div class="tabular-nums font-semibold text-sm whitespace-nowrap">฿{{ n(item.used_value) | number:'1.0-0' }}</div>
+                      </div>
+                      <div class="m-card__chips">
+                        <app-status-chip type="promotion_category" [value]="item.promotion_category" />
+                        <app-status-chip type="budget_source" [value]="fundingToChipValue(item.funding_source_type)" />
+                        @if (item.convert_to_discount === '1' || item.convert_to_discount === true) {
+                          <span class="badge badge--success">แปลงส่วนลด</span>
+                        }
+                      </div>
+                      @if (item.remark) {
+                        <div class="m-card__remark">{{ item.remark }}</div>
+                      }
+                    </div>
+                  }
+                  <div class="m-card__foot">
+                    <span class="text-sm font-semibold">รวมงบอื่นๆ</span>
+                    <span class="tabular-nums font-bold" style="color: var(--color-primary-700); font-size: 15px">฿{{ otherTotal() | number:'1.0-0' }}</span>
+                  </div>
+                </div>
+
+                <!-- Desktop: table -->
+                <div class="hidden md:block overflow-x-auto">
                   <table class="w-full text-sm">
                     <thead>
                       <tr>
@@ -242,7 +301,30 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
             <!-- Budget Movements -->
             @if (movements().length > 0) {
               <app-section-card title="เคลื่อนไหวงบประมาณ" icon="arrows-right-left" [noPadding]="true" class="mb-6">
-                <div class="overflow-x-auto">
+
+                <!-- Mobile: card list -->
+                <div class="md:hidden p-3 space-y-2">
+                  @for (mv of movements(); track mv.id) {
+                    <div class="m-card">
+                      <div class="m-card__head">
+                        <div class="font-mono text-xs" style="color: var(--color-text-secondary)">{{ mv.movement_no || '—' }}</div>
+                        <div class="tabular-nums font-semibold text-sm whitespace-nowrap"
+                          [class.text-loss]="n(mv.amount) < 0"
+                          [class.text-profit]="n(mv.amount) > 0">
+                          ฿{{ n(mv.amount) | number:'1.0-0' }}
+                        </div>
+                      </div>
+                      <div class="m-card__chips">
+                        <app-status-chip type="movement_type" [value]="mv.movement_type" />
+                        <app-status-chip type="budget_source" [value]="fundingToChipValue(mv.budget_source_type)" />
+                        <app-status-chip type="movement_status" [value]="mv.status" />
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- Desktop: table -->
+                <div class="hidden md:block overflow-x-auto">
                   <table class="w-full text-sm">
                     <thead>
                       <tr>
@@ -300,7 +382,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                   <!-- ราคาสุทธิ (highlight) -->
                   <div class="s-row s-row--highlight">
                     <span class="font-bold">ราคาสุทธิ (Net Price)</span>
-                    <span class="tabular-nums text-xl font-bold">{{ n(tx().net_price) | number:'1.0-0' }}</span>
+                    <span class="tabular-nums text-lg sm:text-xl font-bold">{{ n(tx().net_price) | number:'1.0-0' }}</span>
                   </div>
 
                   <div class="s-sep"></div>
@@ -460,6 +542,26 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                 </div>
               </div>
 
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ Mobile Sticky Bottom Bar (< lg) ═══ -->
+        <div class="m-bottom-bar lg:hidden">
+          <div class="m-bottom-bar__inner">
+            <div class="m-bottom-bar__col">
+              <span class="m-bottom-bar__label">ราคาสุทธิ</span>
+              <span class="m-bottom-bar__value tabular-nums" style="color: var(--color-primary)">
+                ฿{{ n(tx().net_price) | number:'1.0-0' }}
+              </span>
+            </div>
+            <div class="m-bottom-bar__col m-bottom-bar__col--end">
+              <span class="m-bottom-bar__label">กำไร</span>
+              <span class="m-bottom-bar__value tabular-nums"
+                [class.text-profit]="n(tx().profit) >= 0"
+                [class.text-loss]="n(tx().profit) < 0">
+                {{ n(tx().profit) | number:'1.0-0' }}
+              </span>
             </div>
           </div>
         </div>
@@ -690,6 +792,122 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
       border-radius: 50%;
       flex-shrink: 0;
       display: inline-block;
+    }
+
+    /* ── Header Actions (mobile-friendly) ── */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn-back {
+      min-width: 0;
+    }
+    /* Stack title และ actions เป็นแนวตั้งบนมือถือ ลดความเบียด */
+    @media (max-width: 640px) {
+      :host ::ng-deep app-page-header > div {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      :host ::ng-deep app-page-header > div > div:last-child {
+        justify-content: flex-start;
+      }
+    }
+
+    /* ── Mobile item card (แทน table บนมือถือ) ── */
+    .m-card {
+      padding: 12px;
+      border: 1px solid var(--color-gray-200);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+    }
+    .m-card__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .m-card__name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-text-primary);
+      line-height: 1.35;
+      flex: 1;
+      min-width: 0;
+    }
+    .m-card__chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .m-card__remark {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--color-gray-200);
+    }
+    .m-card__foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      margin-top: 4px;
+      background: var(--color-gray-50);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-gray-200);
+    }
+
+    /* ── badge variant: success (ใช้ในการ์ดมือถือ) ── */
+    .badge--success {
+      background: var(--color-success-subtle, rgba(16,185,129,0.12));
+      color: var(--color-success);
+    }
+
+    /* ── Mobile sticky bottom bar (KPI หลัก) ── */
+    .m-bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-top: 1px solid var(--color-gray-200);
+      box-shadow: 0 -2px 12px rgba(15, 23, 42, 0.06);
+      z-index: 40;
+      padding: 10px 14px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
+    }
+    .m-bottom-bar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+    .m-bottom-bar__col {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .m-bottom-bar__col--end {
+      align-items: flex-end;
+    }
+    .m-bottom-bar__label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .m-bottom-bar__value {
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.2;
     }
   `],
 })
