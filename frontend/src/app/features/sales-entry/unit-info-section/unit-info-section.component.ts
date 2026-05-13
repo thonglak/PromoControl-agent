@@ -1,4 +1,4 @@
-import { Component, inject, ElementRef, signal, computed, output, effect, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, ElementRef, signal, computed, output, input, effect, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -7,6 +7,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatRadioModule } from '@angular/material/radio';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subscription } from 'rxjs';
 
 import { ProjectService } from '../../../core/services/project.service';
@@ -30,7 +31,7 @@ function toISODateStr(d: any): string {
   imports: [
     CommonModule, ReactiveFormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
-    MatDatepickerModule, MatRadioModule,
+    MatDatepickerModule, MatRadioModule, MatTooltipModule,
     CurrencyMaskDirective,
   ],
   template: `
@@ -72,20 +73,29 @@ function toISODateStr(d: any): string {
           <mat-datepicker #picker></mat-datepicker>
         </mat-form-field>
 
-        <!-- ราคาหน้าสัญญา -->
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>ราคาหน้าสัญญา</mat-label>
-          <input matInput currencyMask
-            [formControl]="contractPriceControl"
-            placeholder="0">
-          <span matTextPrefix>฿&nbsp;</span>
-          @if (contractPriceControl.touched && contractPriceControl.hasError('required')) {
-            <mat-error>กรุณาระบุราคาหน้าสัญญา</mat-error>
+        <!-- ราคาหน้าสัญญา (auto-fill จากราคาแนะนำ — แก้ไขได้) -->
+        <div class="flex flex-col">
+          <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+            <mat-label>ราคาหน้าสัญญา</mat-label>
+            <input matInput currencyMask
+              [formControl]="contractPriceControl"
+              placeholder="0">
+            <span matTextPrefix>฿&nbsp;</span>
+            @if (contractPriceControl.touched && contractPriceControl.hasError('required')) {
+              <mat-error>กรุณาระบุราคาหน้าสัญญา</mat-error>
+            }
+            @if (contractPriceControl.touched && contractPriceControl.hasError('min')) {
+              <mat-error>ราคาหน้าสัญญาต้องมากกว่า 0</mat-error>
+            }
+          </mat-form-field>
+          @if (showApplyRecommendedButton()) {
+            <button type="button" class="text-xs mt-1 self-start hover:underline tabular-nums"
+              style="color: var(--color-primary)"
+              (click)="applyRecommendedContractPrice()">
+              ↺ ใช้ราคาแนะนำ ฿{{ recommendedContractPrice() | number:'1.0-0' }}
+            </button>
           }
-          @if (contractPriceControl.touched && contractPriceControl.hasError('min')) {
-            <mat-error>ราคาหน้าสัญญาต้องมากกว่า 0</mat-error>
-          }
-        </mat-form-field>
+        </div>
 
         <!-- ราคาขาย -->
         <mat-form-field appearance="outline" class="w-full readonly-field">
@@ -143,7 +153,7 @@ function toISODateStr(d: any): string {
       <div class="mt-4 pt-4 border-t border-slate-200">
         <div class="text-xs font-medium mb-3" style="color: var(--color-text-secondary)">ส่วนเสริม (สำหรับยื่นกู้)</div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
           <!-- ขอบวกเพิ่ม -->
           <mat-form-field appearance="outline" class="w-full">
             <mat-label>ขอบวกเพิ่ม (เพื่อยื่นกู้)</mat-label>
@@ -154,14 +164,45 @@ function toISODateStr(d: any): string {
             <mat-hint>ลูกค้าขอบวกเพิ่มในราคาสุทธิเพื่อยื่นกู้ — ไม่กระทบงบ/กำไรจริง</mat-hint>
           </mat-form-field>
 
-          <!-- ค่าใช้จ่ายบวกเพิ่ม -->
-          <mat-form-field appearance="outline" class="w-full">
-            <mat-label>ค่าใช้จ่ายบวกเพิ่ม (ค่าธรรมเนียมโอน)</mat-label>
-            <input matInput currencyMask
-              [formControl]="additionalExpenseControl"
-              placeholder="0">
-            <span matTextPrefix>฿&nbsp;</span>
-          </mat-form-field>
+          <!-- ค่าใช้จ่ายบวกเพิ่ม (auto-fill จาก system setting transfer_fee_percent — แก้ไขได้) -->
+          <div class="flex flex-col">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>ค่าใช้จ่ายบวกเพิ่ม (ค่าธรรมเนียมโอน)</mat-label>
+              <input matInput currencyMask
+                [formControl]="additionalExpenseControl"
+                placeholder="0">
+              <span matTextPrefix>฿&nbsp;</span>
+            </mat-form-field>
+
+            <!-- คำอธิบายสูตรตามโหมด -->
+            @if (transferFeePercent() > 0) {
+              <p class="text-xs mt-1 leading-relaxed" style="color: var(--color-text-secondary)">
+                @if (additionalExpenseModeControl.value === 'add_to_net') {
+                  สูตร: (ราคาสุทธิยื่นกู้ − ราคาสุทธิ) × {{ transferFeePercent() }}%
+                  <br>
+                  <span style="color: var(--color-gray-500)">
+                    = ขอบวกเพิ่ม × {{ transferFeePercent() }}% ÷ (100% − {{ transferFeePercent() }}%)
+                    <span [matTooltip]="'mode บวกเข้าราคาขายสุทธิ → ค่าธรรมเนียมโอนถูกบวกเข้า ราคาสุทธิยื่นกู้ ด้วย → ผลต่างจึงรวมตัวมันเอง แก้สมการ closed-form'">
+                      (ทำไม?)
+                    </span>
+                  </span>
+                } @else {
+                  สูตร: ขอบวกเพิ่ม × {{ transferFeePercent() }}%
+                  <span style="color: var(--color-gray-500)" [matTooltip]="'mode ของแถมเพิ่มเติม → ค่าธรรมเนียมโอน ไม่อยู่ใน ราคาสุทธิยื่นกู้ → คิดตรงๆ จากขอบวกเพิ่ม'">
+                    (ทำไม?)
+                  </span>
+                }
+              </p>
+            }
+
+            @if (showApplyRecommendedAdditionalExpenseButton()) {
+              <button type="button" class="text-xs mt-1 self-start hover:underline tabular-nums"
+                style="color: var(--color-primary)"
+                (click)="applyRecommendedAdditionalExpense()">
+                ↺ ใช้ค่าเริ่มต้น ฿{{ recommendedAdditionalExpense() | number:'1.0-0' }}
+              </button>
+            }
+          </div>
         </div>
 
         <!-- โหมดการคิดค่าธรรมเนียมโอน — แสดงเมื่อมีจำนวนเงิน -->
@@ -187,6 +228,14 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   private el = inject(ElementRef);
   private project = inject(ProjectService);
   private unitApi = inject(UnitApiService);
+
+  // Inputs
+  /** ราคาที่แนะนำสำหรับ contract_price = net_price + ขอบวกเพิ่ม + ค่าธรรมเนียมโอน(add_to_net) */
+  recommendedContractPrice = input<number>(0);
+  /** ค่าธรรมเนียมโอนแนะนำจาก system_settings.transfer_fee_percent */
+  recommendedAdditionalExpense = input<number>(0);
+  /** อัตรา % ค่าธรรมเนียมโอน (จาก system_settings) — สำหรับแสดงสูตรใต้ช่อง input */
+  transferFeePercent = input<number>(0);
 
   // Outputs
   unitSelected = output<Unit | null>();
@@ -217,6 +266,31 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   readonly allowSoldUnit = signal(false);
   /** ข้อความที่ผู้ใช้พิมพ์เพื่อค้นหายูนิต */
   readonly unitSearchText = signal<string>('');
+  /** true เมื่อ user แก้ ราคาหน้าสัญญา เอง — บล็อก auto-fill จากราคาแนะนำ */
+  readonly userOverrodeContract = signal<boolean>(false);
+  /** ค่าปัจจุบันของ contractPriceControl เป็น signal (sync จาก valueChanges + auto-fill) */
+  private contractValueSignal = signal<number | null>(null);
+
+  /** true เมื่อ user แก้ ค่าธรรมเนียมโอน เอง — บล็อก auto-fill */
+  readonly userOverrodeAdditionalExpense = signal<boolean>(false);
+  /** ค่าปัจจุบันของ additionalExpenseControl เป็น signal */
+  private additionalExpenseValueSignal = signal<number>(0);
+
+  /** แสดงปุ่ม "ใช้ราคาแนะนำ" เมื่อ: user เคยแก้เอง + recommended > 0 + ค่าใน ช่อง ≠ recommended */
+  readonly showApplyRecommendedButton = computed(() => {
+    const rec = this.recommendedContractPrice();
+    if (rec <= 0) return false;
+    if (!this.userOverrodeContract()) return false;
+    return Number(this.contractValueSignal() ?? 0) !== rec;
+  });
+
+  /** แสดงปุ่ม "ใช้ค่าเริ่มต้น" สำหรับค่าธรรมเนียมโอน */
+  readonly showApplyRecommendedAdditionalExpenseButton = computed(() => {
+    const rec = this.recommendedAdditionalExpense();
+    if (rec <= 0) return false;
+    if (!this.userOverrodeAdditionalExpense()) return false;
+    return Number(this.additionalExpenseValueSignal() ?? 0) !== rec;
+  });
 
   readonly projectName = computed(() => this.project.selectedProject()?.name ?? '');
   readonly projectId = computed(() => Number(this.project.selectedProject()?.id ?? 0));
@@ -254,9 +328,13 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
       })
     );
 
-    // เมื่อเปลี่ยนราคาหน้าสัญญา → emit (parent ใช้ recalc expression formulas)
+    // เมื่อเปลี่ยนราคาหน้าสัญญา (user แก้เอง — auto-fill ใช้ emitEvent:false ไม่ผ่านที่นี่)
+    // → flag override + emit ให้ parent recalc expression formulas ที่อ้าง contract_price
     this.subs.push(
       this.contractPriceControl.valueChanges.subscribe(price => {
+        const num = price == null ? null : Number(price);
+        this.contractValueSignal.set(num);
+        this.userOverrodeContract.set(true);
         this.contractPriceChanged.emit(price);
       })
     );
@@ -267,9 +345,13 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
         this.loanMarkupChanged.emit(Number(v) || 0);
       })
     );
+    // ค่าธรรมเนียมโอน — user แก้เอง (auto-fill ใช้ emitEvent:false ไม่ผ่านที่นี่)
     this.subs.push(
       this.additionalExpenseControl.valueChanges.subscribe(v => {
-        this.additionalExpenseChanged.emit(Number(v) || 0);
+        const num = Number(v) || 0;
+        this.additionalExpenseValueSignal.set(num);
+        this.userOverrodeAdditionalExpense.set(true);
+        this.additionalExpenseChanged.emit(num);
       })
     );
     this.subs.push(
@@ -294,6 +376,55 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     this.subs.forEach(s => s.unsubscribe());
   }
 
+  /** Auto-fill contract_price จาก recommended เมื่อ user ยังไม่ได้แก้เอง
+   *  ใช้ emitEvent:false → ไม่ trigger contractPriceChanged → ไม่ trigger eligible reload (กัน loop) */
+  private autoFillContractEffect = effect(() => {
+    const rec = this.recommendedContractPrice();
+    if (this.userOverrodeContract()) return;
+    if (rec <= 0) return;
+    if (this.contractPriceControl.disabled) return;
+    const current = Number(this.contractValueSignal() ?? 0);
+    if (current === rec) return;
+    this.contractPriceControl.setValue(rec, { emitEvent: false });
+    this.contractValueSignal.set(rec);
+  });
+
+  /** ปุ่ม "ใช้ราคาแนะนำ" — รีเซ็ต override + sync ค่าใหม่ + emit (ให้ parent recalc ถ้ามีสูตรอ้าง contract_price) */
+  applyRecommendedContractPrice(): void {
+    const rec = this.recommendedContractPrice();
+    if (rec <= 0) return;
+    this.contractPriceControl.setValue(rec, { emitEvent: false });
+    this.contractValueSignal.set(rec);
+    this.userOverrodeContract.set(false);
+    this.contractPriceControl.markAsPristine();
+    this.contractPriceChanged.emit(rec);
+  }
+
+  /** Auto-fill ค่าธรรมเนียมโอน จาก recommendedAdditionalExpense เมื่อ user ยังไม่ได้แก้
+   *  ใช้ emitEvent:false → ไม่ flip override flag, ไม่ trigger additionalExpenseChanged
+   *  → ผมยังต้องอัพเดท parent state เอง ตรงนี้แค่ sync ช่องในจอ */
+  private autoFillAdditionalExpenseEffect = effect(() => {
+    const rec = this.recommendedAdditionalExpense();
+    if (this.userOverrodeAdditionalExpense()) return;
+    if (this.additionalExpenseControl.disabled) return;
+    const current = Number(this.additionalExpenseValueSignal() ?? 0);
+    if (current === rec) return;
+    this.additionalExpenseControl.setValue(rec, { emitEvent: false });
+    this.additionalExpenseValueSignal.set(rec);
+    this.additionalExpenseChanged.emit(rec);
+  });
+
+  /** ปุ่ม "ใช้ค่าเริ่มต้น" สำหรับค่าธรรมเนียมโอน */
+  applyRecommendedAdditionalExpense(): void {
+    const rec = this.recommendedAdditionalExpense();
+    if (rec <= 0) return;
+    this.additionalExpenseControl.setValue(rec, { emitEvent: false });
+    this.additionalExpenseValueSignal.set(rec);
+    this.userOverrodeAdditionalExpense.set(false);
+    this.additionalExpenseControl.markAsPristine();
+    this.additionalExpenseChanged.emit(rec);
+  }
+
   /** แสดงข้อความใน input จาก unit ID — ใช้กับ [displayWith] ของ mat-autocomplete */
   displayUnit(unitId: number | string | null): string {
     if (unitId == null) return '';
@@ -310,6 +441,12 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     this.unitSearchText.set('');
     const unit = this.units().find(u => String(u.id) === String(unitId)) ?? null;
     this.selectedUnit.set(unit);
+    // เปลี่ยนยูนิต → reset override ของ contract_price + additional_expense
+    // (ของยูนิตใหม่ไม่ใช่ข้อมูลที่ user เคยแก้)
+    this.userOverrodeContract.set(false);
+    this.contractPriceControl.markAsPristine();
+    this.userOverrodeAdditionalExpense.set(false);
+    this.additionalExpenseControl.markAsPristine();
     this.unitSelected.emit(unit);
   }
 

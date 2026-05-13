@@ -220,6 +220,54 @@ POST/PUT body fields:
 POST   /api/fee-formulas/test                 (ทดสอบสูตร — body: formula_id, mode='unit'|'manual', unit_id, sale_date, manual_input?, contract_price?, net_price?; ถ้าไม่ส่ง net_price → fallback เป็น base_price; ถ้าไม่ส่ง formula_id จะคืนทุกสูตร)
 POST   /api/fee-formulas/test-batch           (ทดสอบสูตรเดียวกับทุกยูนิตในโครงการ — body: formula_id, sale_date, project_id)
 
+## System Settings (ตั้งค่าระบบ — key/value ทั่วระบบ)
+GET    /api/system-settings                   (รายการตัวแปรทั้งหมด — logged-in user ทุก role อ่านได้)
+GET    /api/system-settings/{key}             (อ่านค่าเดียวตาม key)
+PUT    /api/system-settings/{key}             (แก้ไขค่า — admin/manager; body: `{ "setting_value": <value> }`)
+
+Schema row:
+```json
+{
+  "id": 1,
+  "setting_key": "transfer_fee_percent",
+  "setting_value": 4.3,
+  "description": "อัตราค่าธรรมเนียมโอน (%) — ใช้คำนวณ default ของ additional_expense_amount ใน sales-entry",
+  "updated_by": 2,
+  "updated_at": "2026-05-13 12:00:00"
+}
+```
+
+- `setting_value` เก็บเป็น JSON ใน DB → รองรับ number / string / boolean / object ในอนาคต
+- เพิ่ม key ใหม่ผ่าน migration/seed (controller จะปฏิเสธ key ที่ไม่ผ่าน validateValue)
+
+Keys ปัจจุบัน:
+- `transfer_fee_percent` (number, 0 ≤ x < 100) — ใช้คำนวณ default ของ `additional_expense_amount` ใน sales-entry
+
+  สูตรหลัก (definition):
+  ```
+  additional_expense = (ราคาสุทธิยื่นกู้ − ราคาสุทธิ Net Price) × pct%
+  ```
+  โดย `ราคาสุทธิยื่นกู้ = net_price + loan_markup + (additional_expense ถ้า mode='add_to_net')`
+
+  เนื่องจาก mode มี 2 แบบ จึงต้อง derive ออกมา 2 กรณี:
+
+  - **mode `as_premium`** (บริษัทจ่ายให้ลูกค้า) — `additional_expense` ไม่อยู่ใน `ราคาสุทธิยื่นกู้` ดังนั้น:
+    - ผลต่าง = `loan_markup` เท่านั้น
+    - `default = loan_markup × pct/100`
+
+  - **mode `add_to_net`** (ลูกค้าจ่ายเอง บวกเข้าราคาสุทธิยื่นกู้) — `additional_expense` ถูกบวกเข้าใน `ราคาสุทธิยื่นกู้` ด้วย → ผลต่างจึงรวมตัวมันเอง:
+    - `default = (loan_markup + default) × pct/100`
+    - แก้สมการ closed-form: `default = loan_markup × p / (1 − p)` (โดย `p = pct/100`)
+    - ทำให้ไม่ต้อง iterate และไม่เกิด feedback loop ในจอ
+
+  ตัวอย่างที่อาจดูแปลกตา (เพื่อเข้าใจง่าย): `loan_markup = 200,000`, `pct = 1%`, mode = `add_to_net`
+  ```
+  default = 200,000 × 0.01 / (1 − 0.01) = 200,000 × 0.01 / 0.99 ≈ 2,020.20
+  ```
+  ตรวจกลับด้วยสูตรหลัก: `ราคาสุทธิยื่นกู้ − net = 200,000 + 2,020.20 = 202,020.20`; `202,020.20 × 1% = 2,020.20` ✓
+
+  หมายเหตุ: ถ้า mode เดียวกันเป็น `as_premium` → `default = 200,000 × 1% = 2,000` ตรงๆ (ไม่ recursive)
+
 ## Number Series (เลขที่เอกสาร)
 GET    /api/number-series                     (รายการ series ของโครงการที่เลือก)
 GET    /api/number-series/{id}                (รายละเอียด series)

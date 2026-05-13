@@ -89,6 +89,7 @@ const MENU: MenuItem[] = [
     label: 'ตั้งค่า', icon: 'cog',
     roles: ['admin', 'manager'],
     children: [
+      { label: 'ตั้งค่าระบบ', path: '/settings/system', roles: ['admin', 'manager'] },
       { label: 'เลขที่เอกสาร', path: '/settings/number-series', roles: ['admin', 'manager'] },
       { label: 'รูปแบบวันที่', path: '/settings/date-format' },
     ],

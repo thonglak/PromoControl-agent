@@ -235,6 +235,15 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->post('provision-all', 'NumberSeriesController::provisionAll');
     });
 
+    // System Settings (ตั้งค่าระบบ — key/value ทั่วระบบ)
+    $routes->group('system-settings', static function (RouteCollection $routes): void {
+        $routes->get('/',              'SystemSettingController::index');
+        $routes->get('(:segment)',     'SystemSettingController::show/$1');
+    });
+    $routes->group('system-settings', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
+        $routes->put('(:segment)',     'SystemSettingController::update/$1');
+    });
+
     // Reports (รายงาน)
     $routes->group('reports', ['filter' => 'role:admin,manager,finance,viewer'], static function (RouteCollection $routes): void {
         $routes->get('sales',            'ReportController::sales');

@@ -8,6 +8,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 import { ProjectService } from '../../core/services/project.service';
 import { AuthService } from '../../core/services/auth.service';
+import { SystemSettingsService } from '../settings/services/system-settings.service';
 import { SalesEntryService, EligibleResponse } from './services/sales-entry.service';
 import { UnitInfoSectionComponent } from './unit-info-section/unit-info-section.component';
 import { BudgetOverviewSectionComponent } from './budget-overview-section/budget-overview-section.component';
@@ -56,6 +57,9 @@ function toISODateStr(d: any): string {
 
           <!-- Section 1: ข้อมูลยูนิต -->
           <app-unit-info-section
+            [recommendedContractPrice]="recommendedContractPrice()"
+            [recommendedAdditionalExpense]="recommendedAdditionalExpense()"
+            [transferFeePercent]="transferFeePercent()"
             (unitSelected)="onUnitSelected($event)"
             (saleDateChanged)="onSaleDateChanged($event)"
             (contractPriceChanged)="onContractPriceChanged($event)"
@@ -138,6 +142,7 @@ export class SalesEntryComponent implements OnInit {
   private project = inject(ProjectService);
   private auth = inject(AuthService);
   private salesSvc = inject(SalesEntryService);
+  private systemSettings = inject(SystemSettingsService);
   private snack = inject(MatSnackBar);
   private dialog = inject(MatDialog);
   private router = inject(Router);
@@ -232,6 +237,10 @@ export class SalesEntryComponent implements OnInit {
   readonly projectId = computed(() => Number(this.project.selectedProject()?.id ?? 0));
 
   ngOnInit(): void {
+    // โหลด system settings ตอนเปิดหน้า (ถ้ายังไม่มี cache ก็ดึงครั้งแรก; subsequent visits ใช้ cache จากบริการ)
+    // ไม่ block UI — auto-fill จะทำงานทันทีเมื่อ settings มาถึง (computed track signal)
+    this.systemSettings.list().subscribe({ error: () => {} });
+
     const id = Number(this.route.snapshot.paramMap.get('id'));
     if (id > 0) {
       this.editMode.set(true);
@@ -420,7 +429,7 @@ export class SalesEntryComponent implements OnInit {
    *  - panel A category=discount → used_value ทั้งก้อน
    *  - panel A category=premium → discount_convert_value (ส่วนแปลงเป็นส่วนลด)
    *  - panel B category=discount → used_value */
-  private currentNetPrice(): number {
+  readonly currentNetPriceSignal = computed(() => {
     const base = this.selectedUnit()?.base_price ?? 0;
     if (base <= 0) return 0;
     let totalDiscount = 0;
@@ -437,7 +446,43 @@ export class SalesEntryComponent implements OnInit {
       if (r.category === 'discount') totalDiscount += r.used_value;
     }
     return Math.max(0, base - totalDiscount);
+  });
+
+  private currentNetPrice(): number {
+    return this.currentNetPriceSignal();
   }
+
+  /** ราคาแนะนำสำหรับ contract_price = net_price + ขอบวกเพิ่ม + ค่าธรรมเนียมโอน (เฉพาะโหมด add_to_net) */
+  readonly recommendedContractPrice = computed(() => {
+    const np = this.currentNetPriceSignal();
+    const markup = Math.max(0, this.loanMarkupAmount());
+    const addExpense = this.additionalExpenseMode() === 'add_to_net'
+      ? Math.max(0, this.additionalExpenseAmount())
+      : 0;
+    return Math.round(np + markup + addExpense);
+  });
+
+  /** อัตรา % ค่าธรรมเนียมโอน จาก system settings (signal — auto-update เมื่อ settings โหลดเสร็จ) */
+  readonly transferFeePercent = computed(() => {
+    this.systemSettings.settings();
+    return Number(this.systemSettings.getValue('transfer_fee_percent', 0)) || 0;
+  });
+
+  /** ค่าธรรมเนียมโอนแนะนำ — คำนวณจาก system setting `transfer_fee_percent`
+   *  สูตร: add_expense = (netPriceForLoan − net_price) × p
+   *  - mode=as_premium: ผลต่าง = markup → add_expense = markup × p
+   *  - mode=add_to_net: ผลต่าง = markup + add_expense (recursive) → closed-form add_expense = markup × p/(1−p)
+   *  คืน 0 ถ้า markup ≤ 0 หรือ pct ≤ 0 */
+  readonly recommendedAdditionalExpense = computed(() => {
+    const pct = this.transferFeePercent();
+    const markup = Math.max(0, this.loanMarkupAmount());
+    if (markup <= 0 || pct <= 0) return 0;
+    const p = pct / 100;
+    if (this.additionalExpenseMode() === 'add_to_net' && p < 1) {
+      return Math.round(markup * p / (1 - p));
+    }
+    return Math.round(markup * p);
+  });
 
   onPanelAItemsChanged(rows: PanelARow[]): void {
     this.currentPanelARows.set(rows);
@@ -718,9 +763,10 @@ export class SalesEntryComponent implements OnInit {
             this.saleDate.set(tx.sale_date);
           }
 
-          // pre-fill ราคาหน้าสัญญา (edit mode)
+          // pre-fill ราคาหน้าสัญญา (edit mode) — markAsDirty เพื่อบล็อก auto-sync ทับค่าเดิม
           if (tx.contract_price != null) {
             unitInfo.contractPriceControl.setValue(Number(tx.contract_price));
+            unitInfo.contractPriceControl.markAsDirty();
           }
 
           // pre-fill ส่วนเสริม (ขอบวกเพิ่ม + ค่าใช้จ่ายบวกเพิ่ม + โหมด)
@@ -729,8 +775,12 @@ export class SalesEntryComponent implements OnInit {
             this.loanMarkupAmount.set(Number(tx.loan_markup_amount) || 0);
           }
           if (tx.additional_expense_amount != null) {
-            unitInfo.additionalExpenseControl.setValue(Number(tx.additional_expense_amount) || 0);
-            this.additionalExpenseAmount.set(Number(tx.additional_expense_amount) || 0);
+            const v = Number(tx.additional_expense_amount) || 0;
+            unitInfo.additionalExpenseControl.setValue(v);
+            this.additionalExpenseAmount.set(v);
+            // edit mode → บล็อก auto-fill ทับค่าเดิม
+            unitInfo.userOverrodeAdditionalExpense.set(true);
+            unitInfo.additionalExpenseControl.markAsDirty();
           }
           if (tx.additional_expense_mode) {
             unitInfo.additionalExpenseModeControl.setValue(tx.additional_expense_mode);
