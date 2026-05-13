@@ -177,7 +177,7 @@ export class SummarySectionComponent {
   /** ค่าธรรมเนียมโอน */
   additionalExpenseAmount = input<number>(0);
   /** โหมดค่าธรรมเนียมโอน: add_to_net = บวกเข้าสุทธิ, as_premium = expense_support งบผู้บริหาร */
-  additionalExpenseMode = input<'add_to_net' | 'as_premium'>('add_to_net');
+  additionalExpenseMode = input<'add_to_net' | 'as_premium' | 'as_unit_expense'>('add_to_net');
 
   // ─── Computed: calculations (ตรงตามสูตรใน business rules) ──────────
   // panel A premium split: discount_convert_value → discount, ส่วนที่เหลือ → premium จริง

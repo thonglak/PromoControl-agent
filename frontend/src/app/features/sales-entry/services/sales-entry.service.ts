@@ -81,7 +81,7 @@ export interface SalesTransaction {
   /** ค่าธรรมเนียมโอน */
   additional_expense_amount?: number | string;
   /** โหมดค่าธรรมเนียมโอน */
-  additional_expense_mode?: 'add_to_net' | 'as_premium';
+  additional_expense_mode?: 'add_to_net' | 'as_premium' | 'as_unit_expense';
   status: 'active' | 'cancelled';
   cancelled_at?: string;
   cancelled_by?: number;

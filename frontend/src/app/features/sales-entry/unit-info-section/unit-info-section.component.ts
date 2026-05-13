@@ -16,7 +16,13 @@ import { UnitApiService, Unit } from '../../master-data/units/unit-api.service';
 import { CurrencyMaskDirective } from '../../../shared/directives/currency-mask.directive';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
 
-export type AdditionalExpenseMode = 'add_to_net' | 'as_premium';
+export type AdditionalExpenseMode = 'add_to_net' | 'as_premium' | 'as_unit_expense';
+
+/** ตัวเลือกรายการ expense_support สำหรับ mode=as_unit_expense */
+export interface ExpenseSupportOption {
+  id: number;
+  name: string;
+}
 
 /** แปลง Date หรือ Moment → YYYY-MM-DD string */
 function toISODateStr(d: any): string {
@@ -213,7 +219,7 @@ function toISODateStr(d: any): string {
                   </span>
                 } @else {
                   สูตร: ขอบวกเพิ่ม × {{ transferFeePercent() }}%
-                  <span style="color: var(--color-gray-500)" [matTooltip]="'mode ของแถมเพิ่มเติม → ค่าธรรมเนียมโอน ไม่อยู่ใน ราคาสุทธิยื่นกู้ → คิดตรงๆ จากขอบวกเพิ่ม'">
+                  <span style="color: var(--color-gray-500)" [matTooltip]="'mode ที่บริษัทจ่ายให้ → ค่าธรรมเนียมโอนไม่อยู่ในราคาสุทธิยื่นกู้ → คิดตรงๆ จากขอบวกเพิ่ม'">
                     (ทำไม?)
                   </span>
                 }
@@ -245,6 +251,37 @@ function toISODateStr(d: any): string {
               <mat-radio-button value="add_to_net" class="text-sm">
                 ค่าธรรมเนียมโอนบวกเพิ่ม (ลูกค้าจ่ายเอง)
               </mat-radio-button>
+              <mat-radio-button value="as_unit_expense" class="text-sm">
+                ค่าธรรมเนียมโอนบวกเพิ่ม (ใช้งบยูนิต)
+              </mat-radio-button>
+
+              <!-- เลือกรายการ expense_support ที่จะผูก (เฉพาะ mode=as_unit_expense) — อยู่ใต้ radio "ใช้งบยูนิต" -->
+              @if (additionalExpenseModeControl.value === 'as_unit_expense') {
+                <div class="pl-7">
+                  @if (expenseSupportItems().length > 0) {
+                    <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic">
+                      <mat-label>ใช้กับรายการไหน</mat-label>
+                      <mat-select [formControl]="linkedItemControl">
+                        @for (opt of expenseSupportItems(); track opt.id) {
+                          <mat-option [value]="opt.id">{{ opt.name }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                    @if (linkedItemControl.value == null) {
+                      <p class="text-xs mt-1 flex items-center gap-1" style="color: var(--color-warning)">
+                        <app-icon name="exclamation-triangle" class="w-3 h-3" />
+                        กรุณาเลือกรายการค่าใช้จ่ายที่จะผูกค่าธรรมเนียมโอน
+                      </p>
+                    }
+                  } @else {
+                    <p class="text-xs flex items-center gap-1" style="color: var(--color-warning)">
+                      <app-icon name="exclamation-triangle" class="w-3 h-3" />
+                      ยูนิตนี้ไม่มีรายการค่าใช้จ่ายใน Panel A — เลือกโหมดอื่น
+                    </p>
+                  }
+                </div>
+              }
+
               <mat-radio-button value="as_premium" class="text-sm">
                 ค่าธรรมเนียมโอนบวกเพิ่ม (ใช้งบผู้บริหาร)
               </mat-radio-button>
@@ -268,6 +305,8 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   recommendedAdditionalExpense = input<number>(0);
   /** อัตรา % ค่าธรรมเนียมโอน (จาก system_settings) — สำหรับแสดงสูตรใต้ช่อง input */
   transferFeePercent = input<number>(0);
+  /** รายการ expense_support ใน Panel A สำหรับ dropdown ของ mode=as_unit_expense */
+  expenseSupportItems = input<ExpenseSupportOption[]>([]);
 
   // Outputs
   unitSelected = output<Unit | null>();
@@ -276,6 +315,8 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   loanMarkupChanged = output<number>();
   additionalExpenseChanged = output<number>();
   additionalExpenseModeChanged = output<AdditionalExpenseMode>();
+  /** เปลี่ยนรายการที่ผูกกับค่าธรรมเนียมโอน (mode=as_unit_expense); null = ยังไม่เลือก/mode อื่น */
+  linkedItemChanged = output<number | null>();
 
   // Form controls
   unitControl = this.fb.control<number | null>(null);
@@ -288,8 +329,13 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   loanMarkupControl = this.fb.control<number>(0, { nonNullable: true });
   /** ค่าใช้จ่ายบวกเพิ่ม — ค่าธรรมเนียมโอน */
   additionalExpenseControl = this.fb.control<number>(0, { nonNullable: true });
-  /** โหมดการคิดค่าธรรมเนียมโอน: add_to_net = บวกเข้าราคาขายสุทธิ, as_premium = ของแถมเพิ่มเติม (งบผู้บริหาร) */
+  /** โหมดการคิดค่าธรรมเนียมโอน:
+   *  - add_to_net = บวกเข้าราคาขายสุทธิ (ลูกค้าจ่าย)
+   *  - as_premium = ของแถมเพิ่มเติม (งบผู้บริหาร)
+   *  - as_unit_expense = ผูกกับรายการ expense_support ใน Panel A (งบยูนิต) */
   additionalExpenseModeControl = this.fb.control<AdditionalExpenseMode>('add_to_net', { nonNullable: true });
+  /** id ของ promotion_item ที่จะผูกค่าธรรมเนียมโอน (เฉพาะ mode=as_unit_expense) */
+  linkedItemControl = this.fb.control<number | null>(null);
 
   // Signals
   readonly units = signal<Unit[]>([]);
@@ -388,7 +434,16 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     );
     this.subs.push(
       this.additionalExpenseModeControl.valueChanges.subscribe(mode => {
+        // เปลี่ยน mode ออกจาก as_unit_expense → เคลียร์ linkedItem (parent จะปลด lock + clear used_value)
+        if (mode !== 'as_unit_expense' && this.linkedItemControl.value != null) {
+          this.linkedItemControl.setValue(null);
+        }
         this.additionalExpenseModeChanged.emit(mode);
+      })
+    );
+    this.subs.push(
+      this.linkedItemControl.valueChanges.subscribe(id => {
+        this.linkedItemChanged.emit(id);
       })
     );
 
@@ -479,6 +534,10 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     this.contractPriceControl.markAsPristine();
     this.userOverrodeAdditionalExpense.set(false);
     this.additionalExpenseControl.markAsPristine();
+    // เปลี่ยนยูนิต → Panel A เปลี่ยน → เคลียร์ linkedItem (parent ก็ปลด lock เอง)
+    if (this.linkedItemControl.value != null) {
+      this.linkedItemControl.setValue(null);
+    }
     this.unitSelected.emit(unit);
   }
 
@@ -562,7 +621,13 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
 
     const hasUnit = !!this.selectedUnit();
     const contractValid = this.contractPriceControl.valid;
-    const valid = hasUnit && contractValid;
+
+    // mode=as_unit_expense + มี amount → ต้องเลือก linkedItem
+    const mode = this.additionalExpenseModeControl.value;
+    const addExpense = Number(this.additionalExpenseControl.value) || 0;
+    const linkedOk = !(mode === 'as_unit_expense' && addExpense > 0 && this.linkedItemControl.value == null);
+
+    const valid = hasUnit && contractValid && linkedOk;
     if (!valid) {
       this.focusFirstInvalid();
     }

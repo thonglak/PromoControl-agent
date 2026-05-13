@@ -193,7 +193,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                         <span class="detail-label">
                           ค่าธรรมเนียมโอนบวกเพิ่ม
                           <span class="text-[10px] font-normal ml-1" style="color: var(--color-gray-500)">
-                            ({{ tx().additional_expense_mode === 'as_premium' ? 'ใช้งบผู้บริหาร' : 'ลูกค้าจ่ายเอง' }})
+                            ({{ additionalExpenseModeLabel() }})
                           </span>
                         </span>
                         <span class="detail-value tabular-nums">฿{{ n(tx().additional_expense_amount) | number:'1.0-0' }}</span>
@@ -996,12 +996,23 @@ export class SalesDetailComponent implements OnInit {
   readonly otherItems = computed(() =>
     this.items().filter((it: any) => it.funding_source_type !== 'UNIT_STANDARD')
   );
-  /** ค่าธรรมเนียมโอน mode=as_premium — กิน MGMT_SPECIAL จริง ต้องนับใน "งบอื่น/งบนอก" ทุกที่ */
+  /** ค่าธรรมเนียมโอน mode=as_premium — กิน MGMT_SPECIAL จริง ต้องนับใน "งบอื่น/งบนอก" ทุกที่
+   *  mode=as_unit_expense ไม่นับเพราะ amount ถูกผูกเป็น Panel A item แล้ว (อยู่ใน items) */
   readonly transferFeeAsPremium = computed(() => {
     const tx = this.tx() as any;
     return tx?.additional_expense_mode === 'as_premium'
       ? Number(tx?.additional_expense_amount ?? 0)
       : 0;
+  });
+
+  /** label สำหรับ mode ของ additional_expense ใน Zone 3 */
+  readonly additionalExpenseModeLabel = computed(() => {
+    const mode = (this.tx() as any)?.additional_expense_mode;
+    switch (mode) {
+      case 'as_premium': return 'ใช้งบผู้บริหาร';
+      case 'as_unit_expense': return 'ใช้งบยูนิต';
+      default: return 'ลูกค้าจ่ายเอง';
+    }
   });
 
   readonly unitTotal = computed(() =>

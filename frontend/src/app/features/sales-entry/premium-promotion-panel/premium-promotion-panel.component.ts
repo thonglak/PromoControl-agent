@@ -73,6 +73,12 @@ export interface PanelARow {
                   [class]="categoryClass(row.category)">
                   {{ categoryLabel(row.category) }}
                 </span>
+                @if (row.promotion_item_id === lockedItemId()) {
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200"
+                        matTooltip="ผูกกับค่าธรรมเนียมโอน (ใช้งบยูนิต) — แก้ไขที่ส่วนข้อมูลยูนิต">
+                    🔒 ผูกกับค่าธรรมเนียมโอน
+                  </span>
+                }
                 @if (row.applied_policy_name) {
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 border border-green-200"
                         [matTooltip]="'มาตรการที่ใช้: ' + row.applied_policy_name">
@@ -110,12 +116,14 @@ export interface PanelARow {
 
                 <!-- มูลค่าที่ใช้ -->
                 <div>
-                  <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic">
+                  <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic"
+                    [matTooltip]="row.promotion_item_id === lockedItemId() ? 'ผูกกับค่าธรรมเนียมโอน — แก้ที่ส่วนข้อมูลยูนิต' : ''">
                     <mat-label>มูลค่าที่ใช้</mat-label>
                     <span matTextPrefix>฿&nbsp;</span>
                     <input matInput currencyMask
                       [ngModel]="row.used_value"
                       (ngModelChange)="onUsedValueChange(i, $event)"
+                      [readonly]="row.promotion_item_id === lockedItemId()"
                       [min]="0"
                       class="text-right">
                   </mat-form-field>
@@ -201,6 +209,10 @@ export class PremiumPromotionPanelComponent implements OnInit {
   unitBudget = input<number>(0);          // standard_budget จากยูนิต
   unitBudgetUsed = input<number>(0);      // งบที่ใช้ไปแล้ว (จาก movements ที่ approved)
   initialRows = input<PanelARow[]>([]);   // edit mode: ค่าจากรายการขายเดิม
+  /** id ของ promotion_item ที่ถูกผูกกับค่าธรรมเนียมโอน (mode=as_unit_expense)
+   *  - used_value ของแถวนี้ถูกควบคุมจาก unit-info → readonly + แสดง chip lock
+   *  - parent push ค่าผ่าน setUsedValueForItem() แทน */
+  lockedItemId = input<number | null>(null);
 
   // ─── Outputs ─────────────────────────────────────────────────────────
   panelAItemsChanged = output<PanelARow[]>();
@@ -348,6 +360,10 @@ export class PremiumPromotionPanelComponent implements OnInit {
   // ─── Event handlers ──────────────────────────────────────────────────
 
   onUsedValueChange(index: number, value: number | null): void {
+    // กัน user แก้ผ่าน input ถ้าแถวถูกผูกกับค่าธรรมเนียมโอน (readonly อยู่แล้ว — กันชั้นที่ 2)
+    const current = this.rows()[index];
+    if (current && current.promotion_item_id === this.lockedItemId()) return;
+
     this.rows.update(rows => {
       const updated = [...rows];
       const row = { ...updated[index] };
@@ -358,6 +374,28 @@ export class PremiumPromotionPanelComponent implements OnInit {
       // clamp discount_convert_value ไม่ให้เกิน used_value ใหม่
       if (row.discount_convert_value > v) row.discount_convert_value = v;
       updated[index] = row;
+      return updated;
+    });
+    this.emitChanges(this.rows());
+  }
+
+  /** ตั้ง used_value ของแถวที่ผูกกับค่าธรรมเนียมโอน — เรียกจาก parent (sales-entry)
+   *  ค่าจะถูก clamp ตาม max_value (เหมือน onUsedValueChange)
+   *  ไม่ทำอะไรถ้าไม่พบ item หรือ value ไม่เปลี่ยน */
+  setUsedValueForItem(itemId: number, value: number): void {
+    const idx = this.rows().findIndex(r => r.promotion_item_id === itemId);
+    if (idx < 0) return;
+    let v = Math.max(0, Number(value) || 0);
+    const max = this.rows()[idx].max_value;
+    if (max != null && v > max) v = max;
+    if (this.rows()[idx].used_value === v) return; // ไม่เปลี่ยน → ไม่ต้อง emit
+
+    this.rows.update(rows => {
+      const updated = [...rows];
+      const row = { ...updated[idx] };
+      row.used_value = v;
+      if (row.discount_convert_value > v) row.discount_convert_value = v;
+      updated[idx] = row;
       return updated;
     });
     this.emitChanges(this.rows());

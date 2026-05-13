@@ -10,7 +10,7 @@ import { ProjectService } from '../../core/services/project.service';
 import { AuthService } from '../../core/services/auth.service';
 import { SystemSettingsService } from '../settings/services/system-settings.service';
 import { SalesEntryService, EligibleResponse } from './services/sales-entry.service';
-import { UnitInfoSectionComponent } from './unit-info-section/unit-info-section.component';
+import { UnitInfoSectionComponent, ExpenseSupportOption } from './unit-info-section/unit-info-section.component';
 import { BudgetOverviewSectionComponent } from './budget-overview-section/budget-overview-section.component';
 import { PremiumPromotionPanelComponent, PanelARow } from './premium-promotion-panel/premium-promotion-panel.component';
 import { AdditionalPromotionPanelComponent, PanelBRow, BudgetSourceInfo } from './additional-promotion-panel/additional-promotion-panel.component';
@@ -60,12 +60,14 @@ function toISODateStr(d: any): string {
             [recommendedContractPrice]="recommendedContractPrice()"
             [recommendedAdditionalExpense]="recommendedAdditionalExpense()"
             [transferFeePercent]="transferFeePercent()"
+            [expenseSupportItems]="expenseSupportOptions()"
             (unitSelected)="onUnitSelected($event)"
             (saleDateChanged)="onSaleDateChanged($event)"
             (contractPriceChanged)="onContractPriceChanged($event)"
             (loanMarkupChanged)="onLoanMarkupChanged($event)"
             (additionalExpenseChanged)="onAdditionalExpenseChanged($event)"
-            (additionalExpenseModeChanged)="onAdditionalExpenseModeChanged($event)" />
+            (additionalExpenseModeChanged)="onAdditionalExpenseModeChanged($event)"
+            (linkedItemChanged)="onLinkedItemChanged($event)" />
 
           <!-- Section 2: งบประมาณ -->
           <app-budget-overview-section [unitId]="selectedUnitId()" [editReversal]="editReversal()" />
@@ -83,10 +85,12 @@ function toISODateStr(d: any): string {
             @if (eligibleData()) {
               <!-- Panel 3A -->
               <app-premium-promotion-panel
+                #panelA
                 [eligibleItems]="panelAItems()"
                 [unitBudget]="unitStandardBudget()"
                 [unitBudgetUsed]="unitBudgetUsedFromMovements()"
                 [initialRows]="editPanelARows()"
+                [lockedItemId]="additionalExpenseMode() === 'as_unit_expense' ? additionalExpenseLinkedItemId() : null"
                 (panelAItemsChanged)="onPanelAItemsChanged($event)" />
 
               <!-- Panel 3B -->
@@ -156,6 +160,7 @@ export class SalesEntryComponent implements OnInit {
 
   readonly unitInfoSection = viewChild(UnitInfoSectionComponent);
   readonly budgetSection = viewChild(BudgetOverviewSectionComponent);
+  readonly panelARef = viewChild<PremiumPromotionPanelComponent>('panelA');
 
   // State
   readonly selectedUnit = signal<Unit | null>(null);
@@ -177,7 +182,11 @@ export class SalesEntryComponent implements OnInit {
   // ส่วนเสริม (ขอบวกเพิ่ม / ค่าใช้จ่ายบวกเพิ่ม)
   readonly loanMarkupAmount = signal<number>(0);
   readonly additionalExpenseAmount = signal<number>(0);
-  readonly additionalExpenseMode = signal<'add_to_net' | 'as_premium'>('add_to_net');
+  readonly additionalExpenseMode = signal<'add_to_net' | 'as_premium' | 'as_unit_expense'>('add_to_net');
+  /** id ของ promotion_item ที่ผูกกับค่าธรรมเนียมโอน (mode=as_unit_expense); null = ยังไม่เลือก/mode อื่น */
+  readonly additionalExpenseLinkedItemId = signal<number | null>(null);
+  /** จำได้ id ก่อนหน้าที่ผูกไว้ — ใช้ตอนสลับรายการ/mode เพื่อ reset used_value ของแถวเก่ากลับเป็น 0 */
+  private prevLinkedItemId: number | null = null;
 
   readonly canEdit = computed(() => this.editMode() ? true : this.project.canEdit());
 
@@ -273,6 +282,13 @@ export class SalesEntryComponent implements OnInit {
 
   readonly panelAItems = computed(() => this.eligibleData()?.panel_a ?? []);
   readonly panelBItems = computed(() => this.eligibleData()?.panel_b ?? []);
+
+  /** รายการ expense_support ใน Panel A — ส่งให้ unit-info เป็น dropdown ตอนเลือก mode=as_unit_expense */
+  readonly expenseSupportOptions = computed<ExpenseSupportOption[]>(() =>
+    this.panelAItems()
+      .filter((it: any) => it.category === 'expense_support')
+      .map((it: any) => ({ id: Number(it.id), name: String(it.name) }))
+  );
 
   // Budget info
   readonly unitStandardBudget = computed(() => this.eligibleData()?.unit?.standard_budget ?? 0);
@@ -483,7 +499,7 @@ export class SalesEntryComponent implements OnInit {
 
   /** ค่าธรรมเนียมโอนแนะนำ — คำนวณจาก system setting `transfer_fee_percent`
    *  สูตร: add_expense = (netPriceForLoan − net_price) × p
-   *  - mode=as_premium: ผลต่าง = markup → add_expense = markup × p
+   *  - mode=as_premium / as_unit_expense: ผลต่าง = markup → add_expense = markup × p
    *  - mode=add_to_net: ผลต่าง = markup + add_expense (recursive) → closed-form add_expense = markup × p/(1−p)
    *  คืน 0 ถ้า markup ≤ 0 หรือ pct ≤ 0 */
   readonly recommendedAdditionalExpense = computed(() => {
@@ -519,12 +535,59 @@ export class SalesEntryComponent implements OnInit {
     if (this.additionalExpenseMode() === 'as_premium') {
       this.syncBudgetPendingUsed();
     }
+    // ถ้าโหมด as_unit_expense → push ค่าลงแถว Panel A ที่ผูกอยู่
+    if (this.additionalExpenseMode() === 'as_unit_expense') {
+      this.pushAmountToLinkedRow();
+    }
   }
 
-  onAdditionalExpenseModeChanged(mode: 'add_to_net' | 'as_premium'): void {
+  onAdditionalExpenseModeChanged(mode: 'add_to_net' | 'as_premium' | 'as_unit_expense'): void {
+    const oldMode = this.additionalExpenseMode();
     this.additionalExpenseMode.set(mode);
+
+    // ออกจาก as_unit_expense → เคลียร์ used_value ของแถวที่เคยผูกกลับเป็น 0 + ปลด lock
+    if (oldMode === 'as_unit_expense' && mode !== 'as_unit_expense') {
+      this.clearLinkedRow();
+      this.additionalExpenseLinkedItemId.set(null);
+      this.prevLinkedItemId = null;
+    }
+    // เข้าโหมด as_unit_expense — push ค่าเข้าทันทีถ้ามี linkedItem (เช่นกรณี edit pre-fill ตามด้วย mode set)
+    if (mode === 'as_unit_expense' && this.additionalExpenseLinkedItemId() != null) {
+      this.pushAmountToLinkedRow();
+    }
     // โหมดเปลี่ยน → ปรับ pending งบ
     this.syncBudgetPendingUsed();
+  }
+
+  /** เปลี่ยน item ที่ผูก (mat-select ใน unit-info) */
+  onLinkedItemChanged(id: number | null): void {
+    const oldId = this.prevLinkedItemId;
+    this.additionalExpenseLinkedItemId.set(id);
+    this.prevLinkedItemId = id;
+
+    // ถ้ามี oldId และ ≠ id ใหม่ → reset used_value ของแถวเก่า = 0 (ปลด lock ในตัวเพราะ lockedItemId เปลี่ยน)
+    if (oldId != null && oldId !== id) {
+      this.panelARef()?.setUsedValueForItem(oldId, 0);
+    }
+    // push ค่าลงแถวใหม่ (ถ้ามี + อยู่ใน mode ถูกต้อง + มี amount)
+    if (id != null && this.additionalExpenseMode() === 'as_unit_expense') {
+      this.pushAmountToLinkedRow();
+    }
+  }
+
+  /** ดัน additionalExpenseAmount ลงเป็น used_value ของแถวที่ผูก (ทำได้แค่เมื่อ Panel A พร้อม) */
+  private pushAmountToLinkedRow(): void {
+    const id = this.additionalExpenseLinkedItemId();
+    if (id == null) return;
+    const amount = Math.max(0, this.additionalExpenseAmount());
+    this.panelARef()?.setUsedValueForItem(id, amount);
+  }
+
+  /** เคลียร์ used_value ของแถวที่เคยผูก = 0 */
+  private clearLinkedRow(): void {
+    const id = this.additionalExpenseLinkedItemId();
+    if (id == null) return;
+    this.panelARef()?.setUsedValueForItem(id, 0);
   }
 
   /** debounce 500ms — recalc eligibility ด้วย net_price ปัจจุบัน เฉพาะเมื่อมีสูตรที่ขึ้นกับ net_price */
@@ -630,7 +693,7 @@ export class SalesEntryComponent implements OnInit {
       contract_price: number | null;
       loan_markup_amount: number;
       additional_expense_amount: number;
-      additional_expense_mode: 'add_to_net' | 'as_premium';
+      additional_expense_mode: 'add_to_net' | 'as_premium' | 'as_unit_expense';
     },
     items: any[]
   ): void {
@@ -811,6 +874,22 @@ export class SalesEntryComponent implements OnInit {
           if (tx.additional_expense_mode) {
             unitInfo.additionalExpenseModeControl.setValue(tx.additional_expense_mode);
             this.additionalExpenseMode.set(tx.additional_expense_mode);
+          }
+
+          // mode=as_unit_expense: infer linkedItem จาก items (เลือก expense_support row ที่อยู่ใน UNIT_STANDARD)
+          // — feature ออกมาแบบ single-link → สมมุติว่ามี expense_support row เพียง 1 ตัวตอน save
+          if (tx.additional_expense_mode === 'as_unit_expense') {
+            const items: any[] = res.items ?? [];
+            const linked = items.find((it: any) =>
+              it.funding_source_type === 'UNIT_STANDARD' &&
+              (it.promotion_category === 'expense_support' || it.original_category === 'expense_support')
+            );
+            if (linked) {
+              const linkedId = Number(linked.promotion_item_id);
+              this.additionalExpenseLinkedItemId.set(linkedId);
+              this.prevLinkedItemId = linkedId;
+              unitInfo.linkedItemControl.setValue(linkedId, { emitEvent: false });
+            }
           }
 
           // เซ็ต unit_id (Number) ก่อน loadUnitsForProject เพื่อซิงค์ selectedUnit + display text

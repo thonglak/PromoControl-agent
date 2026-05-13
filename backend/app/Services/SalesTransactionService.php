@@ -461,7 +461,7 @@ class SalesTransactionService
         if ($addExpense < 0) {
             throw new RuntimeException('ค่าใช้จ่ายบวกเพิ่มต้องไม่ติดลบ');
         }
-        if (!in_array($mode, ['add_to_net', 'as_premium'], true)) {
+        if (!in_array($mode, ['add_to_net', 'as_premium', 'as_unit_expense'], true)) {
             throw new RuntimeException('โหมดค่าใช้จ่ายบวกเพิ่มไม่ถูกต้อง');
         }
 
