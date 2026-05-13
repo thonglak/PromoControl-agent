@@ -7,16 +7,19 @@ import { Subscription, filter } from 'rxjs';
 
 import { SidebarMenuComponent } from '../sidebar-menu/sidebar-menu.component';
 import { TopNavigationComponent } from '../top-navigation/top-navigation.component';
+import { UpdateBannerComponent } from '../update-banner/update-banner.component';
+import { VersionCheckService } from '../../core/services/version-check.service';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [RouterOutlet, MatSidenavModule, SidebarMenuComponent, TopNavigationComponent, CdkScrollable],
+  imports: [RouterOutlet, MatSidenavModule, SidebarMenuComponent, TopNavigationComponent, UpdateBannerComponent, CdkScrollable],
   templateUrl: './app-layout.component.html',
 })
 export class AppLayoutComponent implements OnInit, OnDestroy {
   private readonly breakpoints = inject(BreakpointObserver);
   private readonly router      = inject(Router);
+  private readonly versionCheck = inject(VersionCheckService);
   private readonly subs        = new Subscription();
 
   @ViewChild('sidenav') sidenav!: MatSidenav;
@@ -25,6 +28,9 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   readonly sidebarCollapsed  = signal(false);
 
   ngOnInit(): void {
+    // เริ่ม poll ตรวจเวอร์ชันใหม่ทุก 5 นาที — banner ขึ้นเองเมื่อพบ
+    this.versionCheck.start();
+
     // ตรวจ mobile breakpoint
     this.subs.add(
       this.breakpoints.observe([Breakpoints.Handset, Breakpoints.TabletPortrait])
