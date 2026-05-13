@@ -6,11 +6,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatRadioModule } from '@angular/material/radio';
 import { Subscription } from 'rxjs';
 
 import { ProjectService } from '../../../core/services/project.service';
 import { UnitApiService, Unit } from '../../master-data/units/unit-api.service';
 import { CurrencyMaskDirective } from '../../../shared/directives/currency-mask.directive';
+
+export type AdditionalExpenseMode = 'add_to_net' | 'as_premium';
 
 /** แปลง Date หรือ Moment → YYYY-MM-DD string */
 function toISODateStr(d: any): string {
@@ -27,7 +30,7 @@ function toISODateStr(d: any): string {
   imports: [
     CommonModule, ReactiveFormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
-    MatDatepickerModule,
+    MatDatepickerModule, MatRadioModule,
     CurrencyMaskDirective,
   ],
   template: `
@@ -135,6 +138,47 @@ function toISODateStr(d: any): string {
           </span>
         </div>
       }
+
+      <!-- ── ส่วนเสริม: ขอบวกเพิ่ม / ค่าใช้จ่ายบวกเพิ่ม ── -->
+      <div class="mt-4 pt-4 border-t border-slate-200">
+        <div class="text-xs font-medium mb-3" style="color: var(--color-text-secondary)">ส่วนเสริม (สำหรับยื่นกู้)</div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- ขอบวกเพิ่ม -->
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>ขอบวกเพิ่ม (เพื่อยื่นกู้)</mat-label>
+            <input matInput currencyMask
+              [formControl]="loanMarkupControl"
+              placeholder="0">
+            <span matTextPrefix>฿&nbsp;</span>
+            <mat-hint>ลูกค้าขอบวกเพิ่มในราคาสุทธิเพื่อยื่นกู้ — ไม่กระทบงบ/กำไรจริง</mat-hint>
+          </mat-form-field>
+
+          <!-- ค่าใช้จ่ายบวกเพิ่ม -->
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>ค่าใช้จ่ายบวกเพิ่ม (ค่าธรรมเนียมโอน)</mat-label>
+            <input matInput currencyMask
+              [formControl]="additionalExpenseControl"
+              placeholder="0">
+            <span matTextPrefix>฿&nbsp;</span>
+          </mat-form-field>
+        </div>
+
+        <!-- โหมดการคิดค่าธรรมเนียมโอน — แสดงเมื่อมีจำนวนเงิน -->
+        @if ((additionalExpenseControl.value ?? 0) > 0) {
+          <div class="mt-2 p-3 rounded" style="background-color: var(--color-primary-100)">
+            <div class="text-xs font-medium mb-2" style="color: var(--color-text-primary)">วิธีคิดค่าธรรมเนียมโอน</div>
+            <mat-radio-group class="flex flex-col gap-1" [formControl]="additionalExpenseModeControl">
+              <mat-radio-button value="add_to_net" class="text-sm">
+                บวกเข้าราคาขายสุทธิ (ลูกค้าจ่ายเอง)
+              </mat-radio-button>
+              <mat-radio-button value="as_premium" class="text-sm">
+                ของแถมเพิ่มเติม (หักจากงบผู้บริหาร)
+              </mat-radio-button>
+            </mat-radio-group>
+          </div>
+        }
+      </div>
     </div>
   `,
 })
@@ -148,6 +192,9 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   unitSelected = output<Unit | null>();
   saleDateChanged = output<string>();
   contractPriceChanged = output<number | null>();
+  loanMarkupChanged = output<number>();
+  additionalExpenseChanged = output<number>();
+  additionalExpenseModeChanged = output<AdditionalExpenseMode>();
 
   // Form controls
   unitControl = this.fb.control<number | null>(null);
@@ -156,6 +203,12 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   saleDateControl = this.fb.control<Date>(new Date(), { nonNullable: true });
   /** ราคาหน้าสัญญา — บังคับกรอก ต้อง > 0 */
   contractPriceControl = this.fb.control<number | null>(null, [Validators.required, Validators.min(0.01)]);
+  /** ขอบวกเพิ่ม — virtual markup เพื่อยื่นกู้ (ไม่กระทบงบ/กำไรจริง) */
+  loanMarkupControl = this.fb.control<number>(0, { nonNullable: true });
+  /** ค่าใช้จ่ายบวกเพิ่ม — ค่าธรรมเนียมโอน */
+  additionalExpenseControl = this.fb.control<number>(0, { nonNullable: true });
+  /** โหมดการคิดค่าธรรมเนียมโอน: add_to_net = บวกเข้าราคาขายสุทธิ, as_premium = ของแถมเพิ่มเติม (งบผู้บริหาร) */
+  additionalExpenseModeControl = this.fb.control<AdditionalExpenseMode>('add_to_net', { nonNullable: true });
 
   // Signals
   readonly units = signal<Unit[]>([]);
@@ -205,6 +258,23 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     this.subs.push(
       this.contractPriceControl.valueChanges.subscribe(price => {
         this.contractPriceChanged.emit(price);
+      })
+    );
+
+    // ส่วนเสริม — emit สู่ parent
+    this.subs.push(
+      this.loanMarkupControl.valueChanges.subscribe(v => {
+        this.loanMarkupChanged.emit(Number(v) || 0);
+      })
+    );
+    this.subs.push(
+      this.additionalExpenseControl.valueChanges.subscribe(v => {
+        this.additionalExpenseChanged.emit(Number(v) || 0);
+      })
+    );
+    this.subs.push(
+      this.additionalExpenseModeControl.valueChanges.subscribe(mode => {
+        this.additionalExpenseModeChanged.emit(mode);
       })
     );
 
@@ -300,10 +370,19 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     return this.formatDate(this.saleDateControl.value);
   }
 
-  getFormValues(): { sale_date: string; contract_price: number | null } {
+  getFormValues(): {
+    sale_date: string;
+    contract_price: number | null;
+    loan_markup_amount: number;
+    additional_expense_amount: number;
+    additional_expense_mode: AdditionalExpenseMode;
+  } {
     return {
       sale_date: this.getSaleDate(),
       contract_price: this.contractPriceControl.value,
+      loan_markup_amount: Number(this.loanMarkupControl.value) || 0,
+      additional_expense_amount: Number(this.additionalExpenseControl.value) || 0,
+      additional_expense_mode: this.additionalExpenseModeControl.value,
     };
   }
 

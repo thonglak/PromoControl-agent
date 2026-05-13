@@ -76,6 +76,12 @@ export interface SalesTransaction {
   profit: number;
   sale_date: string;
   contract_price: number | null;
+  /** ขอบวกเพิ่ม (virtual — แสดงคู่ขนานในราคาสุทธิยื่นกู้ ไม่กระทบงบ/กำไรจริง) */
+  loan_markup_amount?: number | string;
+  /** ค่าธรรมเนียมโอน */
+  additional_expense_amount?: number | string;
+  /** โหมดค่าธรรมเนียมโอน */
+  additional_expense_mode?: 'add_to_net' | 'as_premium';
   status: 'active' | 'cancelled';
   cancelled_at?: string;
   cancelled_by?: number;

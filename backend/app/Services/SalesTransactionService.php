@@ -34,6 +34,8 @@ class SalesTransactionService
             throw new RuntimeException('กรุณาระบุราคาหน้าสัญญา');
         }
 
+        $addOns = $this->normalizeAddOns($data);
+
         $this->db->transBegin();
 
         try {
@@ -42,7 +44,7 @@ class SalesTransactionService
             $this->validateBudget($projectId, $unitId, $items);
 
             $saleNo = $this->generateSaleNo($projectId);
-            $calculations = $this->calculate($items, $unit);
+            $calculations = $this->calculate($items, $unit, $addOns);
 
             $transactionId = $this->insertTransaction([
                 'sale_no' => $saleNo,
@@ -59,11 +61,14 @@ class SalesTransactionService
                 'profit' => $calculations['profit'],
                 'sale_date' => $saleDate,
                 'contract_price' => $contractPrice,
+                'loan_markup_amount' => $addOns['loan_markup_amount'],
+                'additional_expense_amount' => $addOns['additional_expense_amount'],
+                'additional_expense_mode' => $addOns['additional_expense_mode'],
                 'created_by' => $createdBy,
             ]);
 
             $insertedItems = $this->insertItems($transactionId, $items, $projectId, $createdBy);
-            $movements = $this->createBudgetMovements($projectId, $unitId, $items, $createdBy, $transactionId);
+            $movements = $this->createBudgetMovements($projectId, $unitId, $items, $createdBy, $transactionId, $addOns);
             $this->updateUnitStatus($unitId, $saleDate);
 
             $this->db->transCommit();
@@ -107,6 +112,13 @@ class SalesTransactionService
             throw new RuntimeException('กรุณาระบุราคาหน้าสัญญา');
         }
 
+        // ถ้า request ไม่ส่ง field add-on มาเลย → คงค่าเดิมไว้ (รองรับ partial update)
+        $addOns = $this->normalizeAddOns($data, [
+            'loan_markup_amount' => $transaction['loan_markup_amount'] ?? 0,
+            'additional_expense_amount' => $transaction['additional_expense_amount'] ?? 0,
+            'additional_expense_mode' => $transaction['additional_expense_mode'] ?? 'add_to_net',
+        ]);
+
         $this->db->transBegin();
 
         try {
@@ -126,7 +138,7 @@ class SalesTransactionService
             $items = $this->validateItems($projectId, $unitId, $items, $saleDate, $id);
             $this->validateBudget($projectId, $unitId, $items, $id);
 
-            $calculations = $this->calculate($items, $unit);
+            $calculations = $this->calculate($items, $unit, $addOns);
 
             $this->db->table('sales_transactions')
                 ->where('id', $id)
@@ -144,11 +156,14 @@ class SalesTransactionService
                     'profit' => $calculations['profit'],
                     'sale_date' => $saleDate,
                     'contract_price' => $contractPrice,
+                    'loan_markup_amount' => $addOns['loan_markup_amount'],
+                    'additional_expense_amount' => $addOns['additional_expense_amount'],
+                    'additional_expense_mode' => $addOns['additional_expense_mode'],
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
 
             $insertedItems = $this->insertItems($id, $items, $projectId, $createdBy);
-            $movements = $this->createBudgetMovements($projectId, $unitId, $items, $createdBy, $id);
+            $movements = $this->createBudgetMovements($projectId, $unitId, $items, $createdBy, $id, $addOns);
 
             $this->db->table('project_units')
                 ->where('id', $unitId)
@@ -349,7 +364,7 @@ class SalesTransactionService
         }
     }
 
-    private function calculate(array $items, array $unit): array
+    private function calculate(array $items, array $unit, array $addOns = []): array
     {
         $basePrice = (float) $unit['base_price'];
 
@@ -370,6 +385,16 @@ class SalesTransactionService
             }
         }
 
+        // โหมด as_premium: ค่าธรรมเนียมโอนถือเป็น expense_support (บริษัทจ่ายให้ลูกค้า)
+        // → กระทบ total_expense_support → total_promo_burden → profit ลดลง
+        $addExpenseAmount = (float) ($addOns['additional_expense_amount'] ?? 0);
+        $addExpenseMode = $addOns['additional_expense_mode'] ?? 'add_to_net';
+        if ($addExpenseMode === 'as_premium' && $addExpenseAmount > 0) {
+            $totalExpenseSupport += $addExpenseAmount;
+        }
+
+        // หมายเหตุ: loan_markup_amount และ additional_expense_amount (โหมด add_to_net)
+        // เป็น virtual markup สำหรับยื่นกู้ — เก็บแยกใน column ไม่กระทบ net_price/profit ใน DB
         $netPrice = $basePrice - $totalDiscount;
         $totalPromoBurden = $totalPromoCost + $totalExpenseSupport;
         $unitCost = (float) $unit['unit_cost'];
@@ -384,6 +409,46 @@ class SalesTransactionService
             'net_price' => round($netPrice, 2),
             'total_cost' => round($totalCost, 2),
             'profit' => round($profit, 2),
+        ];
+    }
+
+    /**
+     * normalize ค่า add-on 3 ตัว — รับ default จาก row เดิม (ใช้ตอน update)
+     */
+    private function normalizeAddOns(array $data, array $defaults = []): array
+    {
+        $defaults = array_merge([
+            'loan_markup_amount' => 0,
+            'additional_expense_amount' => 0,
+            'additional_expense_mode' => 'add_to_net',
+        ], $defaults);
+
+        $loanMarkup = array_key_exists('loan_markup_amount', $data)
+            ? (float) $data['loan_markup_amount']
+            : (float) $defaults['loan_markup_amount'];
+
+        $addExpense = array_key_exists('additional_expense_amount', $data)
+            ? (float) $data['additional_expense_amount']
+            : (float) $defaults['additional_expense_amount'];
+
+        $mode = array_key_exists('additional_expense_mode', $data)
+            ? (string) $data['additional_expense_mode']
+            : (string) $defaults['additional_expense_mode'];
+
+        if ($loanMarkup < 0) {
+            throw new RuntimeException('ขอบวกเพิ่มต้องไม่ติดลบ');
+        }
+        if ($addExpense < 0) {
+            throw new RuntimeException('ค่าใช้จ่ายบวกเพิ่มต้องไม่ติดลบ');
+        }
+        if (!in_array($mode, ['add_to_net', 'as_premium'], true)) {
+            throw new RuntimeException('โหมดค่าใช้จ่ายบวกเพิ่มไม่ถูกต้อง');
+        }
+
+        return [
+            'loan_markup_amount' => round($loanMarkup, 2),
+            'additional_expense_amount' => round($addExpense, 2),
+            'additional_expense_mode' => $mode,
         ];
     }
 
@@ -433,7 +498,7 @@ class SalesTransactionService
         return $inserted;
     }
 
-    private function createBudgetMovements(int $projectId, int $unitId, array $items, int $createdBy, ?int $transactionId = null): array
+    private function createBudgetMovements(int $projectId, int $unitId, array $items, int $createdBy, ?int $transactionId = null, array $addOns = []): array
     {
         $movements = [];
         $project = $this->db->table('projects')
@@ -466,6 +531,35 @@ class SalesTransactionService
                 'status' => $status,
                 'reference_id' => $transactionId,
                 'reference_type' => 'sales_transaction',
+                'created_by' => $createdBy,
+                'approved_by' => $status === 'approved' ? $createdBy : null,
+                'approved_at' => $status === 'approved' ? $now : null,
+                'created_at' => $now,
+            ]);
+
+            $movements[] = $this->db->table('budget_movements')
+                ->where('id', $this->db->insertID())->get()->getRowArray();
+        }
+
+        // ค่าธรรมเนียมโอน โหมด as_premium → หักงบผู้บริหาร (MANAGEMENT_SPECIAL)
+        $addExpenseAmount = (float) ($addOns['additional_expense_amount'] ?? 0);
+        $addExpenseMode = $addOns['additional_expense_mode'] ?? 'add_to_net';
+        if ($addExpenseMode === 'as_premium' && $addExpenseAmount > 0) {
+            $movementNo = $this->generateMovementNo($projectId);
+            $status = $approvalRequired ? 'pending' : 'approved';
+            $now = date('Y-m-d H:i:s');
+
+            $this->db->table('budget_movements')->insert([
+                'movement_no' => $movementNo,
+                'project_id' => $projectId,
+                'unit_id' => $unitId,
+                'movement_type' => 'SPECIAL_BUDGET_USE',
+                'budget_source_type' => 'MANAGEMENT_SPECIAL',
+                'amount' => $addExpenseAmount,
+                'status' => $status,
+                'reference_id' => $transactionId,
+                'reference_type' => 'sales_transaction',
+                'note' => 'ค่าธรรมเนียมโอน — ของแถมเพิ่มเติม',
                 'created_by' => $createdBy,
                 'approved_by' => $status === 'approved' ? $createdBy : null,
                 'approved_at' => $status === 'approved' ? $now : null,
