@@ -238,9 +238,10 @@ class SalesTransactionController extends BaseController
     public function show(int $id): ResponseInterface
     {
         $transaction = $this->db()->table('sales_transactions st')
-            ->select('st.*, pu.unit_code, pu.status as unit_status, pu.standard_budget, p.name as project_name, p.pool_budget_amount, u.name as created_by_name, tu.name as transferred_by_name, cu.name as cancelled_by_name')
+            ->select('st.*, pu.unit_code, pu.status as unit_status, pu.standard_budget, pu.land_area_sqw, p.name as project_name, p.pool_budget_amount, p.project_type, hm.name as house_model_name, hm.area_sqm, u.name as created_by_name, tu.name as transferred_by_name, cu.name as cancelled_by_name')
             ->join('project_units pu', 'pu.id = st.unit_id', 'left')
             ->join('projects p', 'p.id = st.project_id', 'left')
+            ->join('house_models hm', 'hm.id = pu.house_model_id', 'left')
             ->join('users u', 'u.id = st.created_by', 'left')
             ->join('users tu', 'tu.id = st.transferred_by', 'left')
             ->join('users cu', 'cu.id = st.cancelled_by', 'left')

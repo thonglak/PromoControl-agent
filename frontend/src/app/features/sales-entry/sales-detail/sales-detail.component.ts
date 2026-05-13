@@ -109,7 +109,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
             <app-section-card title="ข้อมูลยูนิต" icon="building-office" class="mb-8">
 
               <!-- Zone 1: identity (inline compact) -->
-              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm pb-3"
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm pb-3"
                 style="border-bottom: 1px solid var(--color-border)">
                 <span>
                   <span style="color: var(--color-gray-500)">โครงการ</span>
@@ -125,6 +125,34 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                   <span style="color: var(--color-gray-500)">วันที่ขาย</span>
                   <span class="ml-1 font-medium" style="color: var(--color-text-primary)">{{ tx().sale_date | thaiDate:'auto' }}</span>
                 </span>
+                @if (anyTx().house_model_name) {
+                  <span style="color: var(--color-gray-300)">·</span>
+                  <span>
+                    <span style="color: var(--color-gray-500)">แบบบ้าน</span>
+                    <span class="ml-1 font-medium" style="color: var(--color-text-primary)">{{ anyTx().house_model_name }}</span>
+                  </span>
+                }
+                @if (anyTx().area_sqm) {
+                  <span style="color: var(--color-gray-300)">·</span>
+                  <span>
+                    <span style="color: var(--color-gray-500)">พื้นที่</span>
+                    <span class="ml-1 font-medium tabular-nums" style="color: var(--color-text-primary)">{{ n(anyTx().area_sqm) | number:'1.2-2' }} ตร.ม.</span>
+                  </span>
+                }
+                @if (anyTx().land_area_sqw && anyTx().project_type !== 'condo') {
+                  <span style="color: var(--color-gray-300)">·</span>
+                  <span>
+                    <span style="color: var(--color-gray-500)">ที่ดิน</span>
+                    <span class="ml-1 font-medium tabular-nums" style="color: var(--color-text-primary)">{{ n(anyTx().land_area_sqw) | number:'1.2-2' }} ตร.ว.</span>
+                  </span>
+                }
+                @if (tx().unit_status) {
+                  <span style="color: var(--color-gray-300)">·</span>
+                  <span class="inline-flex items-center gap-1">
+                    <span style="color: var(--color-gray-500)">สถานะ</span>
+                    <app-status-chip type="unit_status" [value]="tx().unit_status" />
+                  </span>
+                }
               </div>
 
               <!-- Zone 2: pricing (เด่น) -->
@@ -1021,6 +1049,9 @@ export class SalesDetailComponent implements OnInit {
     if (d <= 0 || u <= 0) return 'none';
     return d >= u ? 'full' : 'partial';
   }
+
+  /** typed-loose accessor — รองรับ field ที่ backend join เข้ามา (house_model_name, area_sqm ฯลฯ) */
+  readonly anyTx = computed(() => this.tx() as any);
 
   readonly netAfterPromo = computed(() =>
     this.n(this.tx().net_price) - this.n(this.tx().total_promo_burden)

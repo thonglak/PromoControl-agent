@@ -8,11 +8,13 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatButtonModule } from '@angular/material/button';
 import { Subscription } from 'rxjs';
 
 import { ProjectService } from '../../../core/services/project.service';
 import { UnitApiService, Unit } from '../../master-data/units/unit-api.service';
 import { CurrencyMaskDirective } from '../../../shared/directives/currency-mask.directive';
+import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
 
 export type AdditionalExpenseMode = 'add_to_net' | 'as_premium';
 
@@ -31,20 +33,15 @@ function toISODateStr(d: any): string {
   imports: [
     CommonModule, ReactiveFormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
-    MatDatepickerModule, MatRadioModule, MatTooltipModule,
-    CurrencyMaskDirective,
+    MatDatepickerModule, MatRadioModule, MatTooltipModule, MatButtonModule,
+    CurrencyMaskDirective, SvgIconComponent,
   ],
   template: `
     <div class="section-card">
       <h3 class="text-sm font-semibold mb-4" style="font-size: var(--font-size-card-title); color: var(--color-text-primary)">ข้อมูลยูนิต</h3>
 
+      <!-- Zone A: input fields (กรอก 3 ฟิลด์ติดกัน) -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <!-- โครงการ -->
-        <mat-form-field appearance="outline" class="w-full readonly-field">
-          <mat-label>โครงการ</mat-label>
-          <input matInput [value]="projectName()" readonly>
-        </mat-form-field>
-
         <!-- ยูนิต -->
         <mat-form-field appearance="outline" class="w-full" [class.readonly-field]="unitControl.disabled">
           <mat-label>ยูนิต</mat-label>
@@ -74,79 +71,107 @@ function toISODateStr(d: any): string {
         </mat-form-field>
 
         <!-- ราคาหน้าสัญญา (auto-fill จากราคาแนะนำ — แก้ไขได้) -->
-        <div class="flex flex-col">
-          <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
-            <mat-label>ราคาหน้าสัญญา</mat-label>
-            <input matInput currencyMask
-              [formControl]="contractPriceControl"
-              placeholder="0">
-            <span matTextPrefix>฿&nbsp;</span>
-            @if (contractPriceControl.touched && contractPriceControl.hasError('required')) {
-              <mat-error>กรุณาระบุราคาหน้าสัญญา</mat-error>
-            }
-            @if (contractPriceControl.touched && contractPriceControl.hasError('min')) {
-              <mat-error>ราคาหน้าสัญญาต้องมากกว่า 0</mat-error>
-            }
-          </mat-form-field>
-          @if (showApplyRecommendedButton()) {
-            <button type="button" class="text-xs mt-1 self-start hover:underline tabular-nums"
-              style="color: var(--color-primary)"
-              (click)="applyRecommendedContractPrice()">
-              ↺ ใช้ราคาแนะนำ ฿{{ recommendedContractPrice() | number:'1.0-0' }}
-            </button>
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>ราคาหน้าสัญญา</mat-label>
+          <input matInput currencyMask
+            [formControl]="contractPriceControl"
+            placeholder="0">
+          <span matTextPrefix>฿&nbsp;</span>
+          @if (contractPriceControl.touched && contractPriceControl.hasError('required')) {
+            <mat-error>กรุณาระบุราคาหน้าสัญญา</mat-error>
           }
-        </div>
-
-        <!-- ราคาขาย -->
-        <mat-form-field appearance="outline" class="w-full readonly-field">
-          <mat-label>ราคาขาย (Base Price)</mat-label>
-          <input matInput class="num" [value]="selectedUnit()?.base_price | number:'1.0-0'" readonly>
-          <span matTextPrefix>฿&nbsp;</span>
-        </mat-form-field>
-
-        <!-- ต้นทุน -->
-        <mat-form-field appearance="outline" class="w-full readonly-field">
-          <mat-label>ต้นทุน (Unit Cost)</mat-label>
-          <input matInput class="num" [value]="selectedUnit()?.unit_cost | number:'1.0-0'" readonly>
-          <span matTextPrefix>฿&nbsp;</span>
-        </mat-form-field>
-
-        <!-- ราคาประเมิน -->
-        <mat-form-field appearance="outline" class="w-full readonly-field">
-          <mat-label>ราคาประเมิน</mat-label>
-          <input matInput
-            [class.num]="selectedUnit()?.appraisal_price != null"
-            [value]="selectedUnit()?.appraisal_price != null
-              ? (selectedUnit()!.appraisal_price | number:'1.0-0')
-              : 'ยังไม่มีราคาประเมิน'"
-            readonly
-            [class.text-amber-600]="selectedUnit() && selectedUnit()!.appraisal_price == null">
-          @if (selectedUnit()?.appraisal_price != null) {
-            <span matTextPrefix>฿&nbsp;</span>
+          @if (contractPriceControl.touched && contractPriceControl.hasError('min')) {
+            <mat-error>ราคาหน้าสัญญาต้องมากกว่า 0</mat-error>
           }
         </mat-form-field>
-
       </div>
 
+      <!-- ปุ่ม "ใช้ราคาแนะนำ" — แสดงใต้ grid แยกบรรทัด ไม่ดัน input อื่น -->
+      @if (showApplyRecommendedButton()) {
+        <div class="mt-1.5 flex justify-end">
+          <button type="button"
+            class="suggestion-chip inline-flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer transition-colors hover:opacity-80"
+            style="background-color: var(--color-primary-100);
+                   color: var(--color-primary-700);
+                   border: 1px dashed var(--color-primary-500);
+                   border-radius: var(--radius-sm);
+                   font-weight: 600;"
+            (click)="applyRecommendedContractPrice()">
+            <app-icon name="arrow-path" class="w-3 h-3" />
+            <span>คำนวณอัตโนมัติ</span>
+            <span class="tabular-nums font-bold">฿{{ recommendedContractPrice() | number:'1.0-0' }}</span>
+          </button>
+        </div>
+      }
+
+      <!-- Zone B + C: readonly info (โผล่เมื่อเลือกยูนิตแล้ว) -->
       @if (selectedUnit(); as unit) {
-        <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-500">
-          <span>งบยูนิต: <strong class="text-slate-700">฿{{ unit.standard_budget | number:'1.0-0' }}</strong></span>
+        <!-- Zone B: stat cards เลขสำคัญ 4 ใบ -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+          <div class="p-2.5"
+            style="background-color: var(--color-gray-50); border: 1px solid var(--color-border); border-radius: var(--radius-md)">
+            <p class="text-[11px] mb-0.5" style="color: var(--color-gray-500)">ราคาขาย</p>
+            <p class="text-base font-semibold tabular-nums" style="color: var(--color-text-primary)">
+              ฿{{ unit.base_price | number:'1.0-0' }}
+            </p>
+          </div>
+          <div class="p-2.5"
+            style="background-color: var(--color-gray-50); border: 1px solid var(--color-border); border-radius: var(--radius-md)">
+            <p class="text-[11px] mb-0.5" style="color: var(--color-gray-500)">ต้นทุน</p>
+            <p class="text-base font-semibold tabular-nums" style="color: var(--color-text-primary)">
+              ฿{{ unit.unit_cost | number:'1.0-0' }}
+            </p>
+          </div>
+          <div class="p-2.5"
+            style="background-color: var(--color-gray-50); border: 1px solid var(--color-border); border-radius: var(--radius-md)">
+            <p class="text-[11px] mb-0.5" style="color: var(--color-gray-500)">ราคาประเมิน</p>
+            <p class="text-base font-semibold tabular-nums"
+              [class.text-amber-600]="unit.appraisal_price == null"
+              [style.color]="unit.appraisal_price != null ? 'var(--color-text-primary)' : ''">
+              @if (unit.appraisal_price != null) {
+                ฿{{ unit.appraisal_price | number:'1.0-0' }}
+              } @else {
+                ยังไม่มี
+              }
+            </p>
+          </div>
+          <div class="p-2.5"
+            style="background-color: var(--color-gray-50); border: 1px solid var(--color-border); border-radius: var(--radius-md)">
+            <p class="text-[11px] mb-0.5" style="color: var(--color-gray-500)">งบยูนิต</p>
+            <p class="text-base font-semibold tabular-nums" style="color: var(--color-text-primary)">
+              ฿{{ unit.standard_budget | number:'1.0-0' }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Zone C: meta inline (โครงการ · แบบบ้าน · พื้นที่ · ที่ดิน · สถานะ) -->
+        <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" style="color: var(--color-gray-500)">
+          <span>โครงการ <strong class="text-slate-700">{{ projectName() }}</strong></span>
           @if (unit.house_model_name) {
-            <span>แบบบ้าน: <strong class="text-slate-700">{{ unit.house_model_name }}</strong></span>
+            <span style="color: var(--color-gray-300)">·</span>
+            <span>แบบบ้าน <strong class="text-slate-700">{{ unit.house_model_name }}</strong></span>
           }
           @if (unit.area_sqm) {
-            <span>พื้นที่: <strong class="text-slate-700">{{ unit.area_sqm | number:'1.2-2' }} ตร.ม.</strong></span>
+            <span style="color: var(--color-gray-300)">·</span>
+            <span>พื้นที่ <strong class="text-slate-700">{{ unit.area_sqm | number:'1.2-2' }} ตร.ม.</strong></span>
           }
           @if (unit.land_area_sqw && !isCondo()) {
-            <span>ที่ดิน: <strong class="text-slate-700">{{ unit.land_area_sqw | number:'1.2-2' }} ตร.ว.</strong></span>
+            <span style="color: var(--color-gray-300)">·</span>
+            <span>ที่ดิน <strong class="text-slate-700">{{ unit.land_area_sqw | number:'1.2-2' }} ตร.ว.</strong></span>
           }
-          <span>สถานะ:
+          <span style="color: var(--color-gray-300)">·</span>
+          <span>สถานะ
             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
               [class]="statusClass(unit.status)">
               {{ statusLabel(unit.status) }}
             </span>
           </span>
         </div>
+      } @else {
+        <!-- ยังไม่ได้เลือกยูนิต — แสดง project name อย่างเดียว -->
+        <p class="mt-3 text-sm" style="color: var(--color-gray-500)">
+          โครงการ <strong class="text-slate-700">{{ projectName() }}</strong>
+        </p>
       }
 
       <!-- ── ส่วนเสริม: ขอบวกเพิ่ม / ค่าใช้จ่ายบวกเพิ่ม ── -->
@@ -196,10 +221,17 @@ function toISODateStr(d: any): string {
             }
 
             @if (showApplyRecommendedAdditionalExpenseButton()) {
-              <button type="button" class="text-xs mt-1 self-start hover:underline tabular-nums"
-                style="color: var(--color-primary)"
+              <button type="button"
+                class="suggestion-chip mt-1.5 self-start inline-flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer transition-colors hover:opacity-80"
+                style="background-color: var(--color-primary-100);
+                       color: var(--color-primary-700);
+                       border: 1px dashed var(--color-primary-500);
+                       border-radius: var(--radius-sm);
+                       font-weight: 600;"
                 (click)="applyRecommendedAdditionalExpense()">
-                ↺ ใช้ค่าเริ่มต้น ฿{{ recommendedAdditionalExpense() | number:'1.0-0' }}
+                <app-icon name="arrow-path" class="w-3 h-3" />
+                <span>คำนวณอัตโนมัติ</span>
+                <span class="tabular-nums font-bold">฿{{ recommendedAdditionalExpense() | number:'1.0-0' }}</span>
               </button>
             }
           </div>
