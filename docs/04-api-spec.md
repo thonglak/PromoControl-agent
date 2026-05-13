@@ -245,8 +245,11 @@ POST/PUT body (รายการขาย):
   "unit_id": 10,
   "sale_date": "2026-05-04",
   "contract_price": 3500000,
+  "loan_markup_amount": 100000,
+  "additional_expense_amount": 50000,
+  "additional_expense_mode": "add_to_net",
   "items": [
-    { "promotion_item_id": 5, "used_value": 50000, "funding_source_type": "UNIT_STANDARD" }
+    { "promotion_item_id": 5, "used_value": 60000, "discount_convert_value": 40000, "funding_source_type": "UNIT_STANDARD" }
   ]
 }
 ```
@@ -254,6 +257,24 @@ POST/PUT body (รายการขาย):
 Field `contract_price` (DECIMAL 15,2): ราคาหน้าสัญญา — บังคับกรอก ต้อง > 0
 - เก็บแยกจาก `base_price` / `net_price` ใช้อ้างอิงทางสัญญา/audit
 - ไม่นำไปใช้ในสูตรคำนวณ profit / discount
+
+Field `loan_markup_amount` (DECIMAL 15,2, default 0): ขอบวกเพิ่มเพื่อยื่นกู้ธนาคาร — optional
+- เก็บเป็น virtual markup เพื่อแสดง "ราคาสุทธิยื่นกู้" คู่ขนานราคาสุทธิจริง
+- ไม่กระทบ `net_price` / `profit` / budget — เป็นข้อมูลอ้างอิงล้วน
+
+Field `additional_expense_amount` (DECIMAL 15,2, default 0): ค่าธรรมเนียมโอน — optional
+Field `additional_expense_mode` (ENUM, default 'add_to_net'): โหมดการคิดค่าธรรมเนียมโอน
+- `add_to_net` — ลูกค้าจ่ายเอง บวกเข้าราคาสุทธิยื่นกู้ ไม่กระทบ profit/budget
+- `as_premium` — บริษัทจ่ายให้ลูกค้า ถือเป็น `expense_support` (รวมใน `total_expense_support`/`total_promo_burden`/`total_cost` → ลด `profit`) และหักจากงบ `MANAGEMENT_SPECIAL` ผ่าน budget_movements (movement_type=`SPECIAL_BUDGET_USE`)
+
+Field `items[].discount_convert_value` (DECIMAL 15,2, default 0): ส่วนของ `used_value` ที่แปลงเป็น discount — optional
+- ใช้กับ category=`premium` + funding_source=`UNIT_STANDARD` เท่านั้น (validate)
+- ต้อง `0 ≤ discount_convert_value ≤ used_value`
+- ใช้ split รายการของแถมเป็น 2 ก้อนใน row เดียว: ของแถมจริง (premium) = `used_value − discount_convert_value`, ส่วนลด = `discount_convert_value`
+- กระทบ `total_discount` (+= discount_convert_value) และ `total_promo_cost` (+= used_value − discount_convert_value)
+- งบยูนิตยังหัก `used_value` เต็มก้อนเหมือนเดิม (movement ก้อนเดียว)
+- ใน response ของ GET /sales-transactions/{id} → ส่ง `discount_convert_value` กลับใน `items[]` ด้วย (สำหรับ edit mode)
+- รายการเดิมที่ `convert_to_discount=1` (ก่อน migration) ถูก backfill `discount_convert_value = used_value` (แปลงทั้งก้อน — ของแถมจริง=0)
 
 ### POST /api/sales-transactions/{id}/cancel — ยกเลิกขาย
 

@@ -247,24 +247,40 @@ class SalesTransactionService
                 throw new RuntimeException("รายการ '{$promotionItem['name']}' ไม่สามารถใช้ได้กับยูนิตหรือวันที่ที่เลือก");
             }
 
-            $convertToDiscount = !empty($item['convert_to_discount']);
             $category = $promotionItem['category'];
+            $fundingSource = $item['funding_source_type'] ?? 'UNIT_STANDARD';
 
-            if ($convertToDiscount && $category !== 'premium') {
+            // discount_convert_value: ส่วนที่แปลงเป็นส่วนลด (per-transaction, 0..used_value)
+            // - เฉพาะ premium + UNIT_STANDARD เท่านั้น
+            // - ถ้าไม่ส่งมา → 0 (ของแถมจริงทั้งก้อน)
+            $discountConvertValue = (float) ($item['discount_convert_value'] ?? 0);
+            if ($discountConvertValue < 0) {
+                $discountConvertValue = 0;
+            }
+            if ($discountConvertValue > $usedValue) {
+                throw new RuntimeException('มูลค่าที่แปลงเป็นส่วนลดต้องไม่เกินมูลค่าที่ใช้');
+            }
+            if ($discountConvertValue > 0 && $category !== 'premium') {
                 throw new RuntimeException('สามารถแปลงเป็นส่วนลดได้เฉพาะรายการประเภท premium เท่านั้น');
             }
-
-            if ($convertToDiscount && $promotionItem['is_unit_standard'] != 1) {
+            if ($discountConvertValue > 0 && $fundingSource !== 'UNIT_STANDARD') {
                 throw new RuntimeException('สามารถแปลงเป็นส่วนลดได้เฉพาะของแถมงบยูนิต (Panel 3A) เท่านั้น');
             }
+
+            // convert_to_discount (legacy flag) — derive จากการแปลงทั้งก้อน
+            $convertToDiscount = $discountConvertValue > 0 && $discountConvertValue >= $usedValue;
 
             if ($usedValue > 0) {
                 $validItems[] = [
                     'promotion_item_id' => $promotionItemId,
                     'promotion_item' => $promotionItem,
                     'used_value' => $usedValue,
+                    'discount_convert_value' => $discountConvertValue,
+                    // effective_category สำหรับ row เก็บ DB:
+                    // - แปลงทั้งก้อน → 'discount'
+                    // - ไม่แปลง / split → 'premium' (หรือ category เดิม)
                     'effective_category' => $convertToDiscount ? 'discount' : $category,
-                    'funding_source_type' => $item['funding_source_type'] ?? 'UNIT_STANDARD',
+                    'funding_source_type' => $fundingSource,
                     'convert_to_discount' => $convertToDiscount,
                     'manual_input_value' => $item['manual_input_value'] ?? null,
                     'remark' => $item['remark'] ?? '',
@@ -374,13 +390,17 @@ class SalesTransactionService
 
         foreach ($items as $item) {
             $value = $item['used_value'];
-            $effectiveCategory = $item['effective_category'];
+            $category = $item['promotion_item']['category'] ?? $item['effective_category'];
 
-            if ($effectiveCategory === 'discount') {
+            if ($category === 'premium') {
+                // split: ส่วนแปลงเป็น discount + ส่วนเหลือเป็น premium จริง
+                $convert = (float) ($item['discount_convert_value'] ?? 0);
+                $premiumPart = $value - $convert;
+                $totalDiscount += $convert;
+                $totalPromoCost += $premiumPart;
+            } elseif ($category === 'discount') {
                 $totalDiscount += $value;
-            } elseif ($effectiveCategory === 'premium') {
-                $totalPromoCost += $value;
-            } elseif ($effectiveCategory === 'expense_support') {
+            } elseif ($category === 'expense_support') {
                 $totalExpenseSupport += $value;
             }
         }
@@ -484,6 +504,7 @@ class SalesTransactionService
                 'original_category' => $item['promotion_item']['category'],
                 'effective_category' => $item['effective_category'],
                 'used_value' => $item['used_value'],
+                'discount_convert_value' => $item['discount_convert_value'] ?? 0,
                 'funding_source_type' => $item['funding_source_type'],
                 'convert_to_discount' => $item['convert_to_discount'] ? 1 : 0,
                 'manual_input_value' => $item['manual_input_value'],

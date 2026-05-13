@@ -4,12 +4,6 @@ import { CommonModule } from '@angular/common';
 import { PanelARow } from '../premium-promotion-panel/premium-promotion-panel.component';
 import { PanelBRow } from '../additional-promotion-panel/additional-promotion-panel.component';
 
-/** helper: effective_category ตาม convert_to_discount */
-function getEffectiveCategory(item: { category: string; convert_to_discount?: boolean }): string {
-  if (item.convert_to_discount && item.category === 'premium') return 'discount';
-  return item.category;
-}
-
 /** ข้อมูลงบแต่ละแหล่ง */
 export interface BudgetSourceSummary {
   allocated: number;
@@ -53,6 +47,28 @@ export interface BudgetSummary {
           <span class="tabular-nums text-xl">{{ netPrice() | number:'1.0-0' }}</span>
         </div>
 
+        <!-- 3.1 ราคาสุทธิ (เพื่อยื่นกู้) — แสดงเมื่อมีขอบวกเพิ่ม หรือค่าธรรมเนียมโอนโหมด add_to_net -->
+        @if (loanMarkupAmount() > 0 || (additionalExpenseAmount() > 0 && additionalExpenseMode() === 'add_to_net')) {
+          <div class="flex justify-between py-1 px-3 text-xs" style="color: var(--color-text-secondary)">
+            <span>ราคาสุทธิ (เพื่อยื่นกู้)</span>
+            <span class="tabular-nums font-medium">{{ netPriceForLoan() | number:'1.0-0' }}</span>
+          </div>
+          <div class="px-3 text-xs" style="color: var(--color-text-secondary)">
+            @if (loanMarkupAmount() > 0) {
+              <div class="flex justify-between">
+                <span>↳ ขอบวกเพิ่ม</span>
+                <span class="tabular-nums">+ {{ loanMarkupAmount() | number:'1.0-0' }}</span>
+              </div>
+            }
+            @if (additionalExpenseAmount() > 0 && additionalExpenseMode() === 'add_to_net') {
+              <div class="flex justify-between">
+                <span>↳ ค่าธรรมเนียมโอน (บวกเข้าสุทธิ)</span>
+                <span class="tabular-nums">+ {{ additionalExpenseAmount() | number:'1.0-0' }}</span>
+              </div>
+            }
+          </div>
+        }
+
         <!-- ───── separator ───── -->
         <div class="border-t border-slate-300 my-2"></div>
 
@@ -67,6 +83,14 @@ export interface BudgetSummary {
           <span class="text-slate-600">ค่าใช้จ่ายอุดหนุน (Expense Support)</span>
           <span class="tabular-nums">{{ totalExpenseSupport() | number:'1.0-0' }}</span>
         </div>
+
+        <!-- 6.1 ค่าธรรมเนียมโอน (โหมด as_premium) — รวมอยู่ในค่าใช้จ่ายอุดหนุนข้างบนแล้ว แสดงแยกเพื่อความชัด -->
+        @if (additionalExpenseAmount() > 0 && additionalExpenseMode() === 'as_premium') {
+          <div class="flex justify-between py-1 text-xs px-3" style="color: var(--color-text-secondary)">
+            <span>↳ ค่าธรรมเนียมโอน (งบผู้บริหาร)</span>
+            <span class="tabular-nums">{{ additionalExpenseAmount() | number:'1.0-0' }}</span>
+          </div>
+        }
 
         <!-- 7. ต้นทุนจากของแถม = 5 + 6 -->
         <div class="flex justify-between py-1 text-slate-500 text-xs">
@@ -148,44 +172,75 @@ export class SummarySectionComponent {
   unitCost = input<number>(0);
   standardBudget = input<number>(0);
   budgetSummary = input<BudgetSummary | null>(null);
-
-  // ─── Computed: all items (with effective_category) ─────────────────
-  readonly allItemsWithCategory = computed(() => {
-    const aItems = this.panelAItems().map(r => ({
-      effective_category: getEffectiveCategory(r),
-      used_value: r.used_value,
-      funding_source_type: r.funding_source_type,
-    }));
-    const bItems = this.panelBItems()
-      .filter(r => r.promotion_item_id != null)
-      .map(r => ({
-        effective_category: getEffectiveCategory(r),
-        used_value: r.used_value,
-        funding_source_type: r.funding_source_type,
-      }));
-    return [...aItems, ...bItems];
-  });
+  /** ขอบวกเพิ่ม (virtual — แสดงคู่ขนานในราคาสุทธิยื่นกู้ ไม่กระทบกำไร) */
+  loanMarkupAmount = input<number>(0);
+  /** ค่าธรรมเนียมโอน */
+  additionalExpenseAmount = input<number>(0);
+  /** โหมดค่าธรรมเนียมโอน: add_to_net = บวกเข้าสุทธิ, as_premium = expense_support งบผู้บริหาร */
+  additionalExpenseMode = input<'add_to_net' | 'as_premium'>('add_to_net');
 
   // ─── Computed: calculations (ตรงตามสูตรใน business rules) ──────────
-  readonly totalDiscount = computed(() =>
-    this.allItemsWithCategory()
-      .filter(i => i.effective_category === 'discount' && i.used_value > 0)
-      .reduce((sum, i) => sum + i.used_value, 0)
-  );
+  // panel A premium split: discount_convert_value → discount, ส่วนที่เหลือ → premium จริง
 
-  readonly totalPromoCost = computed(() =>
-    this.allItemsWithCategory()
-      .filter(i => i.effective_category === 'premium' && i.used_value > 0)
-      .reduce((sum, i) => sum + i.used_value, 0)
-  );
+  readonly totalDiscount = computed(() => {
+    let total = 0;
+    for (const r of this.panelAItems()) {
+      if (!r.used_value || r.used_value <= 0) continue;
+      if (r.category === 'discount') {
+        total += r.used_value;
+      } else if (r.category === 'premium') {
+        total += r.discount_convert_value || 0;
+      }
+    }
+    for (const r of this.panelBItems()) {
+      if (r.promotion_item_id == null || !r.used_value || r.used_value <= 0) continue;
+      if (r.category === 'discount') total += r.used_value;
+    }
+    return total;
+  });
 
-  readonly totalExpenseSupport = computed(() =>
-    this.allItemsWithCategory()
-      .filter(i => i.effective_category === 'expense_support' && i.used_value > 0)
-      .reduce((sum, i) => sum + i.used_value, 0)
-  );
+  readonly totalPromoCost = computed(() => {
+    let total = 0;
+    for (const r of this.panelAItems()) {
+      if (!r.used_value || r.used_value <= 0) continue;
+      if (r.category === 'premium') {
+        total += r.used_value - (r.discount_convert_value || 0);
+      }
+    }
+    for (const r of this.panelBItems()) {
+      if (r.promotion_item_id == null || !r.used_value || r.used_value <= 0) continue;
+      if (r.category === 'premium') total += r.used_value;
+    }
+    return total;
+  });
+
+  readonly totalExpenseSupport = computed(() => {
+    let total = 0;
+    for (const r of this.panelAItems()) {
+      if (!r.used_value || r.used_value <= 0) continue;
+      if (r.category === 'expense_support') total += r.used_value;
+    }
+    for (const r of this.panelBItems()) {
+      if (r.promotion_item_id == null || !r.used_value || r.used_value <= 0) continue;
+      if (r.category === 'expense_support') total += r.used_value;
+    }
+    // โหมด as_premium: รวมค่าธรรมเนียมโอนเป็น expense_support ด้วย
+    const fromAddExpense = this.additionalExpenseMode() === 'as_premium'
+      ? Math.max(0, this.additionalExpenseAmount())
+      : 0;
+    return total + fromAddExpense;
+  });
 
   readonly netPrice = computed(() => this.basePrice() - this.totalDiscount());
+
+  /** ราคาสุทธิที่ใช้ยื่นกู้ = net_price + ขอบวกเพิ่ม + (ค่าธรรมเนียมโอน ถ้าโหมด add_to_net) */
+  readonly netPriceForLoan = computed(() => {
+    const markup = Math.max(0, this.loanMarkupAmount());
+    const addExpense = this.additionalExpenseMode() === 'add_to_net'
+      ? Math.max(0, this.additionalExpenseAmount())
+      : 0;
+    return this.netPrice() + markup + addExpense;
+  });
 
   readonly totalPromoBurden = computed(() => this.totalPromoCost() + this.totalExpenseSupport());
 

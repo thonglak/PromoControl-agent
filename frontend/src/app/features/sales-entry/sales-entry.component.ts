@@ -58,7 +58,10 @@ function toISODateStr(d: any): string {
           <app-unit-info-section
             (unitSelected)="onUnitSelected($event)"
             (saleDateChanged)="onSaleDateChanged($event)"
-            (contractPriceChanged)="onContractPriceChanged($event)" />
+            (contractPriceChanged)="onContractPriceChanged($event)"
+            (loanMarkupChanged)="onLoanMarkupChanged($event)"
+            (additionalExpenseChanged)="onAdditionalExpenseChanged($event)"
+            (additionalExpenseModeChanged)="onAdditionalExpenseModeChanged($event)" />
 
           <!-- Section 2: งบประมาณ -->
           <app-budget-overview-section [unitId]="selectedUnitId()" [editReversal]="editReversal()" [unitStatus]="selectedUnit()?.status ?? null" />
@@ -102,7 +105,10 @@ function toISODateStr(d: any): string {
                 [basePrice]="selectedUnit()?.base_price ?? 0"
                 [unitCost]="selectedUnit()?.unit_cost ?? 0"
                 [standardBudget]="unitStandardBudget()"
-                [budgetSummary]="budgetSummaryForSection4()" />
+                [budgetSummary]="budgetSummaryForSection4()"
+                [loanMarkupAmount]="loanMarkupAmount()"
+                [additionalExpenseAmount]="additionalExpenseAmount()"
+                [additionalExpenseMode]="additionalExpenseMode()" />
 
               <!-- ปุ่มบันทึก -->
               @if (canEdit()) {
@@ -162,6 +168,11 @@ export class SalesEntryComponent implements OnInit {
   readonly currentPanelARows = signal<PanelARow[]>([]);
   readonly currentPanelBRows = signal<PanelBRow[]>([]);
 
+  // ส่วนเสริม (ขอบวกเพิ่ม / ค่าใช้จ่ายบวกเพิ่ม)
+  readonly loanMarkupAmount = signal<number>(0);
+  readonly additionalExpenseAmount = signal<number>(0);
+  readonly additionalExpenseMode = signal<'add_to_net' | 'as_premium'>('add_to_net');
+
   readonly canEdit = computed(() => this.editMode() ? true : this.project.canEdit());
 
   /** edit mode: สร้าง initialRows สำหรับ Panel A จากรายการเดิม (UNIT_STANDARD) */
@@ -179,7 +190,7 @@ export class SalesEntryComponent implements OnInit {
         max_value: null,
         calculated_value: null,
         used_value: Number(s.used_value) || 0,
-        convert_to_discount: s.convert_to_discount === '1' || s.convert_to_discount === true,
+        discount_convert_value: Number(s.discount_convert_value) || 0,
         funding_source_type: 'UNIT_STANDARD' as const,
         formula_display: null,
         applied_policy_name: null,
@@ -188,7 +199,6 @@ export class SalesEntryComponent implements OnInit {
         effective_buyer_share: null,
         warnings: [],
         remark: s.remark ?? '',
-        discount_convert_value: null,
         manual_input_value: s.manual_input_value ? Number(s.manual_input_value) : null,
       }));
   });
@@ -239,6 +249,14 @@ export class SalesEntryComponent implements OnInit {
     for (const item of items) {
       const source = item.funding_source_type;
       result[source] = (result[source] ?? 0) + Number(item.used_value ?? 0);
+    }
+    // รวม additional_expense เดิม (mode as_premium) ที่หักจาก MANAGEMENT_SPECIAL
+    const stx = tx.sales_transaction ?? {};
+    if (stx.additional_expense_mode === 'as_premium') {
+      const addExp = Number(stx.additional_expense_amount ?? 0);
+      if (addExp > 0) {
+        result['MANAGEMENT_SPECIAL'] = (result['MANAGEMENT_SPECIAL'] ?? 0) + addExp;
+      }
     }
     return result;
   });
@@ -398,22 +416,21 @@ export class SalesEntryComponent implements OnInit {
     );
   }
 
-  /** คำนวณ net_price ปัจจุบัน = base_price - ผลรวมส่วนลด (รวม convert_to_discount + discount_convert_value) จาก panel A + B */
+  /** คำนวณ net_price ปัจจุบัน = base_price - ผลรวมส่วนลด จาก panel A + B
+   *  - panel A category=discount → used_value ทั้งก้อน
+   *  - panel A category=premium → discount_convert_value (ส่วนแปลงเป็นส่วนลด)
+   *  - panel B category=discount → used_value */
   private currentNetPrice(): number {
     const base = this.selectedUnit()?.base_price ?? 0;
     if (base <= 0) return 0;
     let totalDiscount = 0;
     for (const r of this.currentPanelARows()) {
       if (!r.promotion_item_id || !r.used_value || r.used_value <= 0) continue;
-      const isDiscount = r.convert_to_discount && r.category === 'premium'
-        ? true
-        : r.category === 'discount';
-      if (!isDiscount) continue;
-      // ถ้าแปลง premium → discount และมี discount_convert_value ระบุไว้ ให้ใช้ค่านั้น
-      const v = (r.convert_to_discount && r.discount_convert_value != null)
-        ? r.discount_convert_value
-        : r.used_value;
-      totalDiscount += v;
+      if (r.category === 'discount') {
+        totalDiscount += r.used_value;
+      } else if (r.category === 'premium') {
+        totalDiscount += r.discount_convert_value || 0;
+      }
     }
     for (const r of this.currentPanelBRows()) {
       if (!r.promotion_item_id || !r.used_value || r.used_value <= 0) continue;
@@ -432,6 +449,24 @@ export class SalesEntryComponent implements OnInit {
     this.currentPanelBRows.set(rows);
     this.syncBudgetPendingUsed();
     this.scheduleNetPriceRecalc();
+  }
+
+  onLoanMarkupChanged(v: number): void {
+    this.loanMarkupAmount.set(v);
+  }
+
+  onAdditionalExpenseChanged(v: number): void {
+    this.additionalExpenseAmount.set(v);
+    // ถ้าโหมด as_premium → กระทบงบ MANAGEMENT_SPECIAL ที่ใช้ได้
+    if (this.additionalExpenseMode() === 'as_premium') {
+      this.syncBudgetPendingUsed();
+    }
+  }
+
+  onAdditionalExpenseModeChanged(mode: 'add_to_net' | 'as_premium'): void {
+    this.additionalExpenseMode.set(mode);
+    // โหมดเปลี่ยน → ปรับ pending งบ
+    this.syncBudgetPendingUsed();
   }
 
   /** debounce 500ms — recalc eligibility ด้วย net_price ปัจจุบัน เฉพาะเมื่อมีสูตรที่ขึ้นกับ net_price */
@@ -474,19 +509,21 @@ export class SalesEntryComponent implements OnInit {
     const formValues = unitInfo.getFormValues();
     const totalUsed = items.reduce((sum, i) => sum + i.used_value, 0);
 
-    // effective_category-based calculation for net_price & profit
+    // calc by promotion_category (split premium ตาม discount_convert_value)
     let totalDiscount = 0;
     let totalPromoCost = 0;
     let totalExpense = 0;
     for (const item of items) {
-      const effCat = item.effective_category;
-      if (effCat === 'discount') {
-        // ถ้าแปลงเป็นส่วนลด + มี discount_convert_value → ใช้ค่านั้น
-        totalDiscount += item.discount_convert_value ?? item.used_value;
-      } else if (effCat === 'premium') {
-        totalPromoCost += item.used_value;
-      } else if (effCat === 'expense_support') {
-        totalExpense += item.used_value;
+      const cat = item.promotion_category;
+      const v = Number(item.used_value) || 0;
+      if (cat === 'discount') {
+        totalDiscount += v;
+      } else if (cat === 'premium') {
+        const convert = Number(item.discount_convert_value) || 0;
+        totalDiscount += convert;
+        totalPromoCost += v - convert;
+      } else if (cat === 'expense_support') {
+        totalExpense += v;
       }
     }
     const netPrice = unit.base_price - totalDiscount;
@@ -517,7 +554,13 @@ export class SalesEntryComponent implements OnInit {
 
   private executeSave(
     unit: Unit,
-    formValues: { sale_date: string; contract_price: number | null },
+    formValues: {
+      sale_date: string;
+      contract_price: number | null;
+      loan_markup_amount: number;
+      additional_expense_amount: number;
+      additional_expense_mode: 'add_to_net' | 'as_premium';
+    },
     items: any[]
   ): void {
     const payload = {
@@ -525,10 +568,13 @@ export class SalesEntryComponent implements OnInit {
       unit_id: unit.id,
       sale_date: formValues.sale_date,
       contract_price: formValues.contract_price,
+      loan_markup_amount: formValues.loan_markup_amount,
+      additional_expense_amount: formValues.additional_expense_amount,
+      additional_expense_mode: formValues.additional_expense_mode,
       items: items.map(i => ({
         promotion_item_id: i.promotion_item_id,
         used_value: i.used_value,
-        convert_to_discount: i.convert_to_discount ?? false,
+        discount_convert_value: i.discount_convert_value ?? 0,
         funding_source_type: i.funding_source_type,
         manual_input_value: i.manual_input_value ?? null,
         remark: i.remark || '',
@@ -559,13 +605,11 @@ export class SalesEntryComponent implements OnInit {
     // Panel 3A: เฉพาะ used_value > 0
     for (const row of this.currentPanelARows()) {
       if (row.used_value > 0) {
-        const isConvert = row.convert_to_discount && row.category === 'premium';
         items.push({
           promotion_item_id: row.promotion_item_id,
+          promotion_category: row.category,
           used_value: row.used_value,
-          convert_to_discount: row.convert_to_discount,
-          effective_category: isConvert ? 'discount' : row.category,
-          discount_convert_value: isConvert && row.discount_convert_value ? row.discount_convert_value : null,
+          discount_convert_value: row.category === 'premium' ? (row.discount_convert_value || 0) : 0,
           funding_source_type: row.funding_source_type,
           manual_input_value: row.manual_input_value,
           remark: row.remark,
@@ -573,14 +617,14 @@ export class SalesEntryComponent implements OnInit {
       }
     }
 
-    // Panel 3B: เฉพาะ has item selected + used_value > 0
+    // Panel 3B: เฉพาะ has item selected + used_value > 0 (ไม่มีสิทธิ์แปลง)
     for (const row of this.currentPanelBRows()) {
       if (row.promotion_item_id && row.used_value > 0) {
         items.push({
           promotion_item_id: row.promotion_item_id,
+          promotion_category: row.category,
           used_value: row.used_value,
-          convert_to_discount: false, // Panel 3B ไม่มีสิทธิ์แปลง
-          effective_category: row.category,
+          discount_convert_value: 0,
           funding_source_type: row.funding_source_type,
           manual_input_value: row.manual_input_value,
           remark: row.remark,
@@ -609,7 +653,12 @@ export class SalesEntryComponent implements OnInit {
       }
     }
 
-    // กัน budget table recompute เมื่อ pending ไม่เปลี่ยน (เช่น ตอน toggle convert_to_discount ที่ไม่กระทบยอด)
+    // ค่าธรรมเนียมโอน โหมด as_premium → หักจาก MANAGEMENT_SPECIAL
+    if (this.additionalExpenseMode() === 'as_premium' && this.additionalExpenseAmount() > 0) {
+      pending['MANAGEMENT_SPECIAL'] = (pending['MANAGEMENT_SPECIAL'] ?? 0) + this.additionalExpenseAmount();
+    }
+
+    // กัน budget table recompute เมื่อ pending ไม่เปลี่ยน (เช่น ตอนปรับ discount_convert_value ที่ไม่กระทบยอดงบ)
     const keys = new Set([...Object.keys(this.lastPendingSent), ...Object.keys(pending)]);
     let changed = false;
     for (const k of keys) {
@@ -672,6 +721,20 @@ export class SalesEntryComponent implements OnInit {
           // pre-fill ราคาหน้าสัญญา (edit mode)
           if (tx.contract_price != null) {
             unitInfo.contractPriceControl.setValue(Number(tx.contract_price));
+          }
+
+          // pre-fill ส่วนเสริม (ขอบวกเพิ่ม + ค่าใช้จ่ายบวกเพิ่ม + โหมด)
+          if (tx.loan_markup_amount != null) {
+            unitInfo.loanMarkupControl.setValue(Number(tx.loan_markup_amount) || 0);
+            this.loanMarkupAmount.set(Number(tx.loan_markup_amount) || 0);
+          }
+          if (tx.additional_expense_amount != null) {
+            unitInfo.additionalExpenseControl.setValue(Number(tx.additional_expense_amount) || 0);
+            this.additionalExpenseAmount.set(Number(tx.additional_expense_amount) || 0);
+          }
+          if (tx.additional_expense_mode) {
+            unitInfo.additionalExpenseModeControl.setValue(tx.additional_expense_mode);
+            this.additionalExpenseMode.set(tx.additional_expense_mode);
           }
 
           // เซ็ต unit_id (Number) ก่อน loadUnitsForProject เพื่อซิงค์ selectedUnit + display text

@@ -152,10 +152,18 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                       </div>
                       <div class="m-card__chips">
                         <app-status-chip type="promotion_category" [value]="item.promotion_category" />
-                        @if (item.convert_to_discount === '1' || item.convert_to_discount === true) {
-                          <span class="badge badge--success">แปลงส่วนลด</span>
+                        @if (convertState(item) === 'full') {
+                          <span class="badge badge--success">แปลงส่วนลดทั้งหมด</span>
+                        } @else if (convertState(item) === 'partial') {
+                          <span class="badge badge--info">แปลงส่วนลดบางส่วน ฿{{ n(item.discount_convert_value) | number:'1.0-0' }}</span>
                         }
                       </div>
+                      @if (convertState(item) === 'partial') {
+                        <div class="text-xs mt-1 flex gap-3" style="color: var(--color-text-secondary)">
+                          <span>↳ ของแถมจริง: <span class="tabular-nums font-medium">฿{{ (n(item.used_value) - n(item.discount_convert_value)) | number:'1.0-0' }}</span></span>
+                          <span>↳ ส่วนลด: <span class="tabular-nums font-medium">฿{{ n(item.discount_convert_value) | number:'1.0-0' }}</span></span>
+                        </div>
+                      }
                       @if (item.remark) {
                         <div class="m-card__remark">{{ item.remark }}</div>
                       }
@@ -187,10 +195,19 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                             <div class="font-medium" style="color: var(--color-text-primary)">{{ item.promotion_item_name || 'รายการ #' + item.promotion_item_id }}</div>
                             <app-status-chip type="promotion_category" [value]="item.promotion_category" class="mt-0.5" />
                           </td>
-                          <td class="tbl-td text-right tabular-nums font-semibold" style="color: var(--color-text-primary)">฿{{ n(item.used_value) | number:'1.0-0' }}</td>
+                          <td class="tbl-td text-right tabular-nums font-semibold" style="color: var(--color-text-primary)">
+                            ฿{{ n(item.used_value) | number:'1.0-0' }}
+                            @if (convertState(item) === 'partial') {
+                              <div class="text-xs font-normal mt-0.5" style="color: var(--color-text-secondary)">
+                                ของแถม ฿{{ (n(item.used_value) - n(item.discount_convert_value)) | number:'1.0-0' }} · ลด ฿{{ n(item.discount_convert_value) | number:'1.0-0' }}
+                              </div>
+                            }
+                          </td>
                           <td class="tbl-td text-center">
-                            @if (item.convert_to_discount === '1' || item.convert_to_discount === true) {
-                              <app-icon name="check" class="w-4 h-4 mx-auto" style="color: var(--color-success)" />
+                            @if (convertState(item) === 'full') {
+                              <span class="badge badge--success">ทั้งหมด</span>
+                            } @else if (convertState(item) === 'partial') {
+                              <span class="text-xs tabular-nums" style="color: var(--color-primary)">฿{{ n(item.discount_convert_value) | number:'1.0-0' }}</span>
                             } @else {
                               <span style="color: var(--color-gray-300)">—</span>
                             }
@@ -227,7 +244,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                       <div class="m-card__chips">
                         <app-status-chip type="promotion_category" [value]="item.promotion_category" />
                         <app-status-chip type="budget_source" [value]="fundingToChipValue(item.funding_source_type)" />
-                        @if (item.convert_to_discount === '1' || item.convert_to_discount === true) {
+                        @if (convertState(item) === 'full') {
                           <span class="badge badge--success">แปลงส่วนลด</span>
                         }
                       </div>
@@ -266,7 +283,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                           <td class="tbl-td"><app-status-chip type="budget_source" [value]="fundingToChipValue(item.funding_source_type)" /></td>
                           <td class="tbl-td text-right tabular-nums font-semibold" style="color: var(--color-text-primary)">฿{{ n(item.used_value) | number:'1.0-0' }}</td>
                           <td class="tbl-td text-center">
-                            @if (item.convert_to_discount === '1' || item.convert_to_discount === true) {
+                            @if (convertState(item) === 'full') {
                               <app-icon name="check" class="w-4 h-4 mx-auto" style="color: var(--color-success)" />
                             } @else {
                               <span style="color: var(--color-gray-300)">—</span>
@@ -968,6 +985,14 @@ export class SalesDetailComponent implements OnInit {
   });
 
   n(v: any): number { return Number(v) || 0; }
+
+  /** สถานะการแปลงส่วนลดของรายการ premium: 'none' | 'partial' | 'full' */
+  convertState(item: any): 'none' | 'partial' | 'full' {
+    const d = this.n(item.discount_convert_value);
+    const u = this.n(item.used_value);
+    if (d <= 0 || u <= 0) return 'none';
+    return d >= u ? 'full' : 'partial';
+  }
 
   readonly netAfterPromo = computed(() =>
     this.n(this.tx().net_price) - this.n(this.tx().total_promo_burden)

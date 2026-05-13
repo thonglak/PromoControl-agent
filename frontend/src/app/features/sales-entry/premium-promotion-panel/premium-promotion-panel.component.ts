@@ -5,7 +5,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { EligibleItem } from '../services/sales-entry.service';
@@ -20,8 +19,10 @@ export interface PanelARow {
   value_mode: string;
   max_value: number | null;
   calculated_value: number | null;
+  /** มูลค่ารวมที่หักจากงบยูนิต */
   used_value: number;
-  convert_to_discount: boolean;
+  /** ส่วนของ used_value ที่แปลงเป็นส่วนลด (0..used_value) เฉพาะ premium; ของแถมจริง = used_value - discount_convert_value */
+  discount_convert_value: number;
   funding_source_type: 'UNIT_STANDARD';
   formula_display: string | null;
   applied_policy_name: string | null;
@@ -30,7 +31,6 @@ export interface PanelARow {
   effective_buyer_share: number | null;
   warnings: string[];
   remark: string;
-  discount_convert_value: number | null;
   manual_input_value: number | null;
 }
 
@@ -39,7 +39,7 @@ export interface PanelARow {
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    MatFormFieldModule, MatInputModule, MatCheckboxModule,
+    MatFormFieldModule, MatInputModule,
     MatTooltipModule, SvgIconComponent, CurrencyMaskDirective,
   ],
   template: `
@@ -121,15 +121,19 @@ export interface PanelARow {
                   </mat-form-field>
                 </div>
 
-                <!-- แปลงส่วนลด -->
-                <div class="flex items-center">
+                <!-- แปลงส่วนลด (เฉพาะ premium) — กรอกได้ 0..used_value -->
+                <div>
                   @if (row.category === 'premium') {
-                    <mat-checkbox
-                      [checked]="row.convert_to_discount"
-                      (change)="onConvertToggle(i, $event.checked)"
-                      color="primary">
-                      <span class="text-sm" style="color: var(--color-text-primary)">แปลงส่วนลด</span>
-                    </mat-checkbox>
+                    <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic"
+                      [matTooltip]="'ส่วนของมูลค่าที่ใช้ ที่แปลงเป็นส่วนลด (ของแถมจริง = มูลค่าที่ใช้ − แปลงส่วนลด)'">
+                      <mat-label>แปลงส่วนลด</mat-label>
+                      <span matTextPrefix>฿&nbsp;</span>
+                      <input matInput currencyMask
+                        [ngModel]="row.discount_convert_value"
+                        (ngModelChange)="onDiscountConvertChange(i, $event)"
+                        [min]="0"
+                        class="text-right">
+                    </mat-form-field>
                   }
                 </div>
 
@@ -143,6 +147,18 @@ export interface PanelARow {
                   </mat-form-field>
                 </div>
               </div>
+
+              <!-- breakdown ของ premium ที่ split -->
+              @if (row.category === 'premium' && row.discount_convert_value > 0 && row.discount_convert_value < row.used_value) {
+                <div class="text-xs mt-2 px-2 py-1 rounded bg-blue-50 border border-blue-200 flex gap-4">
+                  <span style="color: var(--color-text-secondary)">
+                    ↳ ของแถมจริง: <span class="font-semibold tabular-nums" style="color: var(--color-primary)">฿{{ (row.used_value - row.discount_convert_value) | number:'1.0-0' }}</span>
+                  </span>
+                  <span style="color: var(--color-text-secondary)">
+                    ↳ ส่วนลด: <span class="font-semibold tabular-nums text-discount">฿{{ row.discount_convert_value | number:'1.0-0' }}</span>
+                  </span>
+                </div>
+              }
 
               @if (row.fee_formula?.base_field === 'manual_input') {
                 <mat-form-field appearance="outline" class="!text-xs w-40 mt-1" subscriptSizing="dynamic">
@@ -206,7 +222,7 @@ export class PremiumPromotionPanelComponent implements OnInit {
 
   // ─── Effects: rebuild rows เมื่อ eligible items เปลี่ยน ──────────────
   // หมายเหตุ: เมื่อ parent ทำ recalc (เช่น contract_price/net_price เปลี่ยน) eligibleItems จะถูก
-  // โหลดใหม่ — เราต้องคงค่าที่ user กรอกไว้ (used_value ของ manual/fixed, convert_to_discount, remark)
+  // โหลดใหม่ — เราต้องคงค่าที่ user กรอกไว้ (used_value ของ manual/fixed, discount_convert_value, remark)
   // แต่ปรับ calculated_value/formula_display/warnings ให้ตรงกับ BE ใหม่
   // กันกระตุก: reuse reference ของ row เดิมถ้า content ไม่เปลี่ยน + skip set+emit ถ้าทั้ง array เหมือนเดิม
   // (Material form field จะไม่ rebuild เพราะ binding อ้างอิง object เดิม)
@@ -246,13 +262,16 @@ export class PremiumPromotionPanelComponent implements OnInit {
         return initRows.length > 0 ? { ...fresh, used_value: 0 } : fresh;
       }
       // มีค่าเดิม — preserve user input + อัปเดต server-derived fields
+      const newUsedValue = item.value_mode === 'calculated' ? fresh.used_value : saved.used_value;
+      // ถ้า used_value ลดลงจน < discount_convert_value → clamp
+      const newConvert = Math.min(saved.discount_convert_value, newUsedValue);
       const merged: PanelARow = {
         ...fresh,
         // value_mode='calculated' → ใช้ค่าใหม่จาก BE; โหมดอื่น → คงค่าที่ user กรอก
-        used_value:           item.value_mode === 'calculated' ? fresh.used_value : saved.used_value,
-        convert_to_discount:  saved.convert_to_discount,
-        remark:               saved.remark,
-        manual_input_value:   saved.manual_input_value,
+        used_value:              newUsedValue,
+        discount_convert_value:  newConvert,
+        remark:                  saved.remark,
+        manual_input_value:      saved.manual_input_value,
       };
       // ถ้า row เดิมเหมือน merged ทุกประการ → reuse reference เดิม กัน Material rebuild
       const existing = inFlightById.get(item.id);
@@ -273,7 +292,7 @@ export class PremiumPromotionPanelComponent implements OnInit {
   private rowsEqual(a: PanelARow, b: PanelARow): boolean {
     return a.promotion_item_id === b.promotion_item_id
       && a.used_value === b.used_value
-      && a.convert_to_discount === b.convert_to_discount
+      && a.discount_convert_value === b.discount_convert_value
       && a.remark === b.remark
       && a.manual_input_value === b.manual_input_value
       && a.calculated_value === b.calculated_value
@@ -284,7 +303,6 @@ export class PremiumPromotionPanelComponent implements OnInit {
       && a.effective_buyer_share === b.effective_buyer_share
       && a.value_mode === b.value_mode
       && a.category === b.category
-      && a.discount_convert_value === b.discount_convert_value
       && a.fee_formula === b.fee_formula
       && (a.warnings?.length ?? 0) === (b.warnings?.length ?? 0);
   }
@@ -314,7 +332,7 @@ export class PremiumPromotionPanelComponent implements OnInit {
       max_value: item.max_value,
       calculated_value: item.calculated_value,
       used_value: usedValue,
-      convert_to_discount: false,
+      discount_convert_value: 0,
       funding_source_type: 'UNIT_STANDARD',
       formula_display: item.formula_display,
       applied_policy_name: item.applied_policy_name,
@@ -324,7 +342,6 @@ export class PremiumPromotionPanelComponent implements OnInit {
       warnings: item.warnings ?? [],
       remark: '',
       manual_input_value: null,
-      discount_convert_value: item.discount_convert_value ?? null,
     };
   }
 
@@ -338,16 +355,23 @@ export class PremiumPromotionPanelComponent implements OnInit {
       if (v < 0) v = 0;
       if (row.max_value != null && v > row.max_value) v = row.max_value;
       row.used_value = v;
+      // clamp discount_convert_value ไม่ให้เกิน used_value ใหม่
+      if (row.discount_convert_value > v) row.discount_convert_value = v;
       updated[index] = row;
       return updated;
     });
     this.emitChanges(this.rows());
   }
 
-  onConvertToggle(index: number, checked: boolean): void {
+  onDiscountConvertChange(index: number, value: number | null): void {
     this.rows.update(rows => {
       const updated = [...rows];
-      updated[index] = { ...updated[index], convert_to_discount: checked };
+      const row = { ...updated[index] };
+      let v = value ?? 0;
+      if (v < 0) v = 0;
+      if (v > row.used_value) v = row.used_value;
+      row.discount_convert_value = v;
+      updated[index] = row;
       return updated;
     });
     this.emitChanges(this.rows());
@@ -390,14 +414,6 @@ export class PremiumPromotionPanelComponent implements OnInit {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
-
-  /** ดึง effective_category ตาม convert_to_discount */
-  getEffectiveCategory(row: PanelARow): string {
-    if (row.convert_to_discount && row.category === 'premium') {
-      return 'discount';
-    }
-    return row.category;
-  }
 
   categoryClass(cat: string): string {
     switch (cat) {
