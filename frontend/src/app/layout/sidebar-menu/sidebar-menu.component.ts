@@ -9,8 +9,8 @@ import { Subscription, filter } from 'rxjs';
 
 import { AuthService } from '../../core/services/auth.service';
 import { ProjectService } from '../../core/services/project.service';
+import { VersionCheckService } from '../../core/services/version-check.service';
 import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
-import { environment } from '../../../environments/environment';
 
 // ── Menu type definitions ────────────────────────────────────────────────────
 
@@ -119,12 +119,14 @@ export class SidebarMenuComponent implements OnInit, OnDestroy {
 
   private readonly auth          = inject(AuthService);
   private readonly projectService = inject(ProjectService);
+  private readonly versionCheck  = inject(VersionCheckService);
   private readonly router        = inject(Router);
   private readonly subs          = new Subscription();
 
   readonly selectedProject = this.projectService.selectedProject;
   readonly currentUser     = this.auth.currentUser;
-  readonly appVersion      = environment.version;
+  /** version ล่าสุดจาก poll — อัปเดตอัตโนมัติเมื่อ VersionCheckService พบเวอร์ชันใหม่ */
+  readonly appVersion      = this.versionCheck.latestVersion;
 
   /** กลุ่มที่ expand อยู่ */
   readonly expandedGroups = signal(new Set<string>());
