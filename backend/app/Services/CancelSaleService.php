@@ -8,33 +8,26 @@ use RuntimeException;
 /**
  * CancelSaleService — ยกเลิกรายการขาย
  *
+ * แนวคิด: ยกเลิก = "เหมือนไม่มีอะไรเกิดขึ้น" — void ทุก movement ที่เกี่ยวข้อง
+ * ไม่สร้าง RETURN ใหม่ ไม่ดันเงินเข้า Pool (balance ทุกแหล่งเด้งกลับสู่สภาพก่อนขาย)
+ *
  * กฎสำคัญ:
  * 1. ยกเลิกได้เฉพาะ transaction status = 'active'
  * 2. ห้ามยกเลิกถ้ายูนิต status = 'transferred'
- * 3. ห้ามยกเลิกถ้ามี manual RETURN movement (คืนงบเข้า Pool แล้ว)
- * 4. UNIT_STANDARD: void เฉพาะ USE (งบคงอยู่กับยูนิต)
- * 5. PROJECT_POOL: void ALLOCATE + USE → Pool ได้งบคืนจาก voided ALLOCATE
- * 6. MANAGEMENT_SPECIAL: void เฉพาะ USE + สร้าง RETURN = ยอด ALLOCATE
- *    (ห้าม void ALLOCATE เพราะจะทำให้ remaining ติดลบ)
- *    → ALLOCATE คงอยู่, RETURN หักออก → remaining = 0
- *    → Pool เพิ่มจาก RETURN (getPoolBalance นับ RETURN ทุก source)
+ * 3. ห้ามยกเลิกถ้ามี manual RETURN movement (กัน remaining ติดลบหลัง void ALLOCATE)
+ * 4. UNIT_STANDARD: void เฉพาะ USE (งบคงอยู่กับยูนิต ALLOCATE ของยูนิตไม่เกี่ยวกับการขาย)
+ * 5. PROJECT_POOL: void ALLOCATE + USE → Pool balance เด้งกลับเองเพราะ voided ไม่ถูกนับ
+ * 6. MANAGEMENT_SPECIAL: void ALLOCATE + USE (ไม่สร้าง RETURN — งบ MGMT หายไปเหมือนไม่เคย allocate)
  * 7. เปลี่ยนสถานะยูนิตเป็น available
  * 8. ทั้งหมดอยู่ใน 1 DB transaction
  */
 class CancelSaleService
 {
     private BaseConnection $db;
-    private NumberSeriesService $numberSeriesSvc;
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
-        $this->numberSeriesSvc = new NumberSeriesService();
-    }
-
-    private function generateMovementNo(int $projectId, ?int $createdBy = null): string
-    {
-        return $this->numberSeriesSvc->generate($projectId, 'BUDGET_MOVE', null, 'budget_movements', $createdBy);
     }
 
     /**
@@ -147,21 +140,22 @@ class CancelSaleService
                 ];
             }
 
-            // 5c. MANAGEMENT_SPECIAL: void เฉพาะ USE + สร้าง RETURN ย้ายงบเข้า Pool
-            //     ห้าม void ALLOCATE! เพราะ:
-            //     - getPoolBalance ไม่นับ MGMT ALLOCATE → void ไม่เพิ่ม Pool
-            //     - ต้องสร้าง RETURN แทน → แต่ถ้า void ALLOCATE ด้วย remaining จะติดลบ
-            //       (allocated=0, returned=X → remaining = -X)
-            //     - คง ALLOCATE ไว้ + สร้าง RETURN → remaining = allocated - returned = 0 ✓
-            $mgmtUseMovements = $this->db->table('budget_movements')
+            // 5c. MANAGEMENT_SPECIAL: void ทั้ง ALLOCATE + USE — เหมือนไม่เคย allocate งบ MGMT
+            //     ไม่สร้าง RETURN ใหม่: งบผู้บริหารไม่ดันเข้า Pool ตอนยกเลิก
+            //     guard ข้อ 3 (manual RETURN check) กัน remaining ติดลบจากกรณี
+            //     ALLOCATE ถูก void แล้วยังมี RETURN เก่าค้างไว้
+            $mgmtMovements = $this->db->table('budget_movements')
                 ->where('unit_id', $unitId)
                 ->where('project_id', $projectId)
                 ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
-                ->whereIn('movement_type', ['USE', 'SPECIAL_BUDGET_USE'])
+                ->whereIn('movement_type', [
+                    'ALLOCATE', 'SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE',
+                    'USE', 'SPECIAL_BUDGET_USE',
+                ])
                 ->where('status', 'approved')
                 ->get()->getResultArray();
 
-            foreach ($mgmtUseMovements as $movement) {
+            foreach ($mgmtMovements as $movement) {
                 $this->db->table('budget_movements')
                     ->where('id', $movement['id'])
                     ->update(['status' => 'voided', 'updated_at' => $now]);
@@ -172,51 +166,6 @@ class CancelSaleService
                     'source'      => $movement['budget_source_type'],
                     'amount'      => (float) $movement['amount'],
                 ];
-            }
-
-            // คำนวณ RETURN ที่ต้องสร้าง = ALLOCATE - RETURN ที่มีอยู่แล้ว
-            // ป้องกัน RETURN ซ้ำ (กรณียกเลิกหลายครั้ง ALLOCATE เดิมยังอยู่)
-            $mgmtAllocRow = $this->db->table('budget_movements')
-                ->selectSum('amount', 'total')
-                ->where('unit_id', $unitId)
-                ->where('project_id', $projectId)
-                ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
-                ->whereIn('movement_type', ['ALLOCATE', 'SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE'])
-                ->where('status', 'approved')
-                ->get()->getRowArray();
-            $mgmtAllocatedTotal = abs((float) ($mgmtAllocRow['total'] ?? 0));
-
-            $mgmtReturnRow = $this->db->table('budget_movements')
-                ->selectSum('amount', 'total')
-                ->where('unit_id', $unitId)
-                ->where('project_id', $projectId)
-                ->where('budget_source_type', 'MANAGEMENT_SPECIAL')
-                ->whereIn('movement_type', ['RETURN', 'SPECIAL_BUDGET_RETURN'])
-                ->where('status', 'approved')
-                ->get()->getRowArray();
-            $mgmtReturnedTotal = abs((float) ($mgmtReturnRow['total'] ?? 0));
-
-            $mgmtToReturn = $mgmtAllocatedTotal - $mgmtReturnedTotal;
-
-            // สร้าง RETURN เฉพาะส่วนที่ยังไม่เคยคืน → ป้องกัน Pool บวกซ้ำ
-            if ($mgmtToReturn > 0) {
-                $movementNo = $this->generateMovementNo($projectId, $cancelledBy);
-                $this->db->table('budget_movements')->insert([
-                    'movement_no'        => $movementNo,
-                    'project_id'         => $projectId,
-                    'unit_id'            => $unitId,
-                    'movement_type'      => 'RETURN',
-                    'budget_source_type' => 'MANAGEMENT_SPECIAL',
-                    'amount'             => $mgmtToReturn,
-                    'status'             => 'approved',
-                    'reference_id'       => $transactionId,
-                    'reference_type'     => 'sales_transaction_cancel',
-                    'note'               => 'คืนงบผู้บริหารเข้า Pool อัตโนมัติ (ยกเลิกขาย)',
-                    'created_by'         => $cancelledBy,
-                    'approved_by'        => $cancelledBy,
-                    'approved_at'        => $now,
-                    'created_at'         => $now,
-                ]);
             }
 
             // 6. อัปเดต transaction

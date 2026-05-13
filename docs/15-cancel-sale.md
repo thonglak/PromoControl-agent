@@ -12,7 +12,7 @@
 
 ## วัตถุประสงค์
 
-ยกเลิกรายการขายที่บันทึกแล้ว — คืนงบทั้งหมดกลับไปยังแหล่งเดิม + เปลี่ยนสถานะยูนิตกลับเป็น `available`
+ยกเลิกรายการขายที่บันทึกแล้ว — ล้างประวัติการใช้งบ (void ทุก movement ที่เกิดจากการขาย) ไม่คืนงบเข้า Pool + เปลี่ยนสถานะยูนิตกลับเป็น `available`
 
 ---
 
@@ -51,7 +51,8 @@
 │  วันที่ขาย: 15/03/2026                    │
 │                                         │
 │  ⚠️ การยกเลิกจะ:                         │
-│  • คืนงบทั้งหมดกลับไปยังแหล่งเดิม            │
+│  • ล้างประวัติการใช้งบของรายการขายนี้         │
+│    (ไม่คืนเข้า Pool)                       │
 │  • เปลี่ยนสถานะยูนิตเป็น "ว่าง"              │
 │  • ไม่สามารถย้อนกลับได้                     │
 │                                         │
@@ -77,10 +78,11 @@
 - unit.status ต้องไม่ใช่ `transferred`
 - ไม่มี RETURN movement ที่อ้างอิงยูนิตนี้ (ถ้ามีต้อง void ก่อน)
 
-**Step 2:** Void budget movements
-- หา budget_movements ทั้งหมดที่ `sale_transaction_id = transaction.id` AND `status = 'approved'`
-- เปลี่ยน status เป็น `voided` ทุก movement
-- ผลลัพธ์: งบคืนกลับไปยังแหล่งเดิมอัตโนมัติ (เพราะ voided ไม่นับใน balance)
+**Step 2:** Void budget movements ของยูนิตที่เกิดจากการขาย
+- UNIT_STANDARD: void เฉพาะ USE/SPECIAL_BUDGET_USE (ALLOCATE ของยูนิตเป็นการตั้งงบไว้ก่อนขาย ไม่เกี่ยวกับ transaction)
+- PROJECT_POOL: void ทั้ง ALLOCATE + USE ที่ผูกกับยูนิต
+- MANAGEMENT_SPECIAL: void ทั้ง ALLOCATE + USE ที่ผูกกับยูนิต — **ไม่สร้าง RETURN ใหม่** (งบ MGMT หายไปเหมือนไม่เคย allocate)
+- ผลลัพธ์: balance ทุกแหล่งเด้งกลับสู่สภาพก่อนขายอัตโนมัติ (voided ไม่นับใน balance) — ไม่มีเงินถูกผลักเข้า Pool
 
 **Step 3:** อัปเดต transaction
 - `sale_transactions.status = 'cancelled'`
@@ -206,14 +208,14 @@
 1. **ยกเลิกได้**: transaction status = `active` AND unit status ≠ `transferred`
 2. **ต้องกรอกวันที่ยกเลิก** (`cancel_date`): required, ห้ามเป็นวันในอนาคต
 3. **เหตุผล** (`cancel_reason`): **optional** — ไม่กรอกได้ (เก็บเป็น NULL)
-4. **Void movements**: เฉพาะ movements ที่ `sale_transaction_id = transaction.id`
-5. **ไม่ void allocations**: ALLOCATE, SPECIAL_BUDGET_ALLOCATE ที่ตั้งไว้ใน Section 2 **ไม่ถูก void** — จัดการแยก
-6. **Atomic**: ทุกขั้นตอนอยู่ใน 1 DB transaction — fail ทั้งหมดหรือสำเร็จทั้งหมด
-7. **Audit**: เก็บ `cancelled_at`, `cancelled_by`, `cancel_date`, `cancel_reason` ไว้เสมอ
-8. **ห้ามยกเลิกซ้ำ**: transaction ที่ cancelled แล้วไม่แสดงปุ่มยกเลิก
-9. **งบคืนอัตโนมัติ**: เมื่อ movement ถูก void → balance recalculate อัตโนมัติ (voided ไม่นับ)
+4. **Void movements**: void ทุก movement ของยูนิตที่ผูกกับการขาย (USE ทุกแหล่ง + ALLOCATE จาก PROJECT_POOL/MANAGEMENT_SPECIAL ที่เกิดในการขาย)
+5. **ไม่ void UNIT_STANDARD ALLOCATE**: ALLOCATE ของงบยูนิตที่ตั้งไว้ใน Section 2 **ไม่ถูก void** — จัดการแยก
+6. **ไม่สร้าง RETURN ใหม่**: ยกเลิกไม่ดันงบเข้า Pool — balance เด้งกลับเองจากการ void
+7. **Atomic**: ทุกขั้นตอนอยู่ใน 1 DB transaction — fail ทั้งหมดหรือสำเร็จทั้งหมด
+8. **Audit**: เก็บ `cancelled_at`, `cancelled_by`, `cancel_date`, `cancel_reason` ไว้เสมอ
+9. **ห้ามยกเลิกซ้ำ**: transaction ที่ cancelled แล้วไม่แสดงปุ่มยกเลิก
 10. **ยูนิตกลับ available**: หลังยกเลิก ยูนิตสามารถขายใหม่ได้
-11. **RETURN conflict**: ถ้ามี RETURN movement สำหรับยูนิตนี้แล้ว → ต้อง void RETURN ก่อนจึงยกเลิกขายได้ (ป้องกันงบเกิน)
+11. **RETURN conflict**: ถ้ามี RETURN movement สำหรับยูนิตนี้แล้ว → ต้อง void RETURN ก่อนจึงยกเลิกขายได้ (ป้องกัน remaining ติดลบหลัง void ALLOCATE)
 
 ---
 
