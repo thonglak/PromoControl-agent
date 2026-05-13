@@ -134,9 +134,13 @@ class SalesTransactionController extends BaseController
                 $summary = $summaryCache[$cacheKey];
                 $row['total_budget_remaining'] = $summary['total_remaining'] ?? 0;
 
-                // งบนอกสุทธิที่ใช้ = งบอื่นที่ใช้ (items ของ transaction นี้) - งบยูนิตคงเหลือ
+                // งบนอกสุทธิที่ใช้ = งบอื่นที่ใช้ (items + ค่าธรรมเนียมโอน mode=as_premium) - งบยูนิตคงเหลือ
+                // ค่าธรรมเนียมโอน mode=as_premium กิน MANAGEMENT_SPECIAL จริง แต่ไม่อยู่ใน items table
                 $unitRemaining = $summary['UNIT_STANDARD']['remaining'] ?? 0;
                 $otherUsed     = $otherUsedMap[(int) $row['id']] ?? 0;
+                if (($row['additional_expense_mode'] ?? null) === 'as_premium') {
+                    $otherUsed += (float) ($row['additional_expense_amount'] ?? 0);
+                }
                 $netExtra      = $otherUsed - $unitRemaining;
                 $row['net_extra_budget_used'] = $netExtra > 0 ? round($netExtra, 2) : 0;
             } catch (\Throwable $e) {
@@ -184,6 +188,14 @@ class SalesTransactionController extends BaseController
             }
         }
 
+        // ═══ sum กำไร — ทุก row ที่ตรง filter ยกเว้นรายการยกเลิก ═══
+        $profitBuilder = $this->db()->table('sales_transactions st')
+            ->selectSum('st.profit', 'total_profit')
+            ->join('project_units pu', 'pu.id = st.unit_id', 'left');
+        $this->applyIndexFilters($profitBuilder, $pid, false);
+        $profitBuilder->where('st.status !=', 'cancelled');
+        $totalProfit = (float) ($profitBuilder->get()->getRowArray()['total_profit'] ?? 0);
+
         // งบผู้บริหารที่คืนแล้ว — project-wide (รวมที่คืนจากการยกเลิกขายและคืนแบบ manual)
         $mgmtReturnedRow = $this->db()->table('budget_movements')
             ->selectSum('amount', 'total')
@@ -213,6 +225,8 @@ class SalesTransactionController extends BaseController
                 'management_budget_returned'  => $managementBudgetReturned,
                 // sum literal ของคอลัมน์ "งบคงเหลือรวม" ทุก row ตรง filter (ไม่ paginate, ไม่ dedupe)
                 'total_budget_remaining_all_units' => round((float) $totalColumnSum, 2),
+                // กำไรรวม — ทุก row ตรง filter ยกเว้นรายการยกเลิก
+                'total_profit' => round($totalProfit, 2),
             ],
         ]);
     }

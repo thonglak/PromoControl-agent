@@ -78,7 +78,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
       <!-- Summary cards -->
       @if (summary()) {
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <!-- งบยูนิต -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
             <p class="text-xs font-semibold text-slate-600 mb-2">งบยูนิต</p>
@@ -110,6 +110,17 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
             <p class="text-xs text-slate-400 mt-2">
               + Pool คงเหลือ: ฿{{ summary()!.pool_budget_remaining | number:'1.0-0' }}
             </p>
+          </div>
+
+          <!-- กำไร (Y) — sum คอลัมน์ profit ทุก row ยกเว้นยกเลิก -->
+          <div class="bg-white rounded-lg border border-slate-200 p-4">
+            <p class="text-xs font-semibold text-slate-600 mb-2">กำไร (Y)</p>
+            <p class="text-2xl font-bold tabular-nums"
+               [class.text-profit]="summary()!.total_profit >= 0"
+               [class.text-loss]="summary()!.total_profit < 0">
+              ฿{{ summary()!.total_profit | number:'1.0-0' }}
+            </p>
+            <p class="text-xs text-slate-400 mt-2">รวมจากรายการที่ตรง filter (ไม่รวมยกเลิก)</p>
           </div>
 
           <!-- งบผู้บริหาร -->
@@ -354,7 +365,7 @@ export class SalesListComponent implements OnInit {
   readonly sortField = signal('st.sale_date');
   readonly sortDir = signal<'ASC' | 'DESC'>('DESC');
   readonly statusFilter = signal('');
-  readonly summary = signal<{ unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number; total_budget_remaining_all_units: number } | null>(null);
+  readonly summary = signal<{ unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number; total_budget_remaining_all_units: number; total_profit: number } | null>(null);
 
   searchControl = this.fb.control('');
 
