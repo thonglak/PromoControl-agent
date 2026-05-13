@@ -105,41 +105,80 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
           <!-- ──── Left Column: เนื้อหาหลัก ──── -->
           <div class="left-col">
 
-            <!-- ข้อมูลยูนิต -->
+            <!-- ข้อมูลยูนิต — 3 zones: identity / pricing / loan extras -->
             <app-section-card title="ข้อมูลยูนิต" icon="building-office" class="mb-8">
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                <div class="detail-field">
-                  <span class="detail-label">โครงการ</span>
-                  <span class="detail-value">{{ tx().project_name }}</span>
+
+              <!-- Zone 1: identity (inline compact) -->
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm pb-3"
+                style="border-bottom: 1px solid var(--color-border)">
+                <span>
+                  <span style="color: var(--color-gray-500)">โครงการ</span>
+                  <span class="ml-1 font-medium" style="color: var(--color-text-primary)">{{ tx().project_name }}</span>
+                </span>
+                <span style="color: var(--color-gray-300)">·</span>
+                <span>
+                  <span style="color: var(--color-gray-500)">ยูนิต</span>
+                  <span class="ml-1 font-mono font-medium" style="color: var(--color-text-primary)">{{ tx().unit_code }}</span>
+                </span>
+                <span style="color: var(--color-gray-300)">·</span>
+                <span>
+                  <span style="color: var(--color-gray-500)">วันที่ขาย</span>
+                  <span class="ml-1 font-medium" style="color: var(--color-text-primary)">{{ tx().sale_date | thaiDate:'auto' }}</span>
+                </span>
+              </div>
+
+              <!-- Zone 2: pricing (เด่น) -->
+              <div class="grid grid-cols-2 gap-4 py-4">
+                <div>
+                  <p class="text-xs mb-1" style="color: var(--color-gray-500)">ราคาขาย</p>
+                  <p class="text-xl font-bold tabular-nums" style="color: var(--color-text-primary)">
+                    ฿{{ n(tx().base_price) | number:'1.0-0' }}
+                  </p>
                 </div>
-                <div class="detail-field">
-                  <span class="detail-label">ยูนิต</span>
-                  <span class="detail-value font-mono">{{ tx().unit_code }}</span>
-                </div>
-                <div class="detail-field">
-                  <span class="detail-label">วันที่ขาย</span>
-                  <span class="detail-value">{{ tx().sale_date | thaiDate:'auto' }}</span>
-                </div>
-                <div class="detail-field">
-                  <span class="detail-label">ราคาหน้าสัญญา</span>
-                  <span class="detail-value tabular-nums">
+                <div>
+                  <p class="text-xs mb-1" style="color: var(--color-gray-500)">ราคาหน้าสัญญา</p>
+                  <p class="text-xl font-bold tabular-nums" style="color: var(--color-text-primary)">
                     @if (tx().contract_price != null) {
                       ฿{{ n(tx().contract_price) | number:'1.0-0' }}
                     } @else {
-                      <span style="color: var(--color-gray-400)">—</span>
+                      <span style="color: var(--color-gray-400); font-weight: normal">—</span>
                     }
-                  </span>
-                </div>
-                <div class="detail-field">
-                  <span class="detail-label">ราคาขาย</span>
-                  <span class="detail-value tabular-nums">฿{{ n(tx().base_price) | number:'1.0-0' }}</span>
+                  </p>
                 </div>
               </div>
+
+              <!-- Zone 3: loan extras — โผล่เมื่อมี -->
+              @if (n(tx().loan_markup_amount) > 0 || n(tx().additional_expense_amount) > 0) {
+                <div class="pt-3" style="border-top: 1px solid var(--color-border)">
+                  <p class="text-xs font-semibold mb-2" style="color: var(--color-gray-600)">
+                    ข้อมูลส่วนเสริม (สำหรับยื่นกู้)
+                  </p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                    @if (n(tx().loan_markup_amount) > 0) {
+                      <div class="detail-field">
+                        <span class="detail-label">ขอบวกเพิ่ม</span>
+                        <span class="detail-value tabular-nums">฿{{ n(tx().loan_markup_amount) | number:'1.0-0' }}</span>
+                      </div>
+                    }
+                    @if (n(tx().additional_expense_amount) > 0) {
+                      <div class="detail-field">
+                        <span class="detail-label">
+                          ค่าธรรมเนียมโอนบวกเพิ่ม
+                          <span class="text-[10px] font-normal ml-1" style="color: var(--color-gray-500)">
+                            ({{ tx().additional_expense_mode === 'as_premium' ? 'ใช้งบผู้บริหาร' : 'ลูกค้าจ่ายเอง' }})
+                          </span>
+                        </span>
+                        <span class="detail-value tabular-nums">฿{{ n(tx().additional_expense_amount) | number:'1.0-0' }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
             </app-section-card>
 
             <!-- โปรโมชั่น: งบยูนิต -->
             @if (unitItems().length > 0) {
-              <app-section-card title="โปรโมชั่น — งบยูนิต" icon="gift" [noPadding]="true" class="mb-8">
+              <app-section-card title="Premium (งบยูนิต)" icon="gift" [noPadding]="true" class="mb-8">
                 <span card-actions class="badge badge--info">{{ unitItems().length }} รายการ</span>
 
                 <!-- Mobile: card list -->
