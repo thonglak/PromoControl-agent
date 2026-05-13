@@ -211,10 +211,10 @@ function toISODateStr(d: any): string {
             <div class="text-xs font-medium mb-2" style="color: var(--color-text-primary)">วิธีคิดค่าธรรมเนียมโอน</div>
             <mat-radio-group class="flex flex-col gap-1" [formControl]="additionalExpenseModeControl">
               <mat-radio-button value="add_to_net" class="text-sm">
-                บวกเข้าราคาขายสุทธิ (ลูกค้าจ่ายเอง)
+                ค่าธรรมเนียมโอนบวกเพิ่ม (ลูกค้าจ่ายเอง)
               </mat-radio-button>
               <mat-radio-button value="as_premium" class="text-sm">
-                ของแถมเพิ่มเติม (หักจากงบผู้บริหาร)
+                ค่าธรรมเนียมโอนบวกเพิ่ม (ใช้งบผู้บริหาร)
               </mat-radio-button>
             </mat-radio-group>
           </div>

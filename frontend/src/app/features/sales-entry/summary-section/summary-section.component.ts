@@ -87,7 +87,7 @@ export interface BudgetSummary {
         <!-- 6.1 ค่าธรรมเนียมโอน (โหมด as_premium) — รวมอยู่ในค่าใช้จ่ายอุดหนุนข้างบนแล้ว แสดงแยกเพื่อความชัด -->
         @if (additionalExpenseAmount() > 0 && additionalExpenseMode() === 'as_premium') {
           <div class="flex justify-between py-1 text-xs px-3" style="color: var(--color-text-secondary)">
-            <span>↳ ค่าธรรมเนียมโอน (งบผู้บริหาร)</span>
+            <span>↳ ค่าธรรมเนียมโอนบวกเพิ่ม</span>
             <span class="tabular-nums">{{ additionalExpenseAmount() | number:'1.0-0' }}</span>
           </div>
         }
@@ -267,12 +267,16 @@ export class SummarySectionComponent {
     this.standardBudget() - this.totalPanelAUsed() - this.totalUnitBudgetReturned()
   );
 
-  // งบอื่นที่ใช้ (Panel 3B ทั้งหมด)
-  readonly totalPanelBUsed = computed(() =>
-    this.panelBItems()
+  // งบอื่นที่ใช้ (Panel 3B ทั้งหมด + ค่าธรรมเนียมโอน mode=as_premium ที่ก็กิน MGMT_SPECIAL)
+  readonly totalPanelBUsed = computed(() => {
+    const rowsSum = this.panelBItems()
       .filter(r => r.promotion_item_id != null && r.used_value > 0)
-      .reduce((sum, r) => sum + r.used_value, 0)
-  );
+      .reduce((sum, r) => sum + r.used_value, 0);
+    const extra = this.additionalExpenseMode() === 'as_premium'
+      ? Math.max(0, this.additionalExpenseAmount())
+      : 0;
+    return rowsSum + extra;
+  });
 
   // งบคงเหลือรวมทุกแหล่ง
   readonly totalBudgetRemaining = computed(() => {

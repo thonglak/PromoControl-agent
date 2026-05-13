@@ -840,18 +840,19 @@ class BudgetMovementService
 
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 10. voidSpecialBudget — ยกเลิกงบพิเศษทั้งก้อน (เมื่อ used = 0)
+    // 10. voidSpecialBudget — ยกเลิกงบพิเศษทั้งก้อน
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
      * ยกเลิกงบพิเศษที่ตั้งไว้ (Void)
-     * ใช้เมื่อตั้งงบผิด/ไม่ต้องการแล้ว — เงื่อนไข: ต้องยังไม่มีการใช้งบ (used = 0)
+     * ใช้เมื่อตั้งงบผิด/ไม่ต้องการแล้ว
      *
      * กฎ:
-     * - ยกเลิกได้เฉพาะ MANAGEMENT_SPECIAL
-     * - ต้อง used = 0 (ยังไม่มีใครใช้งบนี้)
-     * - สร้าง movement type = SPECIAL_BUDGET_VOID, amount = -(allocated), status = voided
-     * - อัปเดต allocation records ทั้งหมดของ unit+source เป็น voided
+     * - ยกเลิกได้เฉพาะ MANAGEMENT_SPECIAL / PROJECT_POOL
+     * - ยกเลิกได้แม้มีการใช้งบไปบ้างแล้ว — สำหรับ MGMT_SPECIAL remaining ติดลบได้
+     * - note optional (default 'ยกเลิกงบ')
+     * - สร้าง movement type = SPECIAL_BUDGET_VOID, amount = -(remaining)
+     * - void ALLOCATE movements ทีละก้อนจนครอบ remaining (อาจ over-void เมื่อ used > 0)
      */
     public function voidSpecialBudget(array $data): array
     {
@@ -867,9 +868,9 @@ class BudgetMovementService
             throw new RuntimeException('ยกเลิกได้เฉพาะงบผู้บริหาร หรืองบส่วนกลาง เท่านั้น');
         }
 
-        // 2. Validate note
+        // 2. note: optional — default 'ยกเลิกงบ' ถ้าว่าง
         if (trim($note) === '') {
-            throw new RuntimeException('กรุณาระบุเหตุผลในการยกเลิก');
+            $note = 'ยกเลิกงบ';
         }
 
         // 3. Validate unit exists in project
@@ -893,9 +894,8 @@ class BudgetMovementService
             throw new RuntimeException('ไม่มีงบที่จะยกเลิก');
         }
 
-        if ($used > 0) {
-            throw new RuntimeException('ไม่สามารถยกเลิกได้ เพราะมีการใช้งบไปแล้ว (' . number_format($used, 0) . ' บาท) — กรุณาใช้ "คืนงบ" แทน');
-        }
+        // อนุญาตให้ยกเลิกได้แม้ used > 0 — สำหรับ MGMT_SPECIAL ยอมให้ remaining ติดลบหลัง void
+        // (ตาม business rule: งบผู้บริหารบริหารจัดการเอง ติดลบได้)
 
         $now = date('Y-m-d H:i:s');
 

@@ -68,7 +68,7 @@ function toISODateStr(d: any): string {
             (additionalExpenseModeChanged)="onAdditionalExpenseModeChanged($event)" />
 
           <!-- Section 2: งบประมาณ -->
-          <app-budget-overview-section [unitId]="selectedUnitId()" [editReversal]="editReversal()" [unitStatus]="selectedUnit()?.status ?? null" />
+          <app-budget-overview-section [unitId]="selectedUnitId()" [editReversal]="editReversal()" />
 
           <!-- Section 3A/3B -->
           @if (selectedUnitId() > 0) {
@@ -94,6 +94,7 @@ function toISODateStr(d: any): string {
                 [eligibleItems]="panelBItems()"
                 [budgetSources]="budgetSourcesForPanelB()"
                 [initialRows]="editPanelBRows()"
+                [extraExpenseAmount]="additionalExpenseMode() === 'as_premium' ? additionalExpenseAmount() : 0"
                 (panelBItemsChanged)="onPanelBItemsChanged($event)" />
             }
           }
@@ -298,7 +299,11 @@ export class SalesEntryComponent implements OnInit {
   readonly totalBudgetAllocated = computed(() => {
     const section = this.budgetSection();
     if (!section) return 0;
-    return section.totalAllocated();
+    const summary = section.summary();
+    if (!summary) return 0;
+    // ตั้งงบสุทธิทุกแหล่ง = allocated - returned
+    const sumNet = (src: any) => (src?.allocated ?? 0) - (src?.returned ?? 0);
+    return sumNet(summary.UNIT_STANDARD) + sumNet(summary.MANAGEMENT_SPECIAL) + sumNet(summary.PROJECT_POOL);
   });
 
   readonly allSourcesUsedFromMovements = computed(() => {
@@ -312,22 +317,30 @@ export class SalesEntryComponent implements OnInit {
       + (summary.PROJECT_POOL?.used ?? 0) - (rev['PROJECT_POOL'] ?? 0);
   });
 
-  /** budgetSummary สำหรับ Section 4 — ดึงจาก budgetRows ของ Section 2 (รวม pending) */
+  /** budgetSummary สำหรับ Section 4 — รวม pending (จาก section.pendingUsed) + editReversal */
   readonly budgetSummaryForSection4 = computed<BudgetSummary | null>(() => {
     const section = this.budgetSection();
     if (!section) return null;
-    const rows = section.budgetRows();
-    if (!rows || rows.length === 0) return null;
+    const s = section.summary();
+    if (!s) return null;
 
-    const result: Record<string, { allocated: number; used: number; remaining: number }> = {};
-    for (const row of rows) {
-      result[row.key] = { allocated: row.allocated, used: row.used, remaining: row.remaining };
-    }
+    const pending = section.pendingUsed();
+    const rev = this.editReversal();
+
+    const adjust = (key: string, src: any) => {
+      const pendingAmount = pending[key] ?? 0;
+      const reversalAmount = rev[key] ?? 0;
+      return {
+        allocated: (src?.allocated ?? 0) - (src?.returned ?? 0),
+        used: (src?.used ?? 0) - reversalAmount + pendingAmount,
+        remaining: (src?.remaining ?? 0) + reversalAmount - pendingAmount,
+      };
+    };
 
     return {
-      UNIT_STANDARD: result['UNIT_STANDARD'] ?? { allocated: 0, used: 0, remaining: 0 },
-      PROJECT_POOL: result['PROJECT_POOL'] ?? { allocated: 0, used: 0, remaining: 0 },
-      MANAGEMENT_SPECIAL: result['MANAGEMENT_SPECIAL'] ?? { allocated: 0, used: 0, remaining: 0 },
+      UNIT_STANDARD: adjust('UNIT_STANDARD', s.UNIT_STANDARD),
+      PROJECT_POOL: adjust('PROJECT_POOL', s.PROJECT_POOL),
+      MANAGEMENT_SPECIAL: adjust('MANAGEMENT_SPECIAL', s.MANAGEMENT_SPECIAL),
     };
   });
 
@@ -552,7 +565,6 @@ export class SalesEntryComponent implements OnInit {
 
     // 3. Calculate summary for confirmation dialog
     const formValues = unitInfo.getFormValues();
-    const totalUsed = items.reduce((sum, i) => sum + i.used_value, 0);
 
     // calc by promotion_category (split premium ตาม discount_convert_value)
     let totalDiscount = 0;
@@ -571,9 +583,22 @@ export class SalesEntryComponent implements OnInit {
         totalExpense += v;
       }
     }
+    // ค่าธรรมเนียมโอน mode=as_premium → กิน MGMT จริง นับเป็น expense + งบใช้ไป
+    const transferFeeAsPremium = this.additionalExpenseMode() === 'as_premium'
+      ? Math.max(0, this.additionalExpenseAmount())
+      : 0;
+    totalExpense += transferFeeAsPremium;
+
+    const totalUsed = items.reduce((sum, i) => sum + i.used_value, 0) + transferFeeAsPremium;
     const netPrice = unit.base_price - totalDiscount;
     const netAfterPromo = netPrice - (totalPromoCost + totalExpense);
     const profit = netAfterPromo - unit.unit_cost;
+
+    // งบคงเหลือรวมจาก section 2 (รวม pending + edit reversal แล้ว)
+    const bs = this.budgetSummaryForSection4();
+    const totalBudgetRemaining = bs
+      ? bs.UNIT_STANDARD.remaining + bs.PROJECT_POOL.remaining + bs.MANAGEMENT_SPECIAL.remaining
+      : 0;
 
     // 4. Confirmation dialog
     const dialogData: ConfirmSaleDialogData = {
@@ -582,6 +607,7 @@ export class SalesEntryComponent implements OnInit {
       netPrice,
       profit,
       totalUsed,
+      totalBudgetRemaining,
     };
 
     const ref = this.dialog.open(ConfirmSaleDialogComponent, {

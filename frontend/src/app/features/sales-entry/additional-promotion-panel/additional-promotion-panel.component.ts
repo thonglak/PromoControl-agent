@@ -5,7 +5,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -43,18 +42,16 @@ export interface PanelBRow {
   manual_input_value: number | null;
 }
 
-// ─── ตัวเลือกแหล่งงบ ──────────────────────────────────────────────────
-const FUNDING_SOURCES = [
-  { key: 'MANAGEMENT_SPECIAL', label: 'งบผู้บริหาร' },
-  { key: 'PROJECT_POOL', label: 'งบส่วนกลาง' },
-];
+// ─── แหล่งงบ ──────────────────────────────────────────────────────────
+// fixed = MANAGEMENT_SPECIAL ตลอด — PROJECT_POOL ถูกตัดออกจาก sales-entry
+const DEFAULT_FUNDING_SOURCE = 'MANAGEMENT_SPECIAL';
 
 @Component({
   selector: 'app-additional-promotion-panel',
   standalone: true,
   imports: [
     CommonModule, FormsModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule,
+    MatFormFieldModule, MatInputModule,
     MatButtonModule, MatTooltipModule, MatCheckboxModule, MatSlideToggleModule,
     SvgIconComponent, CurrencyMaskDirective,
   ],
@@ -63,13 +60,13 @@ const FUNDING_SOURCES = [
       <!-- ── Header ─────────────────────────────────────────────────────── -->
       <div class="flex items-center justify-between cursor-pointer" (click)="collapsed.set(!collapsed())">
         <h3 class="font-semibold m-0" style="font-size: var(--font-size-card-title); color: var(--color-text-primary)">
-          ของแถมเพิ่มเติม (งบอื่นๆ)
+          ของแถมเพิ่มเติม (งบผู้บริหาร)
           <span class="text-sm font-normal ml-2" style="color: var(--color-gray-500)">
             เลือก {{ selectedCount() }} / {{ eligibleItems().length }} รายการ
           </span>
         </h3>
         <div class="flex items-center gap-2">
-          @if (collapsed() && selectedCount() > 0) {
+          @if (collapsed() && (selectedCount() > 0 || extraExpenseAmount() > 0)) {
             <span class="text-sm font-semibold tabular-nums" style="color: var(--color-text-primary)">฿{{ totalUsed() | number:'1.0-0' }}</span>
           }
           <app-icon [name]="collapsed() ? 'chevron-right' : 'chevron-down'" class="w-5 h-5" style="color: var(--color-gray-500)" />
@@ -77,7 +74,7 @@ const FUNDING_SOURCES = [
       </div>
 
       @if (!collapsed()) {
-        @if (eligibleItems().length === 0 && staleSelectedRows().length === 0) {
+        @if (eligibleItems().length === 0 && staleSelectedRows().length === 0 && extraExpenseAmount() <= 0) {
           <div class="text-slate-400 text-sm py-4 text-center">ไม่มีรายการของแถมเพิ่มเติมที่ eligible</div>
         } @else {
           <!-- ── Toolbar: filter toggle ───────────────────────────────── -->
@@ -119,6 +116,27 @@ const FUNDING_SOURCES = [
                   </button>
                 </div>
               }
+            </div>
+          }
+
+          <!-- ── Transfer fee info (mode=as_premium) ─────────────────── -->
+          @if (extraExpenseAmount() > 0) {
+            <div class="mb-3 p-3 rounded-lg flex items-start gap-3"
+              style="background-color: var(--color-primary-100); border: 1px solid var(--color-primary-300)">
+              <app-icon name="banknotes" class="w-5 h-5 mt-0.5 flex-shrink-0" style="color: var(--color-primary-700)" />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-sm font-semibold" style="color: var(--color-text-primary)">
+                    ค่าธรรมเนียมโอนบวกเพิ่ม
+                  </span>
+                  <span class="text-base font-semibold tabular-nums" style="color: var(--color-text-primary)">
+                    ฿{{ extraExpenseAmount() | number:'1.0-0' }}
+                  </span>
+                </div>
+                <p class="text-xs mt-1 m-0" style="color: var(--color-gray-600)">
+                  ตั้งค่าใน "ส่วนข้อมูลยูนิต" → วิธีคิดค่าธรรมเนียมโอน
+                </p>
+              </div>
             </div>
           }
 
@@ -191,7 +209,7 @@ const FUNDING_SOURCES = [
                   @if (selected && row) {
                     @let i = rowIndexFor(row.promotion_item_id);
                     <div class="px-3 pb-3 pt-1" style="border-top: 1px dashed var(--color-border)">
-                      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                         <!-- มูลค่าที่ใช้ -->
                         <div>
                           <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic">
@@ -202,22 +220,6 @@ const FUNDING_SOURCES = [
                               (ngModelChange)="onUsedValueChange(i, $event)"
                               [min]="0"
                               class="text-right">
-                          </mat-form-field>
-                        </div>
-
-                        <!-- แหล่งงบ -->
-                        <div>
-                          <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic">
-                            <mat-label>แหล่งงบ</mat-label>
-                            <mat-select
-                              [ngModel]="row.funding_source_type"
-                              (ngModelChange)="onFundingSourceChange(i, $event)">
-                              @for (src of fundingSources; track src.key) {
-                                <mat-option [value]="src.key" [disabled]="isFundingDisabled(src.key)">
-                                  {{ src.label }}{{ getFundingDisabledReason(src.key) }}
-                                </mat-option>
-                              }
-                            </mat-select>
                           </mat-form-field>
                         </div>
 
@@ -249,7 +251,7 @@ const FUNDING_SOURCES = [
           }
 
           <!-- ── Footer summary ───────────────────────────────────────── -->
-          @if (selectedCount() > 0) {
+          @if (selectedCount() > 0 || extraExpenseAmount() > 0) {
             <div class="mt-4 pt-3" style="border-top: 2px solid var(--color-gray-300)">
               <div class="flex justify-between items-center mb-2">
                 <span class="font-semibold" style="color: var(--color-text-primary)">รวม Panel 3B:</span>
@@ -283,6 +285,9 @@ export class AdditionalPromotionPanelComponent implements OnInit {
   eligibleItems = input<EligibleItem[]>([]);
   budgetSources = input<BudgetSourceInfo[]>([]);
   initialRows = input<PanelBRow[]>([]);
+  /** ค่าธรรมเนียมโอน mode=as_premium (หักจาก MGMT_SPECIAL) — ตั้งจากหน้า unit-info
+   *  แสดงเป็น info card เพื่อให้ user เห็นว่ามีรายการนี้กินงบ MGMT อยู่ — ไม่โต้ตอบในที่นี้ */
+  extraExpenseAmount = input<number>(0);
 
   // ─── Outputs ─────────────────────────────────────────────────────────
   panelBItemsChanged = output<PanelBRow[]>();
@@ -290,7 +295,6 @@ export class AdditionalPromotionPanelComponent implements OnInit {
   // ─── State ───────────────────────────────────────────────────────────
   readonly collapsed = signal(false);
   readonly rows = signal<PanelBRow[]>([]);
-  readonly fundingSources = FUNDING_SOURCES;
   /** toggle: แสดงเฉพาะรายการที่ติ๊ก (โหมดดู checklist) */
   readonly showSelectedOnly = signal(false);
 
@@ -339,11 +343,12 @@ export class AdditionalPromotionPanelComponent implements OnInit {
   });
 
   // ─── Computed: totals ──────────────────────────────────────────────
+  // รวม extraExpenseAmount (ค่าธรรมเนียมโอน mode=as_premium) ในยอดของ panel นี้
   readonly totalUsed = computed(() =>
-    this.rows().reduce((sum, r) => sum + r.used_value, 0)
+    this.rows().reduce((sum, r) => sum + r.used_value, 0) + (this.extraExpenseAmount() || 0)
   );
 
-  /** ใช้ไปแยกต่อแหล่งงบ (เฉพาะจาก Panel 3B rows) */
+  /** ใช้ไปแยกต่อแหล่งงบ (รวม extraExpenseAmount ใต้ MGMT) */
   readonly usedBySource = computed(() => {
     const map: Record<string, number> = {};
     for (const r of this.rows()) {
@@ -351,26 +356,27 @@ export class AdditionalPromotionPanelComponent implements OnInit {
         map[r.funding_source_type] = (map[r.funding_source_type] ?? 0) + r.used_value;
       }
     }
+    const extra = this.extraExpenseAmount() || 0;
+    if (extra > 0) {
+      map[DEFAULT_FUNDING_SOURCE] = (map[DEFAULT_FUNDING_SOURCE] ?? 0) + extra;
+    }
     return map;
   });
 
-  /** สำหรับ footer — รวมข้อมูลงบแต่ละแหล่งกับ used */
+  /** สำหรับ footer — สรุปเฉพาะงบผู้บริหาร (แหล่งงบเดียวของ panel นี้) */
   readonly usedBySourceList = computed(() => {
     const used = this.usedBySource();
-    const sources = this.budgetSources();
-    return FUNDING_SOURCES.map(fs => {
-      const src = sources.find(s => s.key === fs.key);
-      const usedAmt = used[fs.key] ?? 0;
-      const remaining = (src?.remaining ?? 0) - usedAmt;
-      return {
-        key: fs.key,
-        label: fs.label,
-        allocated: src?.allocated ?? 0,
-        used: usedAmt,
-        remaining,
-        exceeded: remaining < 0,
-      };
-    });
+    const src = this.budgetSources().find(s => s.key === DEFAULT_FUNDING_SOURCE);
+    const usedAmt = used[DEFAULT_FUNDING_SOURCE] ?? 0;
+    const remaining = (src?.remaining ?? 0) - usedAmt;
+    return [{
+      key: DEFAULT_FUNDING_SOURCE,
+      label: 'งบผู้บริหาร',
+      allocated: src?.allocated ?? 0,
+      used: usedAmt,
+      remaining,
+      exceeded: remaining < 0,
+    }];
   });
 
   // ─── Effect: sync rows เมื่อ eligibleItems เปลี่ยน ──────────────────
@@ -447,11 +453,17 @@ export class AdditionalPromotionPanelComponent implements OnInit {
     this.emitChanges(updated);
   });
 
-  /** เติม server-derived fields ลง row จาก EligibleItem (ถ้าเจอ) — คง used_value/remark/funding_source ที่ user กรอกเดิมไว้ */
+  /** เติม server-derived fields ลง row จาก EligibleItem (ถ้าเจอ) — คง used_value/remark ที่ user กรอกเดิมไว้
+   *  edit mode legacy: row เก่า funding=PROJECT_POOL → migrate เป็น MANAGEMENT_SPECIAL ตลอด
+   *  (PROJECT_POOL ถูกถอดจาก panel นี้แล้ว user แก้ไม่ได้ ต้อง migrate ไม่งั้น save ค้างค่าเก่า) */
   private mergeFromItem(row: PanelBRow, item: EligibleItem | undefined): PanelBRow {
-    if (!item) return row;
+    const fundingSource = row.funding_source_type === 'PROJECT_POOL'
+      ? DEFAULT_FUNDING_SOURCE
+      : (row.funding_source_type || DEFAULT_FUNDING_SOURCE);
+    if (!item) return { ...row, funding_source_type: fundingSource };
     return {
       ...row,
+      funding_source_type:   fundingSource,
       max_value:             item.max_value,
       formula_display:       item.formula_display,
       applied_policy_name:   item.applied_policy_name,
@@ -529,15 +541,6 @@ export class AdditionalPromotionPanelComponent implements OnInit {
     this.emitChanges(this.rows());
   }
 
-  onFundingSourceChange(index: number, source: string): void {
-    this.rows.update(rows => {
-      const updated = [...rows];
-      updated[index] = { ...updated[index], funding_source_type: source };
-      return updated;
-    });
-    this.emitChanges(this.rows());
-  }
-
   onRemarkChange(index: number, value: string): void {
     this.rows.update(rows => {
       const updated = [...rows];
@@ -568,29 +571,6 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       return updated;
     });
     this.emitChanges(this.rows());
-  }
-
-  // ─── Funding source helpers ──────────────────────────────────────────
-
-  isFundingDisabled(key: string): boolean {
-    const src = this.budgetSources().find(s => s.key === key);
-    if (!src) return true;
-    // งบผู้บริหาร (MANAGEMENT_SPECIAL) ใช้ได้เสมอ — ทีมการตลาดบริหารจัดการเอง อนุญาตติดลบ
-    if (key === 'MANAGEMENT_SPECIAL') return false;
-    if (src.allocated <= 0) return true;
-    // ตรวจงบเหลือ: allocated - already_used_by_movements - pending_from_panel_b
-    const pendingUsed = this.usedBySource()[key] ?? 0;
-    return (src.remaining - pendingUsed) <= 0;
-  }
-
-  getFundingDisabledReason(key: string): string {
-    // งบผู้บริหารใช้ได้เสมอ ไม่ต้องแสดงเหตุผล disable
-    if (key === 'MANAGEMENT_SPECIAL') return '';
-    const src = this.budgetSources().find(s => s.key === key);
-    if (!src || src.allocated <= 0) return ' (ยังไม่ได้ตั้งงบ)';
-    const pendingUsed = this.usedBySource()[key] ?? 0;
-    if ((src.remaining - pendingUsed) <= 0) return ' (งบหมดแล้ว)';
-    return '';
   }
 
   // ─── UI helpers ──────────────────────────────────────────────────────
@@ -632,7 +612,7 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       max_value: item.max_value,
       calculated_value: item.calculated_value,
       used_value: usedValue,
-      funding_source_type: this.getDefaultFundingSource(),
+      funding_source_type: DEFAULT_FUNDING_SOURCE,
       formula_display: item.formula_display,
       applied_policy_name: item.applied_policy_name,
       fee_formula: item.fee_formula,
@@ -642,15 +622,6 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       remark: '',
       manual_input_value: null,
     };
-  }
-
-  /** Default = MANAGEMENT_SPECIAL ถ้ามี allocation, ไม่งั้นเลือกแหล่งแรกที่มี */
-  private getDefaultFundingSource(): string {
-    const sources = this.budgetSources();
-    const mgmt = sources.find(s => s.key === 'MANAGEMENT_SPECIAL');
-    if (mgmt && mgmt.allocated > 0) return 'MANAGEMENT_SPECIAL';
-    const avail = sources.find(s => s.allocated > 0);
-    return avail?.key ?? 'MANAGEMENT_SPECIAL';
   }
 
   private emitChanges(rows: PanelBRow[]): void {

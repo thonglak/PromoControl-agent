@@ -34,6 +34,7 @@ const SOURCE_LABELS: Record<string, string> = {
   ],
   template: `
     <h2 mat-dialog-title>ตั้งงบเพิ่มเติม</h2>
+    <form (submit)="$event.preventDefault(); submit()">
     <mat-dialog-content class="min-w-[320px]">
       <div class="flex flex-col gap-4 py-2">
         <!-- แหล่งงบ -->
@@ -51,7 +52,7 @@ const SOURCE_LABELS: Record<string, string> = {
         <!-- จำนวนเงิน -->
         <mat-form-field appearance="outline" class="w-full">
           <mat-label>จำนวนเงิน</mat-label>
-          <input matInput currencyMask [formControl]="amountControl" placeholder="0">
+          <input matInput currencyMask [formControl]="amountControl" placeholder="0" cdkFocusInitial>
           <span matTextPrefix>฿&nbsp;</span>
           @if (amountControl.hasError('required')) {
             <mat-error>กรุณากรอกจำนวนเงิน</mat-error>
@@ -76,14 +77,15 @@ const SOURCE_LABELS: Record<string, string> = {
       </div>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close [disabled]="saving()">ยกเลิก</button>
-      <button mat-flat-button color="primary" (click)="submit()" [disabled]="saving()">
+      <button type="button" mat-button mat-dialog-close [disabled]="saving()">ยกเลิก</button>
+      <button type="submit" mat-flat-button color="primary" [disabled]="saving()">
         @if (saving()) {
           <mat-spinner diameter="20" class="inline-block mr-2"></mat-spinner>
         }
         ยืนยัน
       </button>
     </mat-dialog-actions>
+    </form>
   `,
 })
 export class InlineBudgetDialogComponent {
