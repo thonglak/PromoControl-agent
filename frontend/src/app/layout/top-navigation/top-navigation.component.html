@@ -22,6 +22,49 @@
     }
   </div>
 
+  <!-- ── Font size controls ───────────────────────────────────────────── -->
+  <div class="flex items-center mr-1 flex-shrink-0"
+       style="border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
+    <button
+      type="button"
+      (click)="fontSize.decrease()"
+      [disabled]="!fontSize.canDecrease()"
+      matTooltip="ลดขนาดตัวอักษร"
+      matTooltipPosition="below"
+      class="w-7 h-7 flex items-center justify-center transition-colors
+             border-0 bg-transparent cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      style="color: var(--color-gray-700)"
+      onmouseover="if(!this.disabled) this.style.backgroundColor='var(--color-gray-100)'"
+      onmouseout="this.style.backgroundColor='transparent'">
+      <span class="text-base leading-none font-medium">A−</span>
+    </button>
+    <button
+      type="button"
+      (click)="fontSize.reset()"
+      matTooltip="คลิกเพื่อรีเซ็ตเป็นขนาดมาตรฐาน"
+      matTooltipPosition="below"
+      class="px-1.5 h-7 flex items-center justify-center transition-colors
+             border-0 bg-transparent cursor-pointer text-[10px] uppercase font-semibold"
+      style="color: var(--color-gray-500); border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border);"
+      onmouseover="this.style.backgroundColor='var(--color-gray-100)'"
+      onmouseout="this.style.backgroundColor='transparent'">
+      {{ fontSize.size() }}
+    </button>
+    <button
+      type="button"
+      (click)="fontSize.increase()"
+      [disabled]="!fontSize.canIncrease()"
+      matTooltip="เพิ่มขนาดตัวอักษร"
+      matTooltipPosition="below"
+      class="w-7 h-7 flex items-center justify-center transition-colors
+             border-0 bg-transparent cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+      style="color: var(--color-gray-700)"
+      onmouseover="if(!this.disabled) this.style.backgroundColor='var(--color-gray-100)'"
+      onmouseout="this.style.backgroundColor='transparent'">
+      <span class="text-base leading-none font-medium">A+</span>
+    </button>
+  </div>
+
   <!-- ── Theme toggle ─────────────────────────────────────────────────── -->
   <button
     type="button"

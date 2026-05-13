@@ -88,6 +88,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+// ── User-adjustable font scale ─────────────────────────────────────────────
+// ปรับขนาด root font-size → rem ทั้งแอป scale ตาม (Tailwind + Material ใช้ rem)
+html.font-sm { font-size: 14px; }
+html.font-md { font-size: 16px; }
+html.font-lg { font-size: 18px; }
+html.font-xl { font-size: 20px; }
+
 html, body {
   height: 100%;
   overflow: hidden;

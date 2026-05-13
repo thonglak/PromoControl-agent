@@ -8,6 +8,8 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { FontSizeService } from '../../core/services/font-size.service';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
 import { ChangePasswordDialogComponent } from './change-password-dialog.component';
 
@@ -42,7 +44,7 @@ const ROUTE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-top-navigation',
   standalone: true,
-  imports: [MatMenuModule, MatDividerModule, MatDialogModule, SvgIconComponent],
+  imports: [MatMenuModule, MatDividerModule, MatDialogModule, MatTooltipModule, SvgIconComponent],
   templateUrl: './top-navigation.component.html',
   host: { class: 'block flex-shrink-0' },
 })
@@ -54,6 +56,7 @@ export class TopNavigationComponent {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   readonly theme          = inject(ThemeService);
+  readonly fontSize       = inject(FontSizeService);
 
   readonly currentUser = this.auth.currentUser;
 
