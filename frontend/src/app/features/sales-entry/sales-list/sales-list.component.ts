@@ -437,7 +437,6 @@ export class SalesListComponent implements OnInit {
       total_budget_remaining: number;
       total_profit: number;
       as_of_date: string;
-      note: string | null;
     } | null;
   } | null>(null);
 
@@ -591,7 +590,9 @@ export class SalesListComponent implements OnInit {
     const ref = this.dialog.open(LegacyReconciliationDialogComponent, {
       data: {
         projectId: this.projectId(),
-        current: this.summary()?.legacy ?? null,
+        // summary.legacy ไม่ตรง shape LegacyReconciliation — ส่ง null เพื่อให้ user กรอกใหม่
+        current: null,
+        hasExisting: this.summary()?.legacy != null,
         isAdmin: this.auth.currentUser()?.role === 'admin',
       },
       width: '500px',

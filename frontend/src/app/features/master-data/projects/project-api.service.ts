@@ -17,6 +17,12 @@ export interface Project {
   electric_meter_fee?: number;
   water_meter_fee?: number;
   unit_count?: number;
+  // ข้อมูลระบบเก่า สำหรับ Dashboard
+  legacy_sold_units?: number;
+  legacy_sold_net_price?: number;
+  legacy_total_discount_amount?: number;
+  legacy_value_achieved?: number;
+  legacy_dashboard_as_of_date?: string | null;
 }
 
 export interface ProjectCreatePayload {
@@ -30,6 +36,11 @@ export interface ProjectCreatePayload {
   common_fee_rate?: number;
   electric_meter_fee?: number;
   water_meter_fee?: number;
+  legacy_sold_units?: number;
+  legacy_sold_net_price?: number;
+  legacy_total_discount_amount?: number;
+  legacy_value_achieved?: number;
+  legacy_dashboard_as_of_date?: string | null;
 }
 
 export interface ProjectUpdatePayload {
@@ -43,6 +54,11 @@ export interface ProjectUpdatePayload {
   common_fee_rate?: number;
   electric_meter_fee?: number;
   water_meter_fee?: number;
+  legacy_sold_units?: number;
+  legacy_sold_net_price?: number;
+  legacy_total_discount_amount?: number;
+  legacy_value_achieved?: number;
+  legacy_dashboard_as_of_date?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

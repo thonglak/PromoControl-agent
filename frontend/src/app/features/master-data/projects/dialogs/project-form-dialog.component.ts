@@ -8,6 +8,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CurrencyMaskDirective } from '../../../../shared/directives/currency-mask.directive';
@@ -25,7 +27,9 @@ export interface ProjectFormDialogData {
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatButtonModule, MatCheckboxModule, MatProgressSpinnerModule, CurrencyMaskDirective,
+    MatButtonModule, MatCheckboxModule, MatProgressSpinnerModule,
+    MatDatepickerModule, MatDividerModule,
+    CurrencyMaskDirective,
   ],
   template: `
     <h2 mat-dialog-title class="!text-lg !font-semibold !text-slate-800">
@@ -129,6 +133,72 @@ export interface ProjectFormDialogData {
           }
         </mat-form-field>
 
+        <!-- ─── ข้อมูลระบบเก่า (สำหรับ Dashboard) ─────────────────────────── -->
+        <mat-divider />
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide -mb-2">
+          ข้อมูลระบบเก่า (สำหรับ Dashboard)
+        </p>
+
+        <!-- จำนวนยูนิตที่ขายไปแล้ว -->
+        <mat-form-field appearance="outline">
+          <mat-label>จำนวนยูนิตที่ขายไปแล้ว (ระบบเก่า)</mat-label>
+          <input matInput
+                 currencyMask
+                 [options]="{ precision: 0, allowNegative: false }"
+                 formControlName="legacy_sold_units"
+                 class="text-right font-mono tabular-nums"
+                 placeholder="0" />
+          <mat-hint>จำนวนเต็ม ≥ 0</mat-hint>
+        </mat-form-field>
+
+        <!-- มูลค่าขายสุทธิระบบเก่า -->
+        <mat-form-field appearance="outline">
+          <mat-label>มูลค่าขายสุทธิระบบเก่า</mat-label>
+          <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+          <input matInput
+                 currencyMask
+                 [options]="{ allowNegative: true }"
+                 formControlName="legacy_sold_net_price"
+                 class="text-right font-mono tabular-nums"
+                 placeholder="0" />
+        </mat-form-field>
+
+        <!-- มูลค่าส่วนลดรวมระบบเก่า -->
+        <mat-form-field appearance="outline">
+          <mat-label>มูลค่าส่วนลดรวมระบบเก่า</mat-label>
+          <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+          <input matInput
+                 currencyMask
+                 [options]="{ allowNegative: true }"
+                 formControlName="legacy_total_discount_amount"
+                 class="text-right font-mono tabular-nums"
+                 placeholder="0" />
+        </mat-form-field>
+
+        <!-- มูลค่าโครงการที่ทำได้ระบบเก่า -->
+        <mat-form-field appearance="outline">
+          <mat-label>มูลค่าโครงการที่ทำได้ระบบเก่า</mat-label>
+          <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+          <input matInput
+                 currencyMask
+                 [options]="{ allowNegative: true }"
+                 formControlName="legacy_value_achieved"
+                 class="text-right font-mono tabular-nums"
+                 placeholder="0" />
+        </mat-form-field>
+
+        <!-- ณ วันที่ (cutoff Dashboard) -->
+        <mat-form-field appearance="outline">
+          <mat-label>ณ วันที่ (cutoff Dashboard)</mat-label>
+          <input matInput [matDatepicker]="legacyPicker"
+                 formControlName="legacy_dashboard_as_of_date" />
+          <mat-datepicker-toggle matIconSuffix [for]="legacyPicker" />
+          <mat-datepicker #legacyPicker />
+          <mat-hint>ปล่อยว่างได้ถ้ายังไม่มีข้อมูลระบบเก่า</mat-hint>
+        </mat-form-field>
+
+        <mat-divider />
+
         <!-- Approval required -->
         <div class="flex items-center gap-2">
           <mat-checkbox formControlName="approval_required" color="primary">
@@ -209,9 +279,30 @@ export class ProjectFormDialogComponent {
     common_fee_rate:     [this.data.project?.common_fee_rate ?? 0, Validators.min(0)],
     electric_meter_fee:  [this.data.project?.electric_meter_fee ?? 0, Validators.min(0)],
     water_meter_fee:     [this.data.project?.water_meter_fee ?? 0, Validators.min(0)],
+    // ข้อมูลระบบเก่า สำหรับ Dashboard
+    legacy_sold_units:              [this.data.project?.legacy_sold_units ?? 0],
+    legacy_sold_net_price:          [this.data.project?.legacy_sold_net_price ?? 0],
+    legacy_total_discount_amount:   [this.data.project?.legacy_total_discount_amount ?? 0],
+    legacy_value_achieved:          [this.data.project?.legacy_value_achieved ?? 0],
+    legacy_dashboard_as_of_date:    [
+      this.data.project?.legacy_dashboard_as_of_date
+        ? new Date(this.data.project.legacy_dashboard_as_of_date)
+        : null as Date | null,
+    ],
     approval_required:   [!!Number(this.data.project?.approval_required)],
     allow_over_budget:   [!!Number(this.data.project?.allow_over_budget)],
   });
+
+  /** แปลง Date object → 'YYYY-MM-DD' หรือ null */
+  private formatDate(d: Date | null | undefined): string | null {
+    if (!d) return null;
+    const val: unknown = d;
+    const asAny = val as Record<string, () => number>;
+    const year  = typeof asAny['year']  === 'function' ? asAny['year']()  : (d as Date).getFullYear();
+    const month = typeof asAny['month'] === 'function' ? asAny['month']() + 1 : (d as Date).getMonth() + 1;
+    const day   = typeof asAny['date']  === 'function' ? asAny['date']()  : (d as Date).getDate();
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
 
   save(): void {
     if (this.form.invalid) {
@@ -222,6 +313,7 @@ export class ProjectFormDialogComponent {
     this.serverError.set(null);
 
     const val = this.form.value;
+    const legacyAsOfDate = this.formatDate(val.legacy_dashboard_as_of_date as Date | null | undefined);
 
     const obs = this.data.mode === 'create'
       ? this.api.createProject({
@@ -235,6 +327,11 @@ export class ProjectFormDialogComponent {
           water_meter_fee:    val.water_meter_fee ?? 0,
           approval_required:  !!val.approval_required,
           allow_over_budget:  !!val.allow_over_budget,
+          legacy_sold_units:             val.legacy_sold_units ?? 0,
+          legacy_sold_net_price:         val.legacy_sold_net_price ?? 0,
+          legacy_total_discount_amount:  val.legacy_total_discount_amount ?? 0,
+          legacy_value_achieved:         val.legacy_value_achieved ?? 0,
+          legacy_dashboard_as_of_date:   legacyAsOfDate,
         })
       : this.api.updateProject(this.data.project!.id, {
           name:               val.name!,
@@ -247,6 +344,11 @@ export class ProjectFormDialogComponent {
           water_meter_fee:    val.water_meter_fee ?? 0,
           approval_required:  !!val.approval_required,
           allow_over_budget:  !!val.allow_over_budget,
+          legacy_sold_units:             val.legacy_sold_units ?? 0,
+          legacy_sold_net_price:         val.legacy_sold_net_price ?? 0,
+          legacy_total_discount_amount:  val.legacy_total_discount_amount ?? 0,
+          legacy_value_achieved:         val.legacy_value_achieved ?? 0,
+          legacy_dashboard_as_of_date:   legacyAsOfDate,
         });
 
     obs.subscribe({

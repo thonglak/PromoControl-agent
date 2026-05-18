@@ -15,7 +15,6 @@ export interface LegacyDashboard {
   total_discount_amount: number;
   value_achieved: number;
   as_of_date: string;     // YYYY-MM-DD
-  note: string | null;
 }
 
 export interface DashboardData {

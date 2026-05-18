@@ -7,10 +7,6 @@ export interface LegacyReconciliation {
   project_id: string;
   legacy_total_budget_remaining: number;
   legacy_total_profit: number;
-  legacy_sold_units: number;
-  legacy_sold_net_price: number;
-  legacy_total_discount_amount: number;
-  legacy_value_achieved: number;
   as_of_date: string;       // 'YYYY-MM-DD'
   note: string | null;
   updated_at: string;
@@ -21,10 +17,6 @@ export interface LegacyReconciliation {
 export interface LegacyReconciliationPayload {
   legacy_total_budget_remaining: number;
   legacy_total_profit: number;
-  legacy_sold_units: number;
-  legacy_sold_net_price: number;
-  legacy_total_discount_amount: number;
-  legacy_value_achieved: number;
   as_of_date: string;
   note?: string | null;
 }
