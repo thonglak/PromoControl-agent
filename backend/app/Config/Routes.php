@@ -158,19 +158,14 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->get('/',                    'BudgetMovementController::index');
         $routes->get('summary/(:num)',       'BudgetMovementController::unitSummary/$1');
         $routes->get('pool-balance',          'BudgetMovementController::poolBalance');
-        $routes->get('units-with-remaining',    'BudgetMovementController::getUnitsWithRemaining');
-        $routes->get('return-history',           'BudgetMovementController::getReturnHistory');
     });
     $routes->group('budget-movements', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->post('/',                    'BudgetMovementController::create');
-        $routes->post('transfer',             'BudgetMovementController::transfer');
         $routes->post('(:num)/approve',       'BudgetMovementController::approve/$1');
         $routes->post('(:num)/reject',        'BudgetMovementController::reject/$1');
         $routes->post('return-special',        'BudgetMovementController::returnSpecialBudget');
-        $routes->post('return-to-pool',         'BudgetMovementController::returnUnitBudgetToPool');
         $routes->post('transfer-special',      'BudgetMovementController::transferSpecialBudget');
         $routes->post('void-special',          'BudgetMovementController::voidSpecialBudget');
-        $routes->post('batch-return-to-pool',   'BudgetMovementController::batchReturnUnitBudgetToPool');
     });
 
     // Unit Budget Settings (ตั้งค่างบประมาณยูนิต — คำนวณ standard_budget จาก promotion items มาตรฐาน)

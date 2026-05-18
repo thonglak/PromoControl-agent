@@ -84,10 +84,8 @@ const MENU: MenuItem[] = [
     roles: ['admin', 'manager'],
     children: [
       { label: 'ตั้งค่างบประมาณยูนิต', path: '/budget/unit-settings' },
-      { label: 'โอนงบประมาณ',    path: '/budget/transfer' },
       { label: 'รายการเคลื่อนไหว', path: '/budget/movements' },
       { label: 'งบพิเศษ',        path: '/budget/special' },
-      { label: 'คืนงบยูนิตเข้า Pool', path: '/budget/unit-return-pool' },
     ],
   },
   { label: 'รายงาน',     icon: 'chart-pie', path: '/reports', roles: ['admin', 'manager', 'finance', 'viewer'] },

@@ -619,12 +619,8 @@ export class SalesEntryComponent implements OnInit {
     const unit = this.selectedUnit();
     if (!unit) return;
 
-    // 2. Build items
+    // 2. Build items — รองรับกรณีไม่มีโปรโมชั่นใช้จริง (ขายราคาเต็ม) ก็บันทึกได้
     const items = this.buildItemsPayload();
-    if (items.length === 0) {
-      this.snack.open('ไม่มีรายการโปรโมชั่นที่จะบันทึก (used_value > 0)', 'ปิด', { duration: 4000 });
-      return;
-    }
 
     // 3. Calculate summary for confirmation dialog
     const formValues = unitInfo.getFormValues();

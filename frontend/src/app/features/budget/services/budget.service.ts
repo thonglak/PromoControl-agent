@@ -49,14 +49,6 @@ export interface ReturnSpecialBudgetRequest {
   note: string;
 }
 
-export interface ReturnUnitBudgetToPoolRequest {
-  project_id: number;
-  unit_id: number;
-  amount: number;
-  remark?: string;
-}
-
-
 export interface TransferSpecialBudgetRequest {
   from_unit_id: number;
   to_unit_id: number;
@@ -71,49 +63,6 @@ export interface TransferSpecialBudgetResponse {
   message: string;
 }
 
-
-export interface UnitWithRemaining {
-  unit_id: number; unit_code: string; sale_status: string;
-  standard_budget: number; total_used: number; total_returned: number;
-  budget_remain: number;
-  /** งบ Pool ที่จัดสรรให้ยูนิต */
-  pool_allocated: number;
-  pool_used: number;
-  /** งบ Pool คงเหลือ */
-  pool_remain: number;
-  /** งบผู้บริหารที่จัดสรรให้ยูนิต */
-  mgmt_allocated: number;
-  mgmt_used: number;
-  /** งบผู้บริหารคงเหลือ */
-  mgmt_remain: number;
-  /** งบอื่นๆ รวม (Pool + ผู้บริหาร) */
-  other_remain: number;
-  is_returnable: boolean;
-}
-
-export interface UnitsWithRemainingResponse {
-  project: { id: number; name: string; pool_balance: number };
-  units: UnitWithRemaining[];
-}
-
-export interface BatchReturnResponse {
-  message: string;
-  data: {
-    movements: { movement_id: number; unit_id: number; unit_code: string; amount: number }[];
-    total_returned: number;
-    pool_balance: number;
-  };
-}
-
-export interface ReturnHistoryItem {
-  id: number; unit_id: number; amount: number; note: string;
-  created_at: string; created_by: number; unit_code: string;
-  created_by_name: string;
-}
-
-export interface PaginatedReturnHistory {
-  data: ReturnHistoryItem[]; total: number; page: number; per_page: number;
-}
 
 export interface UnitBudgetSettingItem {
   id: number;
@@ -166,10 +115,6 @@ export class BudgetService {
     return this.http.post<{ data: BudgetMovement }>('/api/budget-movements', data).pipe(map(r => r.data));
   }
 
-  transferBudget(data: any): Observable<any> {
-    return this.http.post<any>('/api/budget-movements/transfer', data);
-  }
-
   approveMovement(id: number): Observable<any> {
     return this.http.post<any>(`/api/budget-movements/${id}/approve`, {});
   }
@@ -206,36 +151,6 @@ export class BudgetService {
   // ── Transfer Special Budget ──
   transferSpecialBudget(params: TransferSpecialBudgetRequest): Observable<{ data: TransferSpecialBudgetResponse }> {
     return this.http.post<{ data: TransferSpecialBudgetResponse }>('/api/budget-movements/transfer-special', params);
-  }
-
-  // ── Return Unit Budget to Pool ──
-  returnUnitBudgetToPool(data: ReturnUnitBudgetToPoolRequest): Observable<{ message: string; data: any }> {
-    return this.http.post<{ message: string; data: any }>('/api/budget-movements/return-to-pool', data);
-  }
-
-  // ── Units With Remaining (สำหรับหน้า Unit Budget Return) ──
-  getUnitsWithRemaining(projectId: number): Observable<UnitsWithRemainingResponse> {
-    return this.http.get<UnitsWithRemainingResponse>(
-      "/api/budget-movements/units-with-remaining",
-      { params: { project_id: projectId } }
-    );
-  }
-
-  // ── Batch Return Unit Budget to Pool ──
-  batchReturnUnitBudgetToPool(projectId: number, unitIds: number[], remark: string = ""): Observable<BatchReturnResponse> {
-    return this.http.post<BatchReturnResponse>("/api/budget-movements/batch-return-to-pool", {
-      project_id: projectId,
-      items: unitIds.map(id => ({ unit_id: id })),
-      remark,
-    });
-  }
-
-  // ── Return History ──
-  getReturnHistory(projectId: number, page: number = 1): Observable<PaginatedReturnHistory> {
-    return this.http.get<PaginatedReturnHistory>(
-      "/api/budget-movements/return-history",
-      { params: { project_id: projectId, page } }
-    );
   }
 
   // ── Unit Budget Settings (คำนวณงบยูนิตจากรายการโปรโมชั่นมาตรฐาน) ──
