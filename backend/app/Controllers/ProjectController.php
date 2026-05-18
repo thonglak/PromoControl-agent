@@ -105,8 +105,13 @@ class ProjectController extends BaseController
             return $this->notFound();
         }
 
-        $project['unit_count']  = (int)   $project['unit_count'];
-        $project['budget_used'] = (float) $project['budget_used'];
+        $project['unit_count']                    = (int)   $project['unit_count'];
+        $project['budget_used']                   = (float) $project['budget_used'];
+        $project['legacy_sold_units']             = (int)   ($project['legacy_sold_units'] ?? 0);
+        $project['legacy_sold_net_price']         = (float) ($project['legacy_sold_net_price'] ?? 0);
+        $project['legacy_total_discount_amount']  = (float) ($project['legacy_total_discount_amount'] ?? 0);
+        $project['legacy_value_achieved']         = (float) ($project['legacy_value_achieved'] ?? 0);
+        // legacy_dashboard_as_of_date: เก็บเป็น string YYYY-MM-DD หรือ null
 
         return $this->response->setStatusCode(200)->setJSON(['data' => $project]);
     }
@@ -200,6 +205,16 @@ class ProjectController extends BaseController
         if (isset($body['electric_meter_fee'])) $updateData['electric_meter_fee'] = max(0, (float) $body['electric_meter_fee']);
         if (isset($body['water_meter_fee']))    $updateData['water_meter_fee']    = max(0, (float) $body['water_meter_fee']);
         if (isset($body['status']))             $updateData['status']             = (string) $body['status'];
+
+        // ─── legacy dashboard fields (เก็บตัวเลขจากระบบเก่าสำหรับ Dashboard) ───
+        if (isset($body['legacy_sold_units']))            $updateData['legacy_sold_units']            = max(0, (int) $body['legacy_sold_units']);
+        if (isset($body['legacy_sold_net_price']))        $updateData['legacy_sold_net_price']        = (float) $body['legacy_sold_net_price'];
+        if (isset($body['legacy_total_discount_amount'])) $updateData['legacy_total_discount_amount'] = (float) $body['legacy_total_discount_amount'];
+        if (isset($body['legacy_value_achieved']))        $updateData['legacy_value_achieved']        = (float) $body['legacy_value_achieved'];
+        if (array_key_exists('legacy_dashboard_as_of_date', $body)) {
+            $dashDate = $body['legacy_dashboard_as_of_date'];
+            $updateData['legacy_dashboard_as_of_date'] = ($dashDate === null || $dashDate === '') ? null : (string) $dashDate;
+        }
 
         $this->projectModel->update($id, $updateData);
 
@@ -324,6 +339,37 @@ class ProjectController extends BaseController
 
         if (isset($body['status']) && ! in_array($body['status'], self::VALID_STATUSES, true)) {
             $errors['status'] = 'สถานะโครงการไม่ถูกต้อง';
+        }
+
+        // ─── Validation สำหรับ legacy dashboard fields ────────────────────
+
+        if (isset($body['legacy_sold_units'])) {
+            $v = $body['legacy_sold_units'];
+            if (!is_numeric($v) || (int) $v < 0 || (int) $v != $v) {
+                $errors['legacy_sold_units'] = 'legacy_sold_units ต้องเป็นจำนวนเต็มที่ >= 0';
+            }
+        }
+
+        if (isset($body['legacy_sold_net_price']) && !is_numeric($body['legacy_sold_net_price'])) {
+            $errors['legacy_sold_net_price'] = 'legacy_sold_net_price ต้องเป็นตัวเลข';
+        }
+
+        if (isset($body['legacy_total_discount_amount']) && !is_numeric($body['legacy_total_discount_amount'])) {
+            $errors['legacy_total_discount_amount'] = 'legacy_total_discount_amount ต้องเป็นตัวเลข';
+        }
+
+        if (isset($body['legacy_value_achieved']) && !is_numeric($body['legacy_value_achieved'])) {
+            $errors['legacy_value_achieved'] = 'legacy_value_achieved ต้องเป็นตัวเลข';
+        }
+
+        if (array_key_exists('legacy_dashboard_as_of_date', $body)) {
+            $d = $body['legacy_dashboard_as_of_date'];
+            if ($d !== null && $d !== '') {
+                $parsed = \DateTime::createFromFormat('Y-m-d', (string) $d);
+                if (!$parsed || $parsed->format('Y-m-d') !== (string) $d) {
+                    $errors['legacy_dashboard_as_of_date'] = 'รูปแบบ legacy_dashboard_as_of_date ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)';
+                }
+            }
         }
 
         return $errors;
