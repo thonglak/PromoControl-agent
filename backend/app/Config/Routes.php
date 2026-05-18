@@ -40,13 +40,19 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->get('(:num)',                   'ProjectController::show/$1');
         $routes->get('(:num)/units',             'ProjectController::units/$1');
         $routes->get('(:num)/house-models',      'ProjectController::houseModels/$1');
+        // ข้อมูลกระทบยอดระบบเก่า — ทุก role ที่เข้าถึงโครงการได้ อ่านได้
+        $routes->get('(:num)/legacy-reconciliation', 'ProjectLegacyReconciliationController::show/$1');
     });
     $routes->group('projects', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->post('/',          'ProjectController::create');
         $routes->put('(:num)',      'ProjectController::update/$1');
+        // บันทึก/แก้ไขข้อมูลกระทบยอดระบบเก่า — admin, manager
+        $routes->put('(:num)/legacy-reconciliation', 'ProjectLegacyReconciliationController::upsert/$1');
     });
     $routes->group('projects', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
         $routes->delete('(:num)',   'ProjectController::delete/$1');
+        // ลบข้อมูลกระทบยอดระบบเก่า — admin only
+        $routes->delete('(:num)/legacy-reconciliation', 'ProjectLegacyReconciliationController::delete/$1');
     });
 
     $routes->group('house-models', static function (RouteCollection $routes): void {
