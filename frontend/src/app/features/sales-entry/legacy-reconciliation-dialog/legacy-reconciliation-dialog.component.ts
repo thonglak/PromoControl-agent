@@ -49,9 +49,9 @@ export interface LegacyReconciliationDialogData {
 
         <form [formGroup]="form" class="flex flex-col gap-4">
 
-          <!-- งบคงเหลือรวม (ระบบเก่า) -->
+          <!-- งบคงเหลือรวม X (ระบบเก่า) -->
           <mat-form-field appearance="outline" class="w-full">
-            <mat-label>งบคงเหลือรวม (ระบบเก่า)</mat-label>
+            <mat-label>งบคงเหลือรวม X (ระบบเก่า)</mat-label>
             <input matInput
                    currencyMask
                    [options]="{ allowNegative: true }"
@@ -61,9 +61,9 @@ export interface LegacyReconciliationDialogData {
             <mat-error>กรุณาระบุงบคงเหลือรวม</mat-error>
           </mat-form-field>
 
-          <!-- กำไร (ระบบเก่า) -->
+          <!-- กำไร Y (ระบบเก่า) -->
           <mat-form-field appearance="outline" class="w-full">
-            <mat-label>กำไร (ระบบเก่า)</mat-label>
+            <mat-label>กำไร Y (ระบบเก่า)</mat-label>
             <input matInput
                    currencyMask
                    [options]="{ allowNegative: true }"

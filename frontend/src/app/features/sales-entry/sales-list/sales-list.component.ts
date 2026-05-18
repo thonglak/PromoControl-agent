@@ -101,7 +101,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
             <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
           </div>
 
-          <!-- งบคงเหลือรวม — sum ทุกยูนิต (ไม่รวมยกเลิก) + Pool คงเหลือ -->
+          <!-- งบคงเหลือรวม (X) = ระบบเก่า + ระบบใหม่ (sum ยูนิต + Pool คงเหลือ) -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
             <div class="flex items-center justify-between mb-2">
               <p class="text-xs font-semibold text-slate-600">งบคงเหลือรวม (X)</p>
@@ -115,35 +115,20 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               }
             </div>
             <p class="text-2xl font-bold tabular-nums"
-               [class.text-primary-700]="totalRemaining() >= 0"
-               [class.text-loss]="totalRemaining() < 0">
-              ฿{{ totalRemaining() | number:'1.0-0' }}
+               [class.text-primary-700]="totalBudgetCombined() >= 0"
+               [class.text-loss]="totalBudgetCombined() < 0">
+              ฿{{ totalBudgetCombined() | number:'1.0-0' }}
             </p>
-            <p class="text-xs text-slate-400 mt-1">
-              + Pool คงเหลือ: ฿{{ summary()!.pool_budget_remaining | number:'1.0-0' }}
-            </p>
-            <!-- กระทบยอดระบบเก่า -->
             @if (summary()!.legacy) {
-              <div class="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
-                <p class="text-[11px] text-slate-500">
-                  ระบบเก่า:
-                  <span class="font-mono tabular-nums text-slate-700">
-                    ฿{{ summary()!.legacy!.total_budget_remaining | number:'1.0-0' }}
-                  </span>
-                  <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
-                </p>
-                <p class="text-[11px]"
-                   [class.text-emerald-600]="legacyBudgetDiff() === 0"
-                   [class.text-loss]="legacyBudgetDiff() !== 0">
-                  ผลต่าง:
-                  <span class="font-mono tabular-nums">
-                    {{ legacyBudgetDiff() >= 0 ? '+' : '' }}฿{{ legacyBudgetDiff() | number:'1.0-0' }}
-                  </span>
-                  <span class="ml-1">{{ legacyBudgetDiff() === 0 ? '●' : '●' }}</span>
-                </p>
-              </div>
+              <p class="text-[11px] text-slate-500 mt-2">
+                ระบบเก่า:
+                <span class="font-mono tabular-nums text-slate-700">
+                  ฿{{ summary()!.legacy!.total_budget_remaining | number:'1.0-0' }}
+                </span>
+                <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
+              </p>
             } @else {
-              <div class="mt-2 pt-2 border-t border-slate-100">
+              <div class="mt-2">
                 <p class="text-[11px] text-slate-400 italic">ยังไม่ระบุข้อมูลระบบเก่า</p>
                 @if (canEdit()) {
                   <button type="button"
@@ -156,7 +141,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
             }
           </div>
 
-          <!-- กำไร (Y) — sum คอลัมน์ profit ทุก row ยกเว้นยกเลิก -->
+          <!-- กำไร (Y) = ระบบเก่า + ระบบใหม่ (sum profit ทุก row ยกเว้นยกเลิก) -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
             <div class="flex items-center justify-between mb-2">
               <p class="text-xs font-semibold text-slate-600">กำไร (Y)</p>
@@ -170,33 +155,20 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               }
             </div>
             <p class="text-2xl font-bold tabular-nums"
-               [class.text-profit]="summary()!.total_profit >= 0"
-               [class.text-loss]="summary()!.total_profit < 0">
-              ฿{{ summary()!.total_profit | number:'1.0-0' }}
+               [class.text-profit]="totalProfitCombined() >= 0"
+               [class.text-loss]="totalProfitCombined() < 0">
+              ฿{{ totalProfitCombined() | number:'1.0-0' }}
             </p>
-            <p class="text-xs text-slate-400 mt-1">รวมจากรายการที่ตรง filter (ไม่รวมยกเลิก)</p>
-            <!-- กระทบยอดระบบเก่า -->
             @if (summary()!.legacy) {
-              <div class="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
-                <p class="text-[11px] text-slate-500">
-                  ระบบเก่า:
-                  <span class="font-mono tabular-nums text-slate-700">
-                    ฿{{ summary()!.legacy!.total_profit | number:'1.0-0' }}
-                  </span>
-                  <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
-                </p>
-                <p class="text-[11px]"
-                   [class.text-emerald-600]="legacyProfitDiff() === 0"
-                   [class.text-loss]="legacyProfitDiff() !== 0">
-                  ผลต่าง:
-                  <span class="font-mono tabular-nums">
-                    {{ legacyProfitDiff() >= 0 ? '+' : '' }}฿{{ legacyProfitDiff() | number:'1.0-0' }}
-                  </span>
-                  <span class="ml-1">{{ legacyProfitDiff() === 0 ? '●' : '●' }}</span>
-                </p>
-              </div>
+              <p class="text-[11px] text-slate-500 mt-2">
+                ระบบเก่า:
+                <span class="font-mono tabular-nums text-slate-700">
+                  ฿{{ summary()!.legacy!.total_profit | number:'1.0-0' }}
+                </span>
+                <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
+              </p>
             } @else {
-              <div class="mt-2 pt-2 border-t border-slate-100">
+              <div class="mt-2">
                 <p class="text-[11px] text-slate-400 italic">ยังไม่ระบุข้อมูลระบบเก่า</p>
                 @if (canEdit()) {
                   <button type="button"
@@ -491,18 +463,18 @@ export class SalesListComponent implements OnInit {
     return (s.total_budget_remaining_all_units ?? 0) + (s.pool_budget_remaining ?? 0);
   });
 
-  /** ผลต่าง งบคงเหลือรวม: ระบบใหม่ - ระบบเก่า */
-  readonly legacyBudgetDiff = computed(() => {
+  /** งบคงเหลือรวม (X) ที่แสดงในการ์ด = ระบบเก่า + ระบบใหม่ */
+  readonly totalBudgetCombined = computed(() => {
     const s = this.summary();
-    if (!s?.legacy) return 0;
-    return this.totalRemaining() - s.legacy.total_budget_remaining;
+    if (!s) return 0;
+    return this.totalRemaining() + (s.legacy?.total_budget_remaining ?? 0);
   });
 
-  /** ผลต่าง กำไร: ระบบใหม่ - ระบบเก่า */
-  readonly legacyProfitDiff = computed(() => {
+  /** กำไร (Y) ที่แสดงในการ์ด = ระบบเก่า + ระบบใหม่ */
+  readonly totalProfitCombined = computed(() => {
     const s = this.summary();
-    if (!s?.legacy) return 0;
-    return s.total_profit - s.legacy.total_profit;
+    if (!s) return 0;
+    return (s.total_profit ?? 0) + (s.legacy?.total_profit ?? 0);
   });
 
   ngOnInit(): void {
