@@ -2,15 +2,21 @@ import {
   Component, Input, Output, EventEmitter, OnInit, OnDestroy,
   inject, signal, computed, effect,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subscription, filter } from 'rxjs';
 
 import { AuthService } from '../../core/services/auth.service';
-import { ProjectService } from '../../core/services/project.service';
+import { ProjectService, Project } from '../../core/services/project.service';
 import { VersionCheckService } from '../../core/services/version-check.service';
 import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
+import { ProjectFormDialogComponent } from '../../features/master-data/projects/dialogs/project-form-dialog.component';
 
 // ── Menu type definitions ────────────────────────────────────────────────────
 
@@ -110,7 +116,13 @@ const MENU: MenuItem[] = [
 @Component({
   selector: 'app-sidebar-menu',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, MatButtonModule, MatTooltipModule, SvgIconComponent],
+  imports: [
+    FormsModule,
+    RouterLink, RouterLinkActive,
+    MatButtonModule, MatTooltipModule, MatMenuModule, MatDividerModule,
+    MatDialogModule, MatSnackBarModule,
+    SvgIconComponent,
+  ],
   templateUrl: './sidebar-menu.component.html',
 })
 export class SidebarMenuComponent implements OnInit, OnDestroy {
@@ -121,6 +133,8 @@ export class SidebarMenuComponent implements OnInit, OnDestroy {
   private readonly projectService = inject(ProjectService);
   private readonly versionCheck  = inject(VersionCheckService);
   private readonly router        = inject(Router);
+  private readonly dialog        = inject(MatDialog);
+  private readonly snackBar      = inject(MatSnackBar);
   private readonly subs          = new Subscription();
 
   readonly selectedProject = this.projectService.selectedProject;
@@ -130,6 +144,33 @@ export class SidebarMenuComponent implements OnInit, OnDestroy {
 
   /** กลุ่มที่ expand อยู่ */
   readonly expandedGroups = signal(new Set<string>());
+
+  // ── Project switcher state ────────────────────────────────────────────────
+  /** ค้นหาในเมนูเปลี่ยนโครงการ */
+  readonly projectSearch = signal('');
+
+  /** รายการโครงการทั้งหมดของ user (จาก auth.currentUser) */
+  readonly userProjects = computed<Project[]>(
+    () => (this.currentUser()?.projects as unknown as Project[]) ?? [],
+  );
+
+  /** projects ที่ผ่าน search filter — เปรียบเทียบ name + code */
+  readonly filteredProjects = computed<Project[]>(() => {
+    const q = this.projectSearch().toLowerCase().trim();
+    if (!q) return this.userProjects();
+    return this.userProjects().filter(
+      p => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q),
+    );
+  });
+
+  /** แสดง search input เฉพาะถ้ามีโครงการเกิน 5 */
+  readonly showProjectSearch = computed(() => this.userProjects().length > 5);
+
+  /** admin/manager สร้างโครงการได้ */
+  readonly canCreateProject = computed(() => {
+    const role = this.currentUser()?.role;
+    return role === 'admin' || role === 'manager';
+  });
 
   /** Menu items กรองตาม role */
   readonly filteredMenu = computed<MenuItem[]>(() => {
@@ -164,8 +205,40 @@ export class SidebarMenuComponent implements OnInit, OnDestroy {
     return (item.children ?? []).some(c => c.path && this.router.url.startsWith(c.path));
   }
 
-  changeProject(): void {
-    this.router.navigate(['/select-project']);
+  /** ตรวจว่า project ที่ส่งมาเป็นโครงการที่เลือกอยู่ (id type ระหว่าง PHP/TS ไม่ตรงกัน ใช้ String()) */
+  isCurrentProject(project: Project): boolean {
+    return String(this.selectedProject()?.id) === String(project.id);
+  }
+
+  /** สลับโครงการ — set ใน service แล้วเด้งไป dashboard เพื่อ refresh data ทั้งหน้า */
+  switchProject(project: Project): void {
+    if (this.isCurrentProject(project)) return;
+    this.projectService.selectProject(project);
+    this.projectSearch.set('');
+    this.router.navigate(['/dashboard']);
+  }
+
+  /** เปิด dialog สร้างโครงการใหม่ — เฉพาะ admin/manager */
+  openCreateProject(): void {
+    this.dialog
+      .open(ProjectFormDialogComponent, {
+        data: { mode: 'create' },
+        width: '500px',
+        maxHeight: '90vh',
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((created) => {
+        if (!created) return;
+        this.snackBar.open('สร้างโครงการสำเร็จ', 'ปิด', { duration: 3000 });
+        // refresh user.projects ให้รายการ dropdown อัปเดต
+        this.auth.me().subscribe();
+      });
+  }
+
+  /** เคลียร์ search ทุกครั้งที่ menu ปิด */
+  onMenuClosed(): void {
+    this.projectSearch.set('');
   }
 
   // ── Private ───────────────────────────────────────────────────────────────

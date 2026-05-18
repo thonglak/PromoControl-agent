@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
@@ -29,9 +29,24 @@ import { ThaiDatePipe } from '../../shared/pipes/thai-date.pipe';
   ],
   templateUrl: './dashboard.component.html',
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent {
   private api = inject(DashboardApiService);
   private project = inject(ProjectService);
+
+  constructor() {
+    // Reactive: เมื่อ user เปลี่ยนโครงการ (signal selectedProject เปลี่ยน) → reload data ใหม่
+    // ครอบคลุมทั้งกรณี first-load และกรณีอยู่หน้า dashboard อยู่แล้วแล้ว switch project
+    effect(() => {
+      const id = this.project.selectedProject()?.id;
+      if (!id) return;
+      // reset state ของ project เดิมก่อน fetch ใหม่ — กัน flash ค่าเก่า
+      this.selectedPhaseId.set(null);
+      this.discountInput.set(0);
+      this.discountResult.set(null);
+      this.loadPhases();
+      this.loadDashboard();
+    });
+  }
 
   // ── State ─────────────────────────────────────────────────────────────
   loading = signal(true);
@@ -88,15 +103,6 @@ export class DashboardComponent implements OnInit {
   get projectId(): number {
     const id = this.project.selectedProject()?.id;
     return id ? Number(id) : 0;
-  }
-
-  // ── Lifecycle ──────────────────────────────────────────────────────────
-
-  ngOnInit(): void {
-    if (this.projectId) {
-      this.loadPhases();
-      this.loadDashboard();
-    }
   }
 
   // ── Data Loading ──────────────────────────────────────────────────────
