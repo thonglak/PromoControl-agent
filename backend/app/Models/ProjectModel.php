@@ -16,6 +16,8 @@ class ProjectModel extends Model
     protected $allowedFields = [
         'code', 'name', 'description', 'company_name', 'location',
         'project_type', 'approval_required', 'allow_over_budget', 'pool_budget_amount',
+        'legacy_sold_units', 'legacy_sold_net_price', 'legacy_total_discount_amount',
+        'legacy_value_achieved', 'legacy_dashboard_as_of_date',
         'common_fee_rate', 'electric_meter_fee', 'water_meter_fee',
         'status', 'start_date', 'end_date', 'created_at', 'updated_at',
     ];

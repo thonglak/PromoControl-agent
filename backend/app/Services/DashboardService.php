@@ -37,26 +37,47 @@ class DashboardService
     // ─── Legacy Reconciliation ────────────────────────────────────────────
 
     /**
-     * getLegacyData — ดึงข้อมูลกระทบยอดระบบเก่าของโครงการ
-     * คืน null ถ้ายังไม่มีข้อมูล (project-level, ไม่กรองตาม phase)
+     * getLegacyData — ดึงข้อมูล legacy Dashboard จาก projects table
+     * คืน null ถ้ายังไม่ได้ตั้งค่า (ทั้ง 4 ตัวเลข = 0 และ legacy_dashboard_as_of_date IS NULL)
+     * project-level เท่านั้น — ไม่กรองตาม phase
+     *
+     * หมายเหตุ: ไม่มี 'note' ใน response นี้อีกต่อไป — note ย้ายไปอยู่ใน legacy-reconciliation endpoint
      */
     public function getLegacyData(int $projectId): ?array
     {
-        $row = $this->db->table('project_legacy_reconciliation')
-            ->where('project_id', $projectId)
+        $row = $this->db->table('projects')
+            ->select([
+                'legacy_sold_units',
+                'legacy_sold_net_price',
+                'legacy_total_discount_amount',
+                'legacy_value_achieved',
+                'legacy_dashboard_as_of_date',
+            ])
+            ->where('id', $projectId)
             ->get()->getRowArray();
 
         if (!$row) {
             return null;
         }
 
+        $soldUnits           = (int)   ($row['legacy_sold_units'] ?? 0);
+        $soldNetPrice        = (float) ($row['legacy_sold_net_price'] ?? 0);
+        $totalDiscountAmount = (float) ($row['legacy_total_discount_amount'] ?? 0);
+        $valueAchieved       = (float) ($row['legacy_value_achieved'] ?? 0);
+        $asOfDate            = $row['legacy_dashboard_as_of_date'] ?? null;
+
+        // ถือว่ายังไม่ตั้งค่า → คืน null
+        if ($soldUnits === 0 && $soldNetPrice === 0.0 && $totalDiscountAmount === 0.0
+            && $valueAchieved === 0.0 && $asOfDate === null) {
+            return null;
+        }
+
         return [
-            'sold_units'             => (int) ($row['legacy_sold_units'] ?? 0),
-            'sold_net_price'         => (float) ($row['legacy_sold_net_price'] ?? 0),
-            'total_discount_amount'  => (float) ($row['legacy_total_discount_amount'] ?? 0),
-            'value_achieved'         => (float) ($row['legacy_value_achieved'] ?? 0),
-            'as_of_date'             => $row['as_of_date'],
-            'note'                   => $row['note'],
+            'sold_units'            => $soldUnits,
+            'sold_net_price'        => $soldNetPrice,
+            'total_discount_amount' => $totalDiscountAmount,
+            'value_achieved'        => $valueAchieved,
+            'as_of_date'            => $asOfDate,
         ];
     }
 

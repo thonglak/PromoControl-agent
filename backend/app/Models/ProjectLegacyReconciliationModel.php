@@ -11,6 +11,16 @@ use CodeIgniter\Model;
  *
  * ตาราง project_legacy_reconciliation มี 1 row ต่อ 1 โครงการ (project_id = PRIMARY KEY)
  * ดังนั้นไม่ใช้ auto_increment — ทุก operation ใช้ project_id เป็น key
+ *
+ * fields ในตารางนี้ (หลัง refactor):
+ * - legacy_total_budget_remaining : งบคงเหลือรวมจากระบบเก่า (ใช้กับหน้า รายการขาย)
+ * - legacy_total_profit           : กำไรรวมจากระบบเก่า (ใช้กับหน้า รายการขาย)
+ * - as_of_date                   : วันที่ cutoff สำหรับข้อมูล X/Y
+ * - note                         : หมายเหตุ
+ *
+ * fields ที่ย้ายออกไปอยู่ใน projects table (สำหรับ Dashboard):
+ * - legacy_sold_units, legacy_sold_net_price, legacy_total_discount_amount,
+ *   legacy_value_achieved, legacy_dashboard_as_of_date
  */
 class ProjectLegacyReconciliationModel extends Model
 {
@@ -25,10 +35,6 @@ class ProjectLegacyReconciliationModel extends Model
         'project_id',
         'legacy_total_budget_remaining',
         'legacy_total_profit',
-        'legacy_sold_units',
-        'legacy_sold_net_price',
-        'legacy_total_discount_amount',
-        'legacy_value_achieved',
         'as_of_date',
         'note',
         'created_by',
@@ -53,7 +59,7 @@ class ProjectLegacyReconciliationModel extends Model
     }
 
     /**
-     * Upsert ข้อมูลกระทบยอดระบบเก่า
+     * Upsert ข้อมูลกระทบยอดระบบเก่า (เฉพาะ X/Y fields ที่เหลืออยู่ในตารางนี้)
      * ถ้ายังไม่มี row → INSERT พร้อม created_by / created_at
      * ถ้ามีอยู่แล้ว → UPDATE เฉพาะ field ที่เปลี่ยนได้
      */
@@ -68,10 +74,6 @@ class ProjectLegacyReconciliationModel extends Model
                 'project_id'                    => $projectId,
                 'legacy_total_budget_remaining' => $data['legacy_total_budget_remaining'],
                 'legacy_total_profit'           => $data['legacy_total_profit'],
-                'legacy_sold_units'             => $data['legacy_sold_units'] ?? 0,
-                'legacy_sold_net_price'         => $data['legacy_sold_net_price'] ?? 0,
-                'legacy_total_discount_amount'  => $data['legacy_total_discount_amount'] ?? 0,
-                'legacy_value_achieved'         => $data['legacy_value_achieved'] ?? 0,
                 'as_of_date'                    => $data['as_of_date'],
                 'note'                          => $data['note'] ?? null,
                 'created_by'                    => $userId,
@@ -85,10 +87,6 @@ class ProjectLegacyReconciliationModel extends Model
         return $this->where('project_id', $projectId)->set([
             'legacy_total_budget_remaining' => $data['legacy_total_budget_remaining'],
             'legacy_total_profit'           => $data['legacy_total_profit'],
-            'legacy_sold_units'             => $data['legacy_sold_units'] ?? 0,
-            'legacy_sold_net_price'         => $data['legacy_sold_net_price'] ?? 0,
-            'legacy_total_discount_amount'  => $data['legacy_total_discount_amount'] ?? 0,
-            'legacy_value_achieved'         => $data['legacy_value_achieved'] ?? 0,
             'as_of_date'                    => $data['as_of_date'],
             'note'                          => $data['note'] ?? null,
             'updated_by'                    => $userId,

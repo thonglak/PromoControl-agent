@@ -26,14 +26,15 @@ GET /api/dashboard response:
       "sold_net_price": 120000000.00,
       "total_discount_amount": 5000000.00,
       "value_achieved": 130000000.00,
-      "as_of_date": "2025-12-31",
-      "note": "ข้อมูล cutoff จากระบบเก่า Q4/2568"
+      "as_of_date": "2025-12-31"
     }
   }
 }
 ```
-หมายเหตุ: `legacy` = `null` ถ้ายังไม่มีข้อมูลใน `project_legacy_reconciliation`
+หมายเหตุ: `legacy` = `null` ถ้ายังไม่ได้ตั้งค่า (ทั้ง 4 ตัวเลข = 0 และ `legacy_dashboard_as_of_date` IS NULL)
+`legacy` มาจาก `projects` table (columns: `legacy_sold_units`, `legacy_sold_net_price`, `legacy_total_discount_amount`, `legacy_value_achieved`, `legacy_dashboard_as_of_date`)
 `legacy` คือข้อมูล project-level (ไม่กรองตาม phase) — frontend combine เอง
+ไม่มี `note` ใน legacy ของ Dashboard — note อยู่ใน `/api/projects/{id}/legacy-reconciliation` เท่านั้น
 
 POST /api/dashboard/calculate-discount request:
 ```json
@@ -67,13 +68,12 @@ POST /api/dashboard/calculate-discount response:
       "sold_net_price": 120000000.00,
       "total_discount_amount": 5000000.00,
       "value_achieved": 130000000.00,
-      "as_of_date": "2025-12-31",
-      "note": "ข้อมูล cutoff จากระบบเก่า Q4/2568"
+      "as_of_date": "2025-12-31"
     }
   }
 }
 ```
-หมายเหตุ: `legacy` = `null` ถ้ายังไม่มีข้อมูลใน `project_legacy_reconciliation`
+หมายเหตุ: `legacy` = `null` ถ้ายังไม่ได้ตั้งค่า (ดูเงื่อนไขเดียวกับ GET /api/dashboard)
 
 GET /api/phases response:
 ```json
@@ -126,6 +126,9 @@ DELETE /api/projects/{id}/legacy-reconciliation   (ลบ — admin only)
 
 ### GET /api/projects/{id}/legacy-reconciliation
 
+ข้อมูล X/Y เปรียบเทียบ (งบคงเหลือ + กำไร) จากระบบเก่า — ใช้กับหน้า รายการขาย
+fields Dashboard (sold_units, sold_net_price ฯลฯ) ย้ายไปอยู่ใน `projects` table แล้ว
+
 Response 200 (มีข้อมูล):
 ```json
 {
@@ -133,10 +136,6 @@ Response 200 (มีข้อมูล):
     "project_id": "1",
     "legacy_total_budget_remaining": 12345678.00,
     "legacy_total_profit": 3456789.00,
-    "legacy_sold_units": 30,
-    "legacy_sold_net_price": 120000000.00,
-    "legacy_total_discount_amount": 5000000.00,
-    "legacy_value_achieved": 130000000.00,
     "as_of_date": "2025-12-31",
     "note": "ข้อมูล cutoff จากระบบเก่า Q4/2568",
     "updated_at": "2026-05-18 10:00:00",
@@ -154,10 +153,6 @@ Body:
 {
   "legacy_total_budget_remaining": 12345678.00,
   "legacy_total_profit": 3456789.00,
-  "legacy_sold_units": 30,
-  "legacy_sold_net_price": 120000000.00,
-  "legacy_total_discount_amount": 5000000.00,
-  "legacy_value_achieved": 130000000.00,
   "as_of_date": "2025-12-31",
   "note": "..."
 }
@@ -166,10 +161,6 @@ Body:
 Validation:
 - `legacy_total_budget_remaining` (DECIMAL) — บังคับ, อนุญาตติดลบ
 - `legacy_total_profit` (DECIMAL) — บังคับ, อนุญาตติดลบ
-- `legacy_sold_units` (INT) — optional, จำนวนเต็ม >= 0 (default 0)
-- `legacy_sold_net_price` (DECIMAL) — optional, อนุญาตติดลบ (default 0)
-- `legacy_total_discount_amount` (DECIMAL) — optional, อนุญาตติดลบ (default 0)
-- `legacy_value_achieved` (DECIMAL) — optional, อนุญาตติดลบ (default 0)
 - `as_of_date` (DATE, YYYY-MM-DD) — บังคับ
 - `note` (TEXT) — optional, ≤ 1000 ตัวอักษร
 
@@ -187,6 +178,16 @@ POST/PUT body fields (สำหรับ Projects):
 - `electric_meter_fee` (DECIMAL 10,2) — ค่าติดตั้งมิเตอร์ไฟฟ้า
 - `water_meter_fee` (DECIMAL 10,2) — ค่าติดตั้งมิเตอร์ประปา
 - `approval_required` (boolean), `allow_over_budget` (boolean)
+- `legacy_sold_units` (INT, default 0) — จำนวนยูนิตที่ขายในระบบเก่า (สำหรับ Dashboard legacy)
+- `legacy_sold_net_price` (DECIMAL 15,2, default 0) — มูลค่าขายสุทธิระบบเก่า (อนุญาตติดลบ)
+- `legacy_total_discount_amount` (DECIMAL 15,2, default 0) — มูลค่าส่วนลดรวมระบบเก่า (อนุญาตติดลบ)
+- `legacy_value_achieved` (DECIMAL 15,2, default 0) — มูลค่าโครงการที่ทำได้ระบบเก่า (อนุญาตติดลบ)
+- `legacy_dashboard_as_of_date` (DATE YYYY-MM-DD, nullable) — วันที่ cutoff สำหรับ Dashboard legacy
+
+Validation (legacy dashboard fields — ทุก field optional):
+- `legacy_sold_units`: integer >= 0
+- `legacy_sold_net_price`, `legacy_total_discount_amount`, `legacy_value_achieved`: numeric (อนุญาตติดลบ)
+- `legacy_dashboard_as_of_date`: YYYY-MM-DD หรือ null
 
 ## House Models
 GET /api/house-models

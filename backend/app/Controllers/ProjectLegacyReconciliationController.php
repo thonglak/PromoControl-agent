@@ -15,6 +15,10 @@ use CodeIgniter\HTTP\ResponseInterface;
  * DELETE /api/projects/{id}/legacy-reconciliation — ลบข้อมูล (admin)
  *
  * ข้อมูลนี้เป็น metadata เปรียบเทียบเท่านั้น ไม่แตะ budget_movements และไม่แตะสูตรคำนวณใดๆ
+ *
+ * หมายเหตุ: fields ที่เกี่ยวกับ Dashboard (legacy_sold_units, legacy_sold_net_price,
+ * legacy_total_discount_amount, legacy_value_achieved, legacy_dashboard_as_of_date)
+ * ย้ายไปอยู่ใน projects table แล้ว — ใช้ PUT /api/projects/{id} แทน
  */
 class ProjectLegacyReconciliationController extends BaseController
 {
@@ -60,6 +64,7 @@ class ProjectLegacyReconciliationController extends BaseController
 
     /**
      * แปลง row จาก DB ให้เป็น response payload (cast id เป็น string ตาม convention)
+     * คืนเฉพาะ fields ที่ยังอยู่ใน project_legacy_reconciliation (X/Y fields)
      */
     private function formatRow(array $row): array
     {
@@ -67,10 +72,6 @@ class ProjectLegacyReconciliationController extends BaseController
             'project_id'                    => (string) $row['project_id'],
             'legacy_total_budget_remaining' => (float) $row['legacy_total_budget_remaining'],
             'legacy_total_profit'           => (float) $row['legacy_total_profit'],
-            'legacy_sold_units'             => (int) ($row['legacy_sold_units'] ?? 0),
-            'legacy_sold_net_price'         => (float) ($row['legacy_sold_net_price'] ?? 0),
-            'legacy_total_discount_amount'  => (float) ($row['legacy_total_discount_amount'] ?? 0),
-            'legacy_value_achieved'         => (float) ($row['legacy_value_achieved'] ?? 0),
             'as_of_date'                    => $row['as_of_date'],
             'note'                          => $row['note'],
             'updated_at'                    => $row['updated_at'],
@@ -146,27 +147,6 @@ class ProjectLegacyReconciliationController extends BaseController
             return $this->response->setStatusCode(422)->setJSON(['error' => 'รูปแบบ as_of_date ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)']);
         }
 
-        // legacy_sold_units — optional, integer >= 0
-        $legacySoldUnits = isset($body['legacy_sold_units']) ? $body['legacy_sold_units'] : 0;
-        if (!is_numeric($legacySoldUnits) || (int) $legacySoldUnits < 0 || (int) $legacySoldUnits != $legacySoldUnits) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => 'legacy_sold_units ต้องเป็นจำนวนเต็มที่ >= 0']);
-        }
-
-        // legacy_sold_net_price — optional, ตัวเลข (อนุญาตติดลบ)
-        if (isset($body['legacy_sold_net_price']) && !is_numeric($body['legacy_sold_net_price'])) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => 'legacy_sold_net_price ต้องเป็นตัวเลข']);
-        }
-
-        // legacy_total_discount_amount — optional, ตัวเลข (อนุญาตติดลบ)
-        if (isset($body['legacy_total_discount_amount']) && !is_numeric($body['legacy_total_discount_amount'])) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => 'legacy_total_discount_amount ต้องเป็นตัวเลข']);
-        }
-
-        // legacy_value_achieved — optional, ตัวเลข (อนุญาตติดลบ)
-        if (isset($body['legacy_value_achieved']) && !is_numeric($body['legacy_value_achieved'])) {
-            return $this->response->setStatusCode(422)->setJSON(['error' => 'legacy_value_achieved ต้องเป็นตัวเลข']);
-        }
-
         // note — optional, ≤ 1000 ตัวอักษร
         $note = isset($body['note']) ? (string) $body['note'] : null;
         if ($note !== null && $note !== '' && mb_strlen($note) > 1000) {
@@ -182,10 +162,6 @@ class ProjectLegacyReconciliationController extends BaseController
         $ok = $this->model->upsert($projectId, [
             'legacy_total_budget_remaining' => (float) $body['legacy_total_budget_remaining'],
             'legacy_total_profit'           => (float) $body['legacy_total_profit'],
-            'legacy_sold_units'             => (int) $legacySoldUnits,
-            'legacy_sold_net_price'         => (float) ($body['legacy_sold_net_price'] ?? 0),
-            'legacy_total_discount_amount'  => (float) ($body['legacy_total_discount_amount'] ?? 0),
-            'legacy_value_achieved'         => (float) ($body['legacy_value_achieved'] ?? 0),
             'as_of_date'                    => $asOfDate,
             'note'                          => $note,
         ], $this->userId());
