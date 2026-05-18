@@ -6,6 +6,7 @@ use App\Services\SalesTransactionService;
 use App\Services\CancelSaleService;
 use App\Services\TransferService;
 use App\Services\BudgetMovementService;
+use App\Models\ProjectLegacyReconciliationModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use RuntimeException;
 
@@ -15,13 +16,15 @@ class SalesTransactionController extends BaseController
     private CancelSaleService $cancelSvc;
     private TransferService $transferSvc;
     private BudgetMovementService $budgetSvc;
+    private ProjectLegacyReconciliationModel $legacyModel;
 
     public function __construct()
     {
-        $this->svc = new SalesTransactionService();
-        $this->cancelSvc = new CancelSaleService();
+        $this->svc         = new SalesTransactionService();
+        $this->cancelSvc   = new CancelSaleService();
         $this->transferSvc = new TransferService();
-        $this->budgetSvc = new BudgetMovementService();
+        $this->budgetSvc   = new BudgetMovementService();
+        $this->legacyModel = new ProjectLegacyReconciliationModel();
     }
 
     private function isAdmin(): bool { return ($this->request->user_role ?? '') === 'admin'; }
@@ -206,6 +209,18 @@ class SalesTransactionController extends BaseController
             ->get()->getRowArray();
         $managementBudgetReturned = abs((float) ($mgmtReturnedRow['total'] ?? 0));
 
+        // ─── ดึงข้อมูลกระทบยอดระบบเก่าของโครงการ (metadata เปรียบเทียบ) ───
+        $legacyRow = $this->legacyModel->getByProjectId($pid);
+        $legacySummary = null;
+        if ($legacyRow !== null) {
+            $legacySummary = [
+                'total_budget_remaining' => (float) $legacyRow['legacy_total_budget_remaining'],
+                'total_profit'           => (float) $legacyRow['legacy_total_profit'],
+                'as_of_date'             => $legacyRow['as_of_date'],
+                'note'                   => $legacyRow['note'],
+            ];
+        }
+
         return $this->response->setStatusCode(200)->setJSON([
             'data' => $data,
             'total' => $total,
@@ -227,6 +242,8 @@ class SalesTransactionController extends BaseController
                 'total_budget_remaining_all_units' => round((float) $totalColumnSum, 2),
                 // กำไรรวม — ทุก row ตรง filter ยกเว้นรายการยกเลิก
                 'total_profit' => round($totalProfit, 2),
+                // ข้อมูลกระทบยอดระบบเก่า — null ถ้ายังไม่ได้ตั้งค่า
+                'legacy' => $legacySummary,
             ],
         ]);
     }
