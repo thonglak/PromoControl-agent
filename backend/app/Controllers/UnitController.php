@@ -401,6 +401,50 @@ class UnitController extends BaseController
         }
     }
 
+    // ── Sync สถานะขาย/โอน จาก caldiscount ────────────────────────────────
+
+    public function syncCaldiscountSoldPreview(): ResponseInterface
+    {
+        $projectId = (int) ($this->request->getGet('project_id') ?? 0);
+        if ($projectId <= 0) return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        if (!$this->canAccessProject($projectId)) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
+        }
+
+        try {
+            $svc = new UnitSyncService();
+            return $this->response->setStatusCode(200)->setJSON($svc->previewSoldStatusSync($projectId));
+        } catch (RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function syncCaldiscountSoldApply(): ResponseInterface
+    {
+        $body      = $this->request->getJSON(true) ?? [];
+        $projectId = (int) ($body['project_id'] ?? 0);
+        $unitIds   = is_array($body['unit_ids'] ?? null) ? $body['unit_ids'] : [];
+
+        if ($projectId <= 0) return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
+        if (!$this->canWriteProject($projectId)) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์แก้ไขโครงการนี้']);
+        }
+        if (empty($unitIds)) {
+            return $this->response->setStatusCode(422)->setJSON(['error' => 'กรุณาเลือกยูนิตที่จะ sync']);
+        }
+
+        try {
+            $svc = new UnitSyncService();
+            $r = $svc->applySoldStatusSync($projectId, $unitIds);
+            return $this->response->setStatusCode(200)->setJSON([
+                'message' => "อัปเดต {$r['updated']} ยูนิตสำเร็จ",
+                'data'    => $r,
+            ]);
+        } catch (RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
+        }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────
 
     private function validateUnit(array $body, ?int $excludeId, int $projectId): array
@@ -443,10 +487,10 @@ class UnitController extends BaseController
 
         $optionals = ['floor', 'building', 'land_area_sqw', 'unit_type_id', 'house_model_id',
                       'appraisal_price', 'customer_name', 'salesperson',
-                      'sale_date', 'transfer_date', 'remark', 'status'];
+                      'sale_date', 'transfer_date', 'remark', 'status', 'legacy_source'];
 
-        // ฟิลด์ที่อนุญาตให้เป็น null (FK ที่ไม่บังคับ)
-        $nullableFields = ['house_model_id'];
+        // ฟิลด์ที่อนุญาตให้เป็น null (FK ที่ไม่บังคับ + flag ระบบเก่า)
+        $nullableFields = ['house_model_id', 'legacy_source'];
 
         foreach ($optionals as $field) {
             if (array_key_exists($field, $body)) {

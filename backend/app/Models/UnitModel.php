@@ -14,7 +14,7 @@ class UnitModel extends Model
         'project_id', 'house_model_id', 'unit_code', 'unit_number',
         'floor', 'building', 'unit_type_id',
         'base_price', 'unit_cost', 'appraisal_price', 'standard_budget',
-        'status', 'sale_date', 'transfer_date', 'remark',
+        'status', 'legacy_source', 'sale_date', 'transfer_date', 'remark',
     ];
 
     protected $useTimestamps = true;

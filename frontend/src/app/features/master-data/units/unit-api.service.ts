@@ -23,6 +23,7 @@ export interface Unit {
   land_area_sqw?: number | null;
   standard_budget: number;
   status: 'available' | 'reserved' | 'sold' | 'transferred';
+  legacy_source?: 'caldiscount' | null;
   sale_date?: string | null;
   transfer_date?: string | null;
   remark?: string | null;
@@ -44,6 +45,7 @@ export interface UnitPayload {
   land_area_sqw?: number | null;
   standard_budget: number;
   status?: string;
+  legacy_source?: 'caldiscount' | null;
   remark?: string | null;
 }
 
@@ -126,6 +128,22 @@ export class UnitApiService {
       })
       .pipe(map(r => r.data));
   }
+
+  // ── Sync สถานะขาย/โอน จาก Caldiscount ────────────────────────────────────
+  previewCaldiscountSoldSync(projectId: number): Observable<CaldiscountSoldSyncPreview> {
+    return this.http.get<CaldiscountSoldSyncPreview>('/api/units/sync-caldiscount-sold/preview', {
+      params: { project_id: projectId },
+    });
+  }
+
+  applyCaldiscountSoldSync(projectId: number, unitIds: number[]): Observable<CaldiscountSyncResult> {
+    return this.http
+      .post<{ message: string; data: CaldiscountSyncResult }>('/api/units/sync-caldiscount-sold/apply', {
+        project_id: projectId,
+        unit_ids:   unitIds,
+      })
+      .pipe(map(r => r.data));
+  }
 }
 
 // ── Caldiscount sync types ─────────────────────────────────────────────────
@@ -162,6 +180,37 @@ export interface CaldiscountSyncResult {
   updated: number;
   skipped: { ref: string; reason: string }[];
   errors:  { ref: string; reason: string }[];
+}
+
+// ── Caldiscount sold-status sync types ─────────────────────────────────────
+
+export type CaldiscountSoldRowStatus = 'will_update' | 'no_change' | 'conflict' | 'not_found';
+
+export interface CaldiscountSoldSyncRow {
+  unit_id: number;
+  unit_code: string;
+  current_status: 'available' | 'reserved' | 'sold' | 'transferred';
+  current_sale_date: string | null;
+  current_transfer_date: string | null;
+  new_status: 'sold' | 'transferred' | null;
+  new_sale_date: string | null;
+  new_transfer_date: string | null;
+  status: CaldiscountSoldRowStatus;
+  conflict_sale_no: string | null;
+  note: string | null;
+}
+
+export interface CaldiscountSoldSyncPreview {
+  project_id: number;
+  project_code: string;
+  rows: CaldiscountSoldSyncRow[];
+  summary: {
+    total: number;
+    will_update: number;
+    no_change: number;
+    conflict: number;
+    not_found: number;
+  };
 }
 
 export interface PriceRule {

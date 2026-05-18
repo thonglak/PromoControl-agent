@@ -17,6 +17,7 @@ import { UnitApiService, Unit, BulkCreateRow, BulkCreateResult } from '../unit-a
 import { UnitFormDialogComponent } from '../dialogs/unit-form-dialog.component';
 import { PriceRecalculateDialogComponent, PriceRecalculateDialogData } from '../dialogs/price-recalculate-dialog.component';
 import { CaldiscountSyncDialogComponent, CaldiscountSyncDialogData } from '../dialogs/caldiscount-sync-dialog.component';
+import { CaldiscountSoldSyncDialogComponent, CaldiscountSoldSyncDialogData } from '../dialogs/caldiscount-sold-sync-dialog.component';
 import { HouseModelApiService, HouseModel } from '../../house-models/house-model-api.service';
 import { ProjectService } from '../../../../core/services/project.service';
 import { AuthService } from '../../../../core/services/auth.service';
@@ -232,6 +233,24 @@ export class UnitListComponent implements OnInit, AfterViewInit {
         projectId: this.projectId,
         projectName: this.project.selectedProject()?.name,
       } satisfies CaldiscountSyncDialogData,
+      width: '960px',
+      maxHeight: '90vh',
+      disableClose: true,
+    }).afterClosed().subscribe(result => {
+      if (result?.updated > 0) this.loadUnits();
+    });
+  }
+
+  openCaldiscountSoldStatusSync(): void {
+    if (!this.projectId) {
+      this.snack.open('กรุณาเลือกโครงการก่อน', 'ปิด', { duration: 3000 });
+      return;
+    }
+    this.dialog.open(CaldiscountSoldSyncDialogComponent, {
+      data: {
+        projectId: this.projectId,
+        projectName: this.project.selectedProject()?.name,
+      } satisfies CaldiscountSoldSyncDialogData,
       width: '960px',
       maxHeight: '90vh',
       disableClose: true,

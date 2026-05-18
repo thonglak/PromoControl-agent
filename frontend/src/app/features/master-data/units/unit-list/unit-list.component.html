@@ -9,6 +9,11 @@
           <app-icon name="arrow-path" class="w-4 h-4 mr-1"></app-icon>
           Sync จาก Caldiscount
         </button>
+        <button mat-stroked-button (click)="openCaldiscountSoldStatusSync()"
+                matTooltip="ดึงสถานะขาย/โอนจาก Caldiscount มาอัปเดตยูนิต">
+          <app-icon name="cloud-arrow-down" class="w-4 h-4 mr-1"></app-icon>
+          ดึงสถานะขาย/โอน
+        </button>
         <button mat-stroked-button (click)="openPriceRecalculate()" matTooltip="กำหนดราคาประเมิน / ต้นทุน ด้วยสูตรเป็น batch">
           <app-icon name="cog-6-tooth" class="w-4 h-4 mr-1"></app-icon>
           ตั้งค่าราคา
@@ -253,7 +258,16 @@
           <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">สถานะ</th>
             <td mat-cell *matCellDef="let u">
-              <app-status-chip type="unit_status" [value]="u.status" />
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <app-status-chip type="unit_status" [value]="u.status" />
+                @if (u.legacy_source === 'caldiscount') {
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none border"
+                        style="background-color: var(--color-accent-light); color: var(--color-accent-warm); border-color: var(--color-accent-warm);"
+                        matTooltip="สถานะนี้ดึงมาจากระบบเก่า Caldiscount (snapshot — ไม่นำมาคำนวณซ้ำ)">
+                    ระบบเก่า
+                  </span>
+                }
+              </div>
             </td>
           </ng-container>
 

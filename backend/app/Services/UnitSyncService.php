@@ -276,4 +276,312 @@ class UnitSyncService
             'errors'  => $errors,
         ];
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sync สถานะขาย/โอน จาก Caldiscount → project_units
+    // ─────────────────────────────────────────────────────────────────────────
+    //
+    // Caldiscount fields ที่ใช้:
+    //   is_trans (tinyint 1) → ถ้า 1 = โอนแล้ว
+    //   is_sold  (tinyint 1) → ถ้า 1 = ขายแล้ว (ยังไม่โอน)
+    //   date_trans (date)    → วันที่โอนจริง — ใช้เป็น transfer_date
+    //   due_trans  (date)    → วันที่กำหนดโอน — ใช้เป็น sale_date (fallback)
+    //
+    // Logic mapping → ระบบใหม่:
+    //   is_trans=1            → status='transferred', transfer_date=date_trans, sale_date=due_trans
+    //   is_sold=1 & is_trans=0 → status='sold',       sale_date=due_trans
+    //   ทั้งคู่ = 0            → ข้าม (no_change — ไม่ override sales_transaction ระบบใหม่)
+    //
+    // Conflict: ถ้า unit มี active sales_transaction ในระบบใหม่ → mark conflict
+    //   skip apply กัน data inconsistency
+
+    /**
+     * Preview การ sync สถานะขาย/โอน — เปรียบเทียบ status เดิม/ใหม่ + detect conflict
+     */
+    public function previewSoldStatusSync(int $projectId): array
+    {
+        $project = $this->db->table('projects')->where('id', $projectId)->get()->getRowArray();
+        if (!$project) throw new RuntimeException('ไม่พบโครงการ');
+        $projectCode = trim((string) $project['code']);
+        if ($projectCode === '') throw new RuntimeException('โครงการนี้ยังไม่มีรหัส (code) — กรุณาตั้งรหัสก่อน');
+
+        // units ในระบบใหม่
+        $units = $this->db->table('project_units')
+            ->select('id, unit_code, status, sale_date, transfer_date, legacy_source')
+            ->where('project_id', $projectId)
+            ->orderBy('unit_code', 'ASC')
+            ->get()->getResultArray();
+
+        // ข้อมูลขาย/โอน จาก caldiscount
+        $cal = $this->cal->table('np_products_profile')
+            ->select('pd_uniq, is_sold, is_trans, due_trans, date_trans')
+            ->where('pd_pj_code', $projectCode)
+            ->get()->getResultArray();
+
+        // build exact + normalized maps
+        $calExactMap = [];
+        $calNormMap  = [];
+        foreach ($cal as $r) {
+            $code = (string) $r['pd_uniq'];
+            $calExactMap[$code] = $r;
+            $norm = $this->normalizeCode($code);
+            if ($norm !== null) $calNormMap[$norm][] = $r;
+        }
+
+        // เช็ค active sales_transaction (สำหรับ conflict detection)
+        $unitIds = array_map(static fn($u) => (int) $u['id'], $units);
+        $txMap = [];
+        if (!empty($unitIds)) {
+            $tx = $this->db->table('sales_transactions')
+                ->select('unit_id, sale_no')
+                ->where('project_id', $projectId)
+                ->whereIn('unit_id', $unitIds)
+                ->whereIn('status', ['active', 'confirmed'])
+                ->get()->getResultArray();
+            foreach ($tx as $t) {
+                $txMap[(int) $t['unit_id']] = (string) $t['sale_no'];
+            }
+        }
+
+        $rows = [];
+        $countUpdate = 0; $countNoChange = 0; $countConflict = 0; $countNotFound = 0;
+
+        foreach ($units as $u) {
+            $code = (string) $u['unit_code'];
+            $unitId = (int) $u['id'];
+
+            // หา cal match
+            $matched = $calExactMap[$code] ?? null;
+            if (!$matched) {
+                $norm = $this->normalizeCode($code);
+                $candidates = $norm !== null ? ($calNormMap[$norm] ?? []) : [];
+                if (count($candidates) === 1) $matched = $candidates[0];
+            }
+
+            if (!$matched) {
+                $rows[] = [
+                    'unit_id'              => $unitId,
+                    'unit_code'            => $code,
+                    'current_status'       => $u['status'],
+                    'current_sale_date'    => $u['sale_date'],
+                    'current_transfer_date'=> $u['transfer_date'],
+                    'new_status'           => null,
+                    'new_sale_date'        => null,
+                    'new_transfer_date'    => null,
+                    'status'               => 'not_found',
+                    'conflict_sale_no'     => null,
+                    'note'                 => null,
+                ];
+                $countNotFound++;
+                continue;
+            }
+
+            // คำนวณ status ใหม่จาก flags
+            $isTrans = (int) ($matched['is_trans'] ?? 0) === 1;
+            $isSold  = (int) ($matched['is_sold']  ?? 0) === 1;
+
+            if (!$isTrans && !$isSold) {
+                // Caldiscount ไม่ได้บอกว่าขาย/โอน — ไม่ sync
+                $rows[] = [
+                    'unit_id'              => $unitId,
+                    'unit_code'            => $code,
+                    'current_status'       => $u['status'],
+                    'current_sale_date'    => $u['sale_date'],
+                    'current_transfer_date'=> $u['transfer_date'],
+                    'new_status'           => null,
+                    'new_sale_date'        => null,
+                    'new_transfer_date'    => null,
+                    'status'               => 'no_change',
+                    'conflict_sale_no'     => null,
+                    'note'                 => 'Caldiscount ไม่ได้ระบุว่าขาย/โอน',
+                ];
+                $countNoChange++;
+                continue;
+            }
+
+            $newStatus       = $isTrans ? 'transferred' : 'sold';
+            $newTransferDate = $isTrans ? ($matched['date_trans'] ?? null) : null;
+            $newSaleDate     = $matched['due_trans'] ?? null;
+
+            // เช็ค conflict กับ sales_transaction ใหม่
+            $conflictSaleNo = $txMap[$unitId] ?? null;
+            if ($conflictSaleNo !== null) {
+                $rows[] = [
+                    'unit_id'              => $unitId,
+                    'unit_code'            => $code,
+                    'current_status'       => $u['status'],
+                    'current_sale_date'    => $u['sale_date'],
+                    'current_transfer_date'=> $u['transfer_date'],
+                    'new_status'           => $newStatus,
+                    'new_sale_date'        => $newSaleDate,
+                    'new_transfer_date'    => $newTransferDate,
+                    'status'               => 'conflict',
+                    'conflict_sale_no'     => $conflictSaleNo,
+                    'note'                 => 'มีรายการขาย ' . $conflictSaleNo . ' ในระบบใหม่อยู่แล้ว — ข้าม',
+                ];
+                $countConflict++;
+                continue;
+            }
+
+            // เทียบกับ current — ถ้าเหมือนเดิมและ flag = caldiscount อยู่แล้ว → no_change
+            $sameStatus = $u['status'] === $newStatus;
+            $sameSale   = (string) $u['sale_date']     === (string) $newSaleDate;
+            $sameTrans  = (string) $u['transfer_date'] === (string) $newTransferDate;
+            $alreadyFlagged = $u['legacy_source'] === 'caldiscount';
+
+            if ($sameStatus && $sameSale && $sameTrans && $alreadyFlagged) {
+                $rows[] = [
+                    'unit_id'              => $unitId,
+                    'unit_code'            => $code,
+                    'current_status'       => $u['status'],
+                    'current_sale_date'    => $u['sale_date'],
+                    'current_transfer_date'=> $u['transfer_date'],
+                    'new_status'           => $newStatus,
+                    'new_sale_date'        => $newSaleDate,
+                    'new_transfer_date'    => $newTransferDate,
+                    'status'               => 'no_change',
+                    'conflict_sale_no'     => null,
+                    'note'                 => null,
+                ];
+                $countNoChange++;
+                continue;
+            }
+
+            $rows[] = [
+                'unit_id'              => $unitId,
+                'unit_code'            => $code,
+                'current_status'       => $u['status'],
+                'current_sale_date'    => $u['sale_date'],
+                'current_transfer_date'=> $u['transfer_date'],
+                'new_status'           => $newStatus,
+                'new_sale_date'        => $newSaleDate,
+                'new_transfer_date'    => $newTransferDate,
+                'status'               => 'will_update',
+                'conflict_sale_no'     => null,
+                'note'                 => null,
+            ];
+            $countUpdate++;
+        }
+
+        return [
+            'project_id'   => $projectId,
+            'project_code' => $projectCode,
+            'rows'         => $rows,
+            'summary'      => [
+                'total'       => count($rows),
+                'will_update' => $countUpdate,
+                'no_change'   => $countNoChange,
+                'conflict'    => $countConflict,
+                'not_found'   => $countNotFound,
+            ],
+        ];
+    }
+
+    /**
+     * Apply sync สถานะขาย/โอน — update เฉพาะ unit_ids ที่ส่งมา
+     * Re-fetch จาก Caldiscount + re-check conflict กัน race
+     */
+    public function applySoldStatusSync(int $projectId, array $unitIds): array
+    {
+        $project = $this->db->table('projects')->where('id', $projectId)->get()->getRowArray();
+        if (!$project) throw new RuntimeException('ไม่พบโครงการ');
+        $projectCode = trim((string) $project['code']);
+        if ($projectCode === '') throw new RuntimeException('โครงการนี้ยังไม่มีรหัส');
+
+        $unitIds = array_values(array_unique(array_map('intval', $unitIds)));
+        if (empty($unitIds)) {
+            return ['updated' => 0, 'skipped' => [], 'errors' => []];
+        }
+
+        $units = $this->db->table('project_units')
+            ->select('id, unit_code')
+            ->where('project_id', $projectId)
+            ->whereIn('id', $unitIds)
+            ->get()->getResultArray();
+
+        if (empty($units)) {
+            return ['updated' => 0, 'skipped' => [], 'errors' => [['ref' => '*', 'reason' => 'ไม่พบยูนิตในโครงการนี้']]];
+        }
+
+        // re-fetch caldiscount + re-check conflict
+        $cal = $this->cal->table('np_products_profile')
+            ->select('pd_uniq, is_sold, is_trans, due_trans, date_trans')
+            ->where('pd_pj_code', $projectCode)
+            ->get()->getResultArray();
+
+        $calExactMap = [];
+        $calNormMap  = [];
+        foreach ($cal as $r) {
+            $calExactMap[(string) $r['pd_uniq']] = $r;
+            $norm = $this->normalizeCode((string) $r['pd_uniq']);
+            if ($norm !== null) $calNormMap[$norm][] = $r;
+        }
+
+        $thisUnitIds = array_map(static fn($u) => (int) $u['id'], $units);
+        $tx = $this->db->table('sales_transactions')
+            ->select('unit_id, sale_no')
+            ->where('project_id', $projectId)
+            ->whereIn('unit_id', $thisUnitIds)
+            ->whereIn('status', ['active', 'confirmed'])
+            ->get()->getResultArray();
+        $txMap = [];
+        foreach ($tx as $t) {
+            $txMap[(int) $t['unit_id']] = (string) $t['sale_no'];
+        }
+
+        $updated = 0;
+        $skipped = [];
+        $errors  = [];
+        $now     = date('Y-m-d H:i:s');
+
+        foreach ($units as $u) {
+            $code = (string) $u['unit_code'];
+            $unitId = (int) $u['id'];
+
+            $matched = $calExactMap[$code] ?? null;
+            if (!$matched) {
+                $norm = $this->normalizeCode($code);
+                $candidates = $norm !== null ? ($calNormMap[$norm] ?? []) : [];
+                if (count($candidates) === 1) $matched = $candidates[0];
+            }
+
+            if (!$matched) {
+                $skipped[] = ['ref' => $code, 'reason' => 'ไม่พบใน caldiscount'];
+                continue;
+            }
+
+            $isTrans = (int) ($matched['is_trans'] ?? 0) === 1;
+            $isSold  = (int) ($matched['is_sold']  ?? 0) === 1;
+            if (!$isTrans && !$isSold) {
+                $skipped[] = ['ref' => $code, 'reason' => 'caldiscount ไม่ได้ระบุว่าขาย/โอน'];
+                continue;
+            }
+
+            if (isset($txMap[$unitId])) {
+                $skipped[] = ['ref' => $code, 'reason' => 'มีรายการขาย ' . $txMap[$unitId] . ' ในระบบใหม่ — ข้าม'];
+                continue;
+            }
+
+            $set = [
+                'status'        => $isTrans ? 'transferred' : 'sold',
+                'sale_date'     => $matched['due_trans']  ?? null,
+                'transfer_date' => $isTrans ? ($matched['date_trans'] ?? null) : null,
+                'legacy_source' => 'caldiscount',
+                'updated_at'    => $now,
+            ];
+
+            try {
+                $this->db->table('project_units')->where('id', $unitId)->update($set);
+                $updated++;
+            } catch (\Throwable $e) {
+                $errors[] = ['ref' => $code, 'reason' => $e->getMessage()];
+            }
+        }
+
+        return [
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'errors'  => $errors,
+        ];
+    }
 }

@@ -8,18 +8,18 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { UnitApiService, CaldiscountSyncRow, CaldiscountRowStatus } from '../unit-api.service';
+import { UnitApiService, CaldiscountSoldSyncRow, CaldiscountSoldRowStatus } from '../unit-api.service';
 import { SvgIconComponent } from '../../../../shared/components/svg-icon/svg-icon.component';
 
-export interface CaldiscountSyncDialogData {
+export interface CaldiscountSoldSyncDialogData {
   projectId: number;
   projectName?: string;
 }
 
-type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_only';
+type StatusFilter = 'all' | 'will_update' | 'no_change' | 'conflict' | 'not_found';
 
 @Component({
-  selector: 'app-caldiscount-sync-dialog',
+  selector: 'app-caldiscount-sold-sync-dialog',
   standalone: true,
   imports: [
     CommonModule, FormsModule,
@@ -28,7 +28,7 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_onl
   ],
   template: `
     <h2 mat-dialog-title class="!text-lg !font-semibold !text-slate-800 flex items-center gap-2">
-      Sync ต้นทุน &amp; ราคาประเมิน จาก Caldiscount
+      ดึงสถานะขาย/โอน จาก Caldiscount
       @if (data.projectName) { <span class="text-slate-500 font-normal text-sm">— {{ data.projectName }}</span> }
     </h2>
 
@@ -37,7 +37,7 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_onl
       @if (loading()) {
         <div class="flex flex-col items-center justify-center py-16">
           <mat-spinner diameter="40" />
-          <p class="mt-3 text-slate-500">กำลังเปรียบเทียบข้อมูล...</p>
+          <p class="mt-3 text-slate-500">กำลังเปรียบเทียบสถานะ...</p>
         </div>
       } @else if (error()) {
         <div class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{{ error() }}</div>
@@ -57,12 +57,12 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_onl
             <div class="text-base font-semibold text-slate-700 num">{{ summary().no_change }}</div>
           </div>
           <div class="px-3 py-2 rounded-lg bg-rose-50 border border-rose-200">
-            <div class="text-[11px] text-rose-700 uppercase tracking-wide">ไม่พบใน Cal</div>
-            <div class="text-base font-semibold text-rose-800 num">{{ summary().not_found }}</div>
+            <div class="text-[11px] text-rose-700 uppercase tracking-wide">ขัดแย้ง (ข้าม)</div>
+            <div class="text-base font-semibold text-rose-800 num">{{ summary().conflict }}</div>
           </div>
-          <div class="px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
-            <div class="text-[11px] text-blue-700 uppercase tracking-wide">มีใน Cal เท่านั้น</div>
-            <div class="text-base font-semibold text-blue-800 num">{{ summary().cal_only }}</div>
+          <div class="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500 uppercase tracking-wide">ไม่พบใน Cal</div>
+            <div class="text-base font-semibold text-slate-700 num">{{ summary().not_found }}</div>
           </div>
         </div>
 
@@ -99,20 +99,21 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_onl
               <tr class="text-left">
                 <th class="px-2 py-2 w-10"></th>
                 <th class="px-3 py-2 font-semibold text-slate-600">รหัสยูนิต</th>
-                <th class="px-3 py-2 font-semibold text-slate-600 text-right">ต้นทุนเดิม</th>
-                <th class="px-3 py-2 font-semibold text-slate-600 text-right">→ ใหม่</th>
-                <th class="px-3 py-2 font-semibold text-slate-600 text-right">ราคาประเมินเดิม</th>
-                <th class="px-3 py-2 font-semibold text-slate-600 text-right">→ ใหม่</th>
-                <th class="px-3 py-2 font-semibold text-slate-600 text-center">สถานะ</th>
+                <th class="px-3 py-2 font-semibold text-slate-600 text-center">สถานะเดิม</th>
+                <th class="px-3 py-2 font-semibold text-slate-600 text-center">→ ใหม่</th>
+                <th class="px-3 py-2 font-semibold text-slate-600 text-center">วันที่ขาย</th>
+                <th class="px-3 py-2 font-semibold text-slate-600 text-center">วันที่โอน</th>
+                <th class="px-3 py-2 font-semibold text-slate-600 text-center">ผล</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               @for (row of filteredRows(); track row.unit_code) {
                 <tr class="hover:bg-slate-50/60"
                     [class.bg-amber-50/40]="row.status === 'will_update'"
-                    [class.opacity-60]="row.status === 'cal_only' || row.status === 'not_found'">
+                    [class.bg-rose-50/30]="row.status === 'conflict'"
+                    [class.opacity-60]="row.status === 'not_found'">
                   <td class="px-2 py-1.5 text-center">
-                    @if (row.status === 'will_update' || row.status === 'no_change') {
+                    @if (row.status === 'will_update') {
                       <input type="checkbox"
                              [checked]="isSelected(row)"
                              (change)="toggleSelect(row, $any($event.target).checked)"
@@ -120,30 +121,34 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_onl
                     }
                   </td>
                   <td class="px-3 py-1.5 font-mono text-slate-800">
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <span>{{ row.unit_code }}</span>
-                      @if (row.match_type === 'normalized' && row.cal_unit_code && row.cal_unit_code !== row.unit_code) {
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200"
-                              matTooltip="ระบบจับคู่อัตโนมัติ — รหัสไม่ตรงเป๊ะแต่ normalize แล้วตรงกัน">
-                          🔗 {{ row.cal_unit_code }}
-                        </span>
-                      }
-                    </div>
+                    <span>{{ row.unit_code }}</span>
                     @if (row.note) {
-                      <div class="text-[10px] text-rose-600 mt-0.5">{{ row.note }}</div>
+                      <div class="text-[10px] mt-0.5"
+                           [class.text-rose-600]="row.status === 'conflict'"
+                           [class.text-slate-500]="row.status !== 'conflict'">
+                        {{ row.note }}
+                      </div>
                     }
                   </td>
-                  <td class="px-3 py-1.5 text-right num text-slate-600">{{ formatNum(row.current_unit_cost) }}</td>
-                  <td class="px-3 py-1.5 text-right num font-semibold"
-                      [class.text-amber-700]="diff(row.current_unit_cost, row.new_unit_cost)"
-                      [class.text-slate-700]="!diff(row.current_unit_cost, row.new_unit_cost)">
-                    {{ formatNum(row.new_unit_cost) }}
+                  <td class="px-3 py-1.5 text-center">
+                    <span class="text-xs text-slate-600">{{ statusText(row.current_status) }}</span>
                   </td>
-                  <td class="px-3 py-1.5 text-right num text-slate-600">{{ formatNum(row.current_appraisal_price) }}</td>
-                  <td class="px-3 py-1.5 text-right num font-semibold"
-                      [class.text-amber-700]="diff(row.current_appraisal_price, row.new_appraisal_price)"
-                      [class.text-slate-700]="!diff(row.current_appraisal_price, row.new_appraisal_price)">
-                    {{ formatNum(row.new_appraisal_price) }}
+                  <td class="px-3 py-1.5 text-center">
+                    @if (row.new_status) {
+                      <span class="text-xs font-semibold"
+                            [class.text-amber-700]="row.new_status !== row.current_status"
+                            [class.text-slate-700]="row.new_status === row.current_status">
+                        {{ statusText(row.new_status) }}
+                      </span>
+                    } @else {
+                      <span class="text-slate-300">—</span>
+                    }
+                  </td>
+                  <td class="px-3 py-1.5 text-center text-xs num text-slate-600">
+                    {{ row.new_sale_date ?? row.current_sale_date ?? '—' }}
+                  </td>
+                  <td class="px-3 py-1.5 text-center text-xs num text-slate-600">
+                    {{ row.new_transfer_date ?? row.current_transfer_date ?? '—' }}
                   </td>
                   <td class="px-3 py-1.5 text-center">
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium" [class]="statusClass(row.status)">
@@ -159,11 +164,9 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_onl
         </div>
 
         <p class="text-xs text-slate-500 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span>📌 mapping: <code class="font-mono">pd_bl</code> → ต้นทุน, <code class="font-mono">pd_price_ga</code> → ราคาประเมิน</span>
+          <span>📌 <code class="font-mono">is_trans=1</code> → โอนแล้ว · <code class="font-mono">is_sold=1</code> → ขายแล้ว</span>
+          <span>· ยูนิตที่มีรายการขายในระบบใหม่จะถูก <span class="text-rose-700 font-medium">ข้าม</span> อัตโนมัติ</span>
           @if (preview()?.project_code) { <span>· รหัสโครงการ <code class="font-mono">{{ preview()?.project_code }}</code></span> }
-          @if (normalizedCount() > 0) {
-            <span class="text-indigo-700">· 🔗 auto-match {{ normalizedCount() }} ตัว (รหัสต่างเล็กน้อย — ดูแถวที่มี chip <code class="font-mono">🔗</code>)</span>
-          }
         </p>
       }
     </mat-dialog-content>
@@ -174,25 +177,24 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'not_found' | 'cal_onl
               [disabled]="saving() || selectedCount() === 0"
               (click)="apply()">
         @if (saving()) { <mat-spinner diameter="18" class="!inline-block mr-1" /> }
-        ยืนยัน sync ({{ selectedCount() }})
+        ยืนยันอัปเดต ({{ selectedCount() }})
       </button>
     </mat-dialog-actions>
   `,
 })
-export class CaldiscountSyncDialogComponent implements OnInit {
-  readonly data: CaldiscountSyncDialogData = inject(MAT_DIALOG_DATA);
-  readonly dialogRef = inject(MatDialogRef<CaldiscountSyncDialogComponent>);
+export class CaldiscountSoldSyncDialogComponent implements OnInit {
+  readonly data: CaldiscountSoldSyncDialogData = inject(MAT_DIALOG_DATA);
+  readonly dialogRef = inject(MatDialogRef<CaldiscountSoldSyncDialogComponent>);
   private readonly api   = inject(UnitApiService);
   private readonly snack = inject(MatSnackBar);
 
   loading = signal(true);
   saving  = signal(false);
   error   = signal<string | null>(null);
-  preview = signal<{ project_code: string; rows: CaldiscountSyncRow[]; summary: any } | null>(null);
+  preview = signal<{ project_code: string; rows: CaldiscountSoldSyncRow[]; summary: any } | null>(null);
 
-  readonly summary = computed(() => this.preview()?.summary ?? { total: 0, will_update: 0, no_change: 0, not_found: 0, cal_only: 0 });
+  readonly summary = computed(() => this.preview()?.summary ?? { total: 0, will_update: 0, no_change: 0, conflict: 0, not_found: 0 });
 
-  /** unit_id ของแถวที่เลือก */
   selectedIds = signal<Set<number>>(new Set());
 
   filter = signal<StatusFilter>('all');
@@ -201,8 +203,8 @@ export class CaldiscountSyncDialogComponent implements OnInit {
     { key: 'all',         label: 'ทั้งหมด' },
     { key: 'will_update', label: 'เปลี่ยนแปลง' },
     { key: 'no_change',   label: 'ไม่เปลี่ยน' },
+    { key: 'conflict',    label: 'ขัดแย้ง' },
     { key: 'not_found',   label: 'ไม่พบใน Cal' },
-    { key: 'cal_only',    label: 'มีใน Cal เท่านั้น' },
   ];
 
   readonly filteredRows = computed(() => {
@@ -211,29 +213,21 @@ export class CaldiscountSyncDialogComponent implements OnInit {
     return f === 'all' ? all : all.filter(r => r.status === f);
   });
 
-  /** จำนวน rows ที่ update ได้ (มี unit_id + caldiscount มีค่า) */
   readonly updatableCount = computed(() => (this.preview()?.rows ?? [])
-    .filter(r => r.unit_id !== null && (r.status === 'will_update' || r.status === 'no_change'))
-    .length
+    .filter(r => r.status === 'will_update').length
   );
 
   readonly selectedCount = computed(() => this.selectedIds().size);
 
-  /** จำนวนแถวที่ match แบบ normalized (รหัสต่างเล็กน้อย) */
-  readonly normalizedCount = computed(() => (this.preview()?.rows ?? [])
-    .filter(r => r.match_type === 'normalized')
-    .length
-  );
-
   ngOnInit(): void {
-    this.api.previewCaldiscountSync(this.data.projectId).subscribe({
+    this.api.previewCaldiscountSoldSync(this.data.projectId).subscribe({
       next: res => {
         this.preview.set({ project_code: res.project_code, rows: res.rows, summary: res.summary });
         this.loading.set(false);
         // default: tick rows ที่ "เปลี่ยนแปลง" ทั้งหมด
         const ids = new Set<number>();
         for (const r of res.rows) {
-          if (r.status === 'will_update' && r.unit_id !== null) ids.add(r.unit_id);
+          if (r.status === 'will_update') ids.add(r.unit_id);
         }
         this.selectedIds.set(ids);
       },
@@ -244,12 +238,11 @@ export class CaldiscountSyncDialogComponent implements OnInit {
     });
   }
 
-  isSelected(row: CaldiscountSyncRow): boolean {
-    return row.unit_id !== null && this.selectedIds().has(row.unit_id);
+  isSelected(row: CaldiscountSoldSyncRow): boolean {
+    return this.selectedIds().has(row.unit_id);
   }
 
-  toggleSelect(row: CaldiscountSyncRow, checked: boolean): void {
-    if (row.unit_id === null) return;
+  toggleSelect(row: CaldiscountSoldSyncRow, checked: boolean): void {
     const s = new Set(this.selectedIds());
     if (checked) s.add(row.unit_id); else s.delete(row.unit_id);
     this.selectedIds.set(s);
@@ -258,9 +251,7 @@ export class CaldiscountSyncDialogComponent implements OnInit {
   selectAllUpdatable(): void {
     const ids = new Set<number>();
     for (const r of this.preview()?.rows ?? []) {
-      if (r.unit_id !== null && (r.status === 'will_update' || r.status === 'no_change')) {
-        ids.add(r.unit_id);
-      }
+      if (r.status === 'will_update') ids.add(r.unit_id);
     }
     this.selectedIds.set(ids);
   }
@@ -273,47 +264,47 @@ export class CaldiscountSyncDialogComponent implements OnInit {
     if (this.selectedIds().size === 0) return;
     this.saving.set(true);
     const ids = Array.from(this.selectedIds());
-    this.api.applyCaldiscountSync(this.data.projectId, ids).subscribe({
+    this.api.applyCaldiscountSoldSync(this.data.projectId, ids).subscribe({
       next: res => {
         this.saving.set(false);
         this.snack.open(`อัปเดต ${res.updated} ยูนิตสำเร็จ${res.skipped.length ? ' (ข้าม ' + res.skipped.length + ')' : ''}`, 'ปิด', { duration: 4000 });
         if (res.skipped.length > 0 || res.errors.length > 0) {
-          console.warn('[caldiscount sync]', { skipped: res.skipped, errors: res.errors });
+          console.warn('[caldiscount sold sync]', { skipped: res.skipped, errors: res.errors });
         }
         this.dialogRef.close({ updated: res.updated });
       },
       error: err => {
         this.saving.set(false);
-        this.snack.open(err?.error?.error ?? 'sync ไม่สำเร็จ', 'ปิด', { duration: 5000 });
+        this.snack.open(err?.error?.error ?? 'อัปเดตไม่สำเร็จ', 'ปิด', { duration: 5000 });
       },
     });
   }
 
-  formatNum(v: number | null): string {
-    if (v === null || v === undefined) return '—';
-    return new Intl.NumberFormat('th-TH').format(v);
-  }
-
-  diff(a: number | null, b: number | null): boolean {
-    if (a === null || b === null) return a !== b;
-    return a !== b;
-  }
-
-  statusLabel(s: CaldiscountRowStatus): string {
+  statusText(s: 'available' | 'reserved' | 'sold' | 'transferred' | null): string {
     switch (s) {
-      case 'will_update': return '🟡 เปลี่ยนแปลง';
-      case 'no_change':   return '⚪ ไม่เปลี่ยน';
-      case 'not_found':   return '🔴 ไม่พบใน Cal';
-      case 'cal_only':    return '🔵 มีใน Cal';
+      case 'available':   return 'ว่าง';
+      case 'reserved':    return 'จอง';
+      case 'sold':        return 'ขายแล้ว';
+      case 'transferred': return 'โอนแล้ว';
+      default:            return '—';
     }
   }
 
-  statusClass(s: CaldiscountRowStatus): string {
+  statusLabel(s: CaldiscountSoldRowStatus): string {
+    switch (s) {
+      case 'will_update': return '🟡 เปลี่ยนแปลง';
+      case 'no_change':   return '⚪ ไม่เปลี่ยน';
+      case 'conflict':    return '🔴 ขัดแย้ง';
+      case 'not_found':   return '⚪ ไม่พบใน Cal';
+    }
+  }
+
+  statusClass(s: CaldiscountSoldRowStatus): string {
     switch (s) {
       case 'will_update': return 'bg-amber-100 text-amber-800';
       case 'no_change':   return 'bg-slate-100 text-slate-600';
-      case 'not_found':   return 'bg-rose-100 text-rose-800';
-      case 'cal_only':    return 'bg-blue-100 text-blue-700';
+      case 'conflict':    return 'bg-rose-100 text-rose-800';
+      case 'not_found':   return 'bg-slate-100 text-slate-500';
     }
   }
 }

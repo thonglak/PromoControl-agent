@@ -8,6 +8,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 import { CurrencyMaskDirective } from '../../../../shared/directives/currency-mask.directive';
 import { UnitApiService, Unit, UnitPayload } from '../unit-api.service';
@@ -28,7 +29,7 @@ export interface UnitFormDialogData {
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatButtonModule, MatProgressSpinnerModule, CurrencyMaskDirective,
+    MatButtonModule, MatProgressSpinnerModule, MatCheckboxModule, CurrencyMaskDirective,
   ],
   template: `
     <h2 mat-dialog-title class="!text-lg !font-semibold !text-slate-800">
@@ -139,6 +140,16 @@ export interface UnitFormDialogData {
               <mat-option value="transferred">โอนแล้ว</mat-option>
             </mat-select>
           </mat-form-field>
+
+          <!-- ทำเครื่องหมายว่ามาจากระบบเก่า (Caldiscount) — manual toggle -->
+          <div class="sm:col-span-2 -mt-2 mb-3 flex items-start gap-2">
+            <mat-checkbox formControlName="isLegacyCaldiscount" color="primary" class="mt-0.5">
+              <span class="text-sm">มาจากระบบเก่า (Caldiscount)</span>
+            </mat-checkbox>
+            <span class="text-xs text-slate-400 mt-1">
+              — snapshot สถานะ ไม่นำมาคำนวณซ้ำในระบบใหม่
+            </span>
+          </div>
         }
 
         <mat-form-field appearance="outline" class="sm:col-span-2">
@@ -189,6 +200,7 @@ export class UnitFormDialogComponent implements OnInit {
     appraisal_price: [this.data.unit?.appraisal_price ?? null],
     standard_budget: [this.data.unit?.standard_budget ?? null, Validators.required],
     status:          [this.data.unit?.status ?? 'available'],
+    isLegacyCaldiscount: [this.data.unit?.legacy_source === 'caldiscount'],
     remark:          [this.data.unit?.remark ?? ''],
   });
 
@@ -222,6 +234,7 @@ export class UnitFormDialogComponent implements OnInit {
       appraisal_price: v.appraisal_price ?? null,
       standard_budget: v.standard_budget!,
       status:          v.status ?? 'available',
+      legacy_source:   v.isLegacyCaldiscount ? 'caldiscount' : null,
       remark:          v.remark || null,
     };
 

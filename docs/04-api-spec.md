@@ -208,6 +208,16 @@ DELETE /api/units/{id}
 POST /api/units/preview-recalculate     # dry-run: นับยูนิตที่จะถูกอัปเดต
 POST /api/units/bulk-recalculate        # คำนวณ unit_cost / appraisal_price จากสูตร แบบ batch
 
+GET  /api/units/sync-caldiscount/preview?project_id=    # preview sync ต้นทุน+ราคาประเมินจาก Caldiscount (np_products_profile.pd_bl, pd_price_ga)
+POST /api/units/sync-caldiscount/apply                  # apply { project_id, unit_ids[] } → update unit_cost + appraisal_price
+
+GET  /api/units/sync-caldiscount-sold/preview?project_id=  # preview sync สถานะขาย/โอนจาก Caldiscount (is_sold, is_trans, due_trans, date_trans)
+                                                            #   summary: { total, will_update, no_change, conflict, not_found }
+                                                            #   conflict = ยูนิตมี active sales_transaction ในระบบใหม่อยู่แล้ว → ข้าม
+POST /api/units/sync-caldiscount-sold/apply              # apply { project_id, unit_ids[] }
+                                                            #   set status (sold/transferred) + sale_date + transfer_date + legacy_source='caldiscount'
+                                                            #   skip rows ที่ conflict (re-check ก่อน update กัน race)
+
 ## Unit Types (ประเภทยูนิต — กำหนดเองต่อโครงการ)
 GET    /api/unit-types?project_id=     (รายการประเภทยูนิตของโครงการ)
 POST   /api/unit-types                 (สร้างประเภทใหม่)
