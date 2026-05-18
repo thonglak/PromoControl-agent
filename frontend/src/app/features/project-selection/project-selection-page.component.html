@@ -26,6 +26,21 @@
           }
         </button>
 
+        @if (canCreateProject()) {
+          <!-- เพิ่มโปรเจค: icon-only on mobile, icon+text on sm+ -->
+          <button type="button" (click)="openCreateProject()"
+                  aria-label="เพิ่มโปรเจค"
+                  class="sm:hidden w-9 h-9 flex items-center justify-center border-0 cursor-pointer transition-colors text-white"
+                  style="border-radius: var(--radius-md); background-color: var(--color-primary)">
+            <app-icon name="plus" class="w-5 h-5" />
+          </button>
+          <button mat-flat-button color="primary" (click)="openCreateProject()"
+                  class="hidden sm:inline-flex items-center gap-2">
+            <app-icon name="plus" class="w-4 h-4" />
+            <span>เพิ่มโปรเจค</span>
+          </button>
+        }
+
         <!-- Logout: icon-only on mobile, icon+text on sm+ -->
         <button type="button" (click)="logout()"
                 aria-label="ออกจากระบบ"
@@ -63,8 +78,21 @@
         </div>
         <div>
           <p class="font-medium" style="color: var(--color-gray-700)">ยังไม่มีโครงการที่เข้าถึงได้</p>
-          <p class="text-sm mt-1" style="color: var(--color-gray-500)">กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์เข้าถึงโครงการ</p>
+          <p class="text-sm mt-1" style="color: var(--color-gray-500)">
+            @if (canCreateProject()) {
+              เริ่มต้นโดยการสร้างโครงการใหม่
+            } @else {
+              กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์เข้าถึงโครงการ
+            }
+          </p>
         </div>
+        @if (canCreateProject()) {
+          <button mat-flat-button color="primary" (click)="openCreateProject()"
+                  class="inline-flex items-center gap-2 mt-2">
+            <app-icon name="plus" class="w-4 h-4" />
+            <span>เพิ่มโปรเจค</span>
+          </button>
+        }
       </div>
     } @else {
       <!-- Section title -->
