@@ -61,18 +61,20 @@
     <ng-template matMenuContent>
       <!-- Search (เฉพาะถ้ามีโครงการเกิน 5) -->
       @if (showProjectSearch()) {
-        <div class="px-3 py-2 border-b border-gray-100"
+        <div class="px-3 py-2"
+             style="border-bottom: 1px solid var(--color-border)"
              (click)="$event.stopPropagation()"
              (keydown)="$event.stopPropagation()">
           <div class="relative">
             <app-icon name="magnifying-glass"
-                      class="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                      class="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2"
+                      style="color: var(--color-text-secondary)" />
             <input type="text"
                    [ngModel]="projectSearch()"
                    (ngModelChange)="projectSearch.set($event)"
                    placeholder="ค้นหาโครงการ..."
-                   class="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded-md
-                          focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500" />
+                   class="w-full pl-8 pr-2 py-1.5 text-sm rounded-md focus:outline-none focus:ring-2"
+                   style="background-color: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); --tw-ring-color: var(--color-primary-500)" />
           </div>
         </div>
       }
@@ -80,7 +82,8 @@
       <!-- Project list -->
       <div class="max-h-80 overflow-y-auto py-1">
         @if (filteredProjects().length === 0) {
-          <div class="px-4 py-6 text-center text-sm text-gray-500">
+          <div class="px-4 py-6 text-center text-sm"
+               style="color: var(--color-text-secondary)">
             @if (projectSearch()) {
               ไม่พบโครงการที่ตรงกับ "{{ projectSearch() }}"
             } @else {
@@ -91,26 +94,26 @@
           @for (p of filteredProjects(); track p.id) {
             <button mat-menu-item
                     (click)="switchProject(p)"
-                    [class.bg-primary-100]="isCurrentProject(p)"
-                    class="!h-auto !py-2 !min-h-[3rem]">
+                    class="!h-auto !py-2 !min-h-[3rem]"
+                    [style.background-color]="isCurrentProject(p) ? 'var(--color-primary-subtle)' : null">
               <div class="flex items-center gap-2 w-full">
                 <app-icon
                   [name]="isCurrentProject(p) ? 'check' : 'building-office'"
                   class="w-4 h-4 flex-shrink-0"
-                  [class.text-primary-700]="isCurrentProject(p)"
-                  [class.text-gray-400]="!isCurrentProject(p)" />
+                  [style.color]="isCurrentProject(p) ? 'var(--color-primary-700)' : 'var(--color-text-secondary)'" />
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 truncate leading-tight"
-                     [class.text-primary-900]="isCurrentProject(p)">
+                  <p class="text-sm font-medium truncate leading-tight"
+                     [style.color]="isCurrentProject(p) ? 'var(--color-primary-900)' : 'var(--color-text-primary)'">
                     {{ p.name }}
                   </p>
-                  <p class="text-[11px] font-mono text-gray-500 truncate leading-tight">
+                  <p class="text-[11px] font-mono truncate leading-tight"
+                     style="color: var(--color-text-secondary)">
                     {{ p.code }}
                   </p>
                 </div>
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none flex-shrink-0"
                       [style.background-color]="p.access_level === 'edit' ? 'var(--color-accent-light)' : 'var(--color-neutral-subtle)'"
-                      [style.color]="p.access_level === 'edit' ? 'var(--color-accent-warm)' : 'var(--color-gray-500)'">
+                      [style.color]="p.access_level === 'edit' ? 'var(--color-accent-warm)' : 'var(--color-text-secondary)'">
                   {{ p.access_level === 'edit' ? 'แก้ไขได้' : 'ดูอย่างเดียว' }}
                 </span>
               </div>
@@ -121,7 +124,8 @@
 
       @if (canCreateProject()) {
         <mat-divider />
-        <button mat-menu-item (click)="openCreateProject()" class="!text-primary-700">
+        <button mat-menu-item (click)="openCreateProject()"
+                style="color: var(--color-primary-700)">
           <app-icon name="plus" class="w-4 h-4 mr-2" />
           <span>เพิ่มโปรเจคใหม่</span>
         </button>

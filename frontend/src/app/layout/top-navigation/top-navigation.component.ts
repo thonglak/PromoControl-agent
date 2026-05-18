@@ -84,10 +84,6 @@ export class TopNavigationComponent {
     return name.trim().charAt(0).toUpperCase() || '?';
   });
 
-  openProfile(): void {
-    // TODO: เปิด dialog โปรไฟล์ หรือ navigate ไปหน้า profile
-  }
-
   openChangePassword(): void {
     this.dialog.open(ChangePasswordDialogComponent, {
       width: '420px',

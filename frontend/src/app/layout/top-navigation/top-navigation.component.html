@@ -22,46 +22,40 @@
     }
   </div>
 
-  <!-- ── Font size controls ───────────────────────────────────────────── -->
-  <div class="flex items-center mr-1 flex-shrink-0"
-       style="border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
+  <!-- ── Font size controls (pill) ────────────────────────────────────── -->
+  <div class="flex items-center mr-3 flex-shrink-0 rounded-full overflow-hidden"
+       style="background-color: var(--color-gray-100);">
+    <!-- Decrease (−) -->
     <button
       type="button"
       (click)="fontSize.decrease()"
       [disabled]="!fontSize.canDecrease()"
       matTooltip="ลดขนาดตัวอักษร"
       matTooltipPosition="below"
-      class="w-7 h-7 flex items-center justify-center transition-colors
+      class="w-8 h-7 flex items-center justify-center transition-colors
              border-0 bg-transparent cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-      style="color: var(--color-gray-700)"
-      onmouseover="if(!this.disabled) this.style.backgroundColor='var(--color-gray-100)'"
+      style="color: var(--color-text-primary)"
+      onmouseover="if(!this.disabled) this.style.backgroundColor='var(--color-gray-200)'"
       onmouseout="this.style.backgroundColor='transparent'">
-      <span class="text-base leading-none font-medium">A−</span>
+      <span class="text-lg leading-none font-medium select-none">−</span>
     </button>
-    <button
-      type="button"
-      (click)="fontSize.reset()"
-      matTooltip="คลิกเพื่อรีเซ็ตเป็นขนาดมาตรฐาน"
-      matTooltipPosition="below"
-      class="px-1.5 h-7 flex items-center justify-center transition-colors
-             border-0 bg-transparent cursor-pointer text-[10px] uppercase font-semibold"
-      style="color: var(--color-gray-500); border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border);"
-      onmouseover="this.style.backgroundColor='var(--color-gray-100)'"
-      onmouseout="this.style.backgroundColor='transparent'">
-      {{ fontSize.size() }}
-    </button>
+
+    <!-- Divider -->
+    <span class="block w-px h-3.5 self-center" style="background-color: var(--color-border);"></span>
+
+    <!-- Increase (+) -->
     <button
       type="button"
       (click)="fontSize.increase()"
       [disabled]="!fontSize.canIncrease()"
       matTooltip="เพิ่มขนาดตัวอักษร"
       matTooltipPosition="below"
-      class="w-7 h-7 flex items-center justify-center transition-colors
+      class="w-8 h-7 flex items-center justify-center transition-colors
              border-0 bg-transparent cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-      style="color: var(--color-gray-700)"
-      onmouseover="if(!this.disabled) this.style.backgroundColor='var(--color-gray-100)'"
+      style="color: var(--color-text-primary)"
+      onmouseover="if(!this.disabled) this.style.backgroundColor='var(--color-gray-200)'"
       onmouseout="this.style.backgroundColor='transparent'">
-      <span class="text-base leading-none font-medium">A+</span>
+      <span class="text-lg leading-none font-medium select-none">+</span>
     </button>
   </div>
 
@@ -131,14 +125,6 @@
         {{ currentUser()?.role }}
       </span>
     </div>
-
-    <!-- Profile -->
-    <button mat-menu-item (click)="openProfile()">
-      <div class="flex items-center gap-3">
-        <app-icon name="user-circle" class="w-[18px] h-[18px]" style="color: var(--color-gray-500)" />
-        <span class="text-sm">โปรไฟล์</span>
-      </div>
-    </button>
 
     <!-- Change Password -->
     <button mat-menu-item (click)="openChangePassword()">
