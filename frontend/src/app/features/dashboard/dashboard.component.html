@@ -20,6 +20,13 @@
     </mat-form-field>
   </div>
 
+  <!-- Phase + Legacy warning -->
+  @if (selectedPhaseId() != null && hasLegacy()) {
+    <div class="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-md px-4 py-2">
+      &#9888; ข้อมูลระบบเก่าเป็น project-level — ตัวเลขด้านล่างรวมข้อมูลระบบเก่าทั้งโครงการ ไม่แยกตาม Phase ที่เลือก
+    </div>
+  }
+
   <!-- Loading -->
   @if (loading()) {
     <div class="flex justify-center items-center py-20">
@@ -48,9 +55,17 @@
           <!-- จำนวนยูนิตที่ขายได้ -->
           <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
             <span class="text-body text-gray-700">จำนวนยูนิตที่ขายได้</span>
-            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-              {{ formatInteger(dashboardData()!.sold_units) }}
-            </span>
+            <div class="text-right">
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
+                {{ hasLegacy() ? formatInteger(combinedSoldUnits()) : formatInteger(dashboardData()!.sold_units) }}
+              </span>
+              @if (hasLegacy()) {
+                <span class="text-xs text-gray-500 font-mono tabular-nums">
+                  ระบบเก่า: {{ formatInteger(dashboardData()!.legacy!.sold_units) }} ยูนิต
+                  (ณ {{ dashboardData()!.legacy!.as_of_date | thaiDate:'medium' }})
+                </span>
+              }
+            </div>
           </div>
 
           <div class="border-b border-gray-100 mx-2"></div>
@@ -64,9 +79,17 @@
                 matTooltip="ผลรวมราคาขายสุทธิ (net_price) จากรายการขายที่ active ทั้งหมด"
                 matTooltipPosition="above">info_outline</mat-icon>
             </span>
-            <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-              {{ formatNumber(dashboardData()!.sold_net_price) }}
-            </span>
+            <div class="text-right">
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
+                {{ hasLegacy() ? formatNumber(combinedSoldNetPrice()) : formatNumber(dashboardData()!.sold_net_price) }}
+              </span>
+              @if (hasLegacy()) {
+                <span class="text-xs text-gray-500 font-mono tabular-nums">
+                  ระบบเก่า: ฿{{ formatNumber(dashboardData()!.legacy!.sold_net_price) }}
+                  (ณ {{ dashboardData()!.legacy!.as_of_date | thaiDate:'medium' }})
+                </span>
+              }
+            </div>
           </div>
 
           <div class="border-b border-gray-100 mx-2"></div>
@@ -75,7 +98,7 @@
           <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
             <span class="text-body text-gray-700">ราคาเฉลี่ยต่อยูนิต ที่ขายได้</span>
             <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-              {{ formatNumber(dashboardData()!.avg_price_sold) }}
+              {{ hasLegacy() ? formatNumber(combinedAvgPriceSold()) : formatNumber(dashboardData()!.avg_price_sold) }}
             </span>
           </div>
         </div>
@@ -177,9 +200,17 @@
             <!-- มูลค่าส่วนลดรวม -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าส่วนลดรวมหลังที่ยังไม่ขาย</span>
-              <span class="text-body-lg font-semibold tabular-nums text-discount-color">
-                {{ formatNumber(discountResult()!.total_discount_amount) }}
-              </span>
+              <div class="text-right">
+                <span class="text-body-lg font-semibold tabular-nums text-discount-color block">
+                  {{ hasLegacy() ? formatNumber(combinedTotalDiscountAmount()) : formatNumber(discountResult()!.total_discount_amount) }}
+                </span>
+                @if (hasLegacy()) {
+                  <span class="text-xs text-gray-500 font-mono tabular-nums">
+                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy!.total_discount_amount) }}
+                    (ณ {{ discountResult()!.legacy!.as_of_date | thaiDate:'medium' }})
+                  </span>
+                }
+              </div>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -265,9 +296,17 @@
                   matTooltip="มูลค่าขายสุทธิทั้งโครงการ = ยอดขายจริง + ประมาณการหลังหักส่วนลด"
                   matTooltipPosition="above">info_outline</mat-icon>
               </span>
-              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-                {{ formatNumber(discountResult()!.value_achieved) }}
-              </span>
+              <div class="text-right">
+                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
+                  {{ hasLegacy() ? formatNumber(combinedValueAchieved()) : formatNumber(discountResult()!.value_achieved) }}
+                </span>
+                @if (hasLegacy()) {
+                  <span class="text-xs text-gray-500 font-mono tabular-nums">
+                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy!.value_achieved) }}
+                    (ณ {{ discountResult()!.legacy!.as_of_date | thaiDate:'medium' }})
+                  </span>
+                }
+              </div>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>

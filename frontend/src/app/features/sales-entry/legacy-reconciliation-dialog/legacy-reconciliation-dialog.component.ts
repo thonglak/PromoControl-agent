@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDividerModule } from '@angular/material/divider';
 
 import { CurrencyMaskDirective } from '../../../shared/directives/currency-mask.directive';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
@@ -30,6 +31,7 @@ export interface LegacyReconciliationDialogData {
     MatDatepickerModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    MatDividerModule,
     CurrencyMaskDirective,
     SvgIconComponent,
   ],
@@ -39,7 +41,7 @@ export interface LegacyReconciliationDialogData {
       กระทบยอดระบบเก่า
     </h2>
 
-    <mat-dialog-content style="max-height: 80vh; min-width: 440px">
+    <mat-dialog-content style="max-height: 80vh; min-width: 480px">
       <div class="flex flex-col gap-4 py-2">
 
         <!-- คำอธิบาย -->
@@ -48,6 +50,11 @@ export interface LegacyReconciliationDialogData {
         </div>
 
         <form [formGroup]="form" class="flex flex-col gap-4">
+
+          <!-- ─── Section 1: ค่าสำหรับหน้า รายการขาย ────────────────────── -->
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide -mb-2">
+            ค่าสำหรับหน้า รายการขาย
+          </p>
 
           <!-- งบคงเหลือรวม X (ระบบเก่า) -->
           <mat-form-field appearance="outline" class="w-full">
@@ -72,6 +79,63 @@ export interface LegacyReconciliationDialogData {
             <span matTextPrefix class="text-slate-400 mr-1">฿</span>
             <mat-error>กรุณาระบุกำไร</mat-error>
           </mat-form-field>
+
+          <mat-divider />
+
+          <!-- ─── Section 2: ค่าสำหรับหน้า Dashboard ─────────────────────── -->
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide -mb-2">
+            ค่าสำหรับหน้า Dashboard
+          </p>
+
+          <!-- จำนวนยูนิตที่ขายไปแล้ว (ระบบเก่า) -->
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>จำนวนยูนิตที่ขายไปแล้ว (ระบบเก่า)</mat-label>
+            <input matInput
+                   currencyMask
+                   [options]="{ precision: 0, allowNegative: false }"
+                   formControlName="legacy_sold_units"
+                   class="text-right font-mono tabular-nums" />
+            <mat-hint>จำนวนเต็ม ≥ 0</mat-hint>
+            <mat-error>กรุณาระบุจำนวนยูนิต</mat-error>
+          </mat-form-field>
+
+          <!-- มูลค่าขายสุทธิระบบเก่า -->
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>มูลค่าขายสุทธิระบบเก่า</mat-label>
+            <input matInput
+                   currencyMask
+                   [options]="{ allowNegative: true }"
+                   formControlName="legacy_sold_net_price"
+                   class="text-right font-mono tabular-nums" />
+            <span matTextPrefix class="text-slate-400 mr-1">฿</span>
+            <mat-error>กรุณาระบุมูลค่าขายสุทธิ</mat-error>
+          </mat-form-field>
+
+          <!-- มูลค่าส่วนลดรวมระบบเก่า -->
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>มูลค่าส่วนลดรวมระบบเก่า</mat-label>
+            <input matInput
+                   currencyMask
+                   [options]="{ allowNegative: true }"
+                   formControlName="legacy_total_discount_amount"
+                   class="text-right font-mono tabular-nums" />
+            <span matTextPrefix class="text-slate-400 mr-1">฿</span>
+            <mat-error>กรุณาระบุมูลค่าส่วนลดรวม</mat-error>
+          </mat-form-field>
+
+          <!-- มูลค่าโครงการที่ทำได้ระบบเก่า -->
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>มูลค่าโครงการที่ทำได้ระบบเก่า</mat-label>
+            <input matInput
+                   currencyMask
+                   [options]="{ allowNegative: true }"
+                   formControlName="legacy_value_achieved"
+                   class="text-right font-mono tabular-nums" />
+            <span matTextPrefix class="text-slate-400 mr-1">฿</span>
+            <mat-error>กรุณาระบุมูลค่าโครงการที่ทำได้</mat-error>
+          </mat-form-field>
+
+          <mat-divider />
 
           <!-- ณ วันที่ -->
           <mat-form-field appearance="outline" class="w-full">
@@ -145,6 +209,22 @@ export class LegacyReconciliationDialogComponent {
       this.data.current?.legacy_total_profit ?? null as number | null,
       Validators.required,
     ],
+    legacy_sold_units: [
+      this.data.current?.legacy_sold_units ?? 0,
+      Validators.required,
+    ],
+    legacy_sold_net_price: [
+      this.data.current?.legacy_sold_net_price ?? 0,
+      Validators.required,
+    ],
+    legacy_total_discount_amount: [
+      this.data.current?.legacy_total_discount_amount ?? 0,
+      Validators.required,
+    ],
+    legacy_value_achieved: [
+      this.data.current?.legacy_value_achieved ?? 0,
+      Validators.required,
+    ],
     as_of_date: [
       this.data.current?.as_of_date ? new Date(this.data.current.as_of_date) : null as Date | null,
       Validators.required,
@@ -170,6 +250,10 @@ export class LegacyReconciliationDialogComponent {
     this.legacySvc.save(this.data.projectId, {
       legacy_total_budget_remaining: raw.legacy_total_budget_remaining ?? 0,
       legacy_total_profit: raw.legacy_total_profit ?? 0,
+      legacy_sold_units: raw.legacy_sold_units ?? 0,
+      legacy_sold_net_price: raw.legacy_sold_net_price ?? 0,
+      legacy_total_discount_amount: raw.legacy_total_discount_amount ?? 0,
+      legacy_value_achieved: raw.legacy_value_achieved ?? 0,
       as_of_date: asOfDate,
       note: raw.note || null,
     }).subscribe({
