@@ -15,6 +15,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSelectModule } from '@angular/material/select';
 
 import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dialog.component';
+import { LegacyReconciliationDialogComponent } from '../legacy-reconciliation-dialog/legacy-reconciliation-dialog.component';
 import { SalesEntryService, SalesTransaction } from '../services/sales-entry.service';
 import { ProjectService } from '../../../core/services/project.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -58,6 +59,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     MatProgressSpinnerModule, MatSnackBarModule, MatDialogModule, MatSelectModule,
     SvgIconComponent,
     TableSettingsDialogComponent,
+    LegacyReconciliationDialogComponent,
   ],
   template: `
     <div class="p-6" style="max-width: 1440px; margin: 0 auto;">
@@ -101,26 +103,110 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
           <!-- งบคงเหลือรวม — sum ทุกยูนิต (ไม่รวมยกเลิก) + Pool คงเหลือ -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs font-semibold text-slate-600 mb-2">งบคงเหลือรวม (X)</p>
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-semibold text-slate-600">งบคงเหลือรวม (X)</p>
+              @if (canEdit()) {
+                <button mat-icon-button
+                        class="!w-6 !h-6 !text-slate-400 hover:!text-primary-500"
+                        matTooltip="กระทบยอดระบบเก่า"
+                        (click)="openLegacyDialog()">
+                  <app-icon name="cog" class="w-3.5 h-3.5" />
+                </button>
+              }
+            </div>
             <p class="text-2xl font-bold tabular-nums"
                [class.text-primary-700]="totalRemaining() >= 0"
                [class.text-loss]="totalRemaining() < 0">
               ฿{{ totalRemaining() | number:'1.0-0' }}
             </p>
-            <p class="text-xs text-slate-400 mt-2">
+            <p class="text-xs text-slate-400 mt-1">
               + Pool คงเหลือ: ฿{{ summary()!.pool_budget_remaining | number:'1.0-0' }}
             </p>
+            <!-- กระทบยอดระบบเก่า -->
+            @if (summary()!.legacy) {
+              <div class="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
+                <p class="text-[11px] text-slate-500">
+                  ระบบเก่า:
+                  <span class="font-mono tabular-nums text-slate-700">
+                    ฿{{ summary()!.legacy!.total_budget_remaining | number:'1.0-0' }}
+                  </span>
+                  <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
+                </p>
+                <p class="text-[11px]"
+                   [class.text-emerald-600]="legacyBudgetDiff() === 0"
+                   [class.text-loss]="legacyBudgetDiff() !== 0">
+                  ผลต่าง:
+                  <span class="font-mono tabular-nums">
+                    {{ legacyBudgetDiff() >= 0 ? '+' : '' }}฿{{ legacyBudgetDiff() | number:'1.0-0' }}
+                  </span>
+                  <span class="ml-1">{{ legacyBudgetDiff() === 0 ? '●' : '●' }}</span>
+                </p>
+              </div>
+            } @else {
+              <div class="mt-2 pt-2 border-t border-slate-100">
+                <p class="text-[11px] text-slate-400 italic">ยังไม่ระบุข้อมูลระบบเก่า</p>
+                @if (canEdit()) {
+                  <button type="button"
+                          class="mt-1 text-[11px] text-primary-500 hover:text-primary-700 underline cursor-pointer"
+                          (click)="openLegacyDialog()">
+                    ตั้งค่า
+                  </button>
+                }
+              </div>
+            }
           </div>
 
           <!-- กำไร (Y) — sum คอลัมน์ profit ทุก row ยกเว้นยกเลิก -->
           <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs font-semibold text-slate-600 mb-2">กำไร (Y)</p>
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-semibold text-slate-600">กำไร (Y)</p>
+              @if (canEdit()) {
+                <button mat-icon-button
+                        class="!w-6 !h-6 !text-slate-400 hover:!text-primary-500"
+                        matTooltip="กระทบยอดระบบเก่า"
+                        (click)="openLegacyDialog()">
+                  <app-icon name="cog" class="w-3.5 h-3.5" />
+                </button>
+              }
+            </div>
             <p class="text-2xl font-bold tabular-nums"
                [class.text-profit]="summary()!.total_profit >= 0"
                [class.text-loss]="summary()!.total_profit < 0">
               ฿{{ summary()!.total_profit | number:'1.0-0' }}
             </p>
-            <p class="text-xs text-slate-400 mt-2">รวมจากรายการที่ตรง filter (ไม่รวมยกเลิก)</p>
+            <p class="text-xs text-slate-400 mt-1">รวมจากรายการที่ตรง filter (ไม่รวมยกเลิก)</p>
+            <!-- กระทบยอดระบบเก่า -->
+            @if (summary()!.legacy) {
+              <div class="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
+                <p class="text-[11px] text-slate-500">
+                  ระบบเก่า:
+                  <span class="font-mono tabular-nums text-slate-700">
+                    ฿{{ summary()!.legacy!.total_profit | number:'1.0-0' }}
+                  </span>
+                  <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
+                </p>
+                <p class="text-[11px]"
+                   [class.text-emerald-600]="legacyProfitDiff() === 0"
+                   [class.text-loss]="legacyProfitDiff() !== 0">
+                  ผลต่าง:
+                  <span class="font-mono tabular-nums">
+                    {{ legacyProfitDiff() >= 0 ? '+' : '' }}฿{{ legacyProfitDiff() | number:'1.0-0' }}
+                  </span>
+                  <span class="ml-1">{{ legacyProfitDiff() === 0 ? '●' : '●' }}</span>
+                </p>
+              </div>
+            } @else {
+              <div class="mt-2 pt-2 border-t border-slate-100">
+                <p class="text-[11px] text-slate-400 italic">ยังไม่ระบุข้อมูลระบบเก่า</p>
+                @if (canEdit()) {
+                  <button type="button"
+                          class="mt-1 text-[11px] text-primary-500 hover:text-primary-700 underline cursor-pointer"
+                          (click)="openLegacyDialog()">
+                    ตั้งค่า
+                  </button>
+                }
+              </div>
+            }
           </div>
 
           <!-- งบผู้บริหาร -->
@@ -365,7 +451,23 @@ export class SalesListComponent implements OnInit {
   readonly sortField = signal('st.sale_date');
   readonly sortDir = signal<'ASC' | 'DESC'>('DESC');
   readonly statusFilter = signal('');
-  readonly summary = signal<{ unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number; total_budget_remaining_all_units: number; total_profit: number } | null>(null);
+  readonly summary = signal<{
+    unit_budget_used: number;
+    unit_budget_remaining: number;
+    pool_budget_used: number;
+    pool_budget_remaining: number;
+    management_budget_used: number;
+    management_budget_remaining: number;
+    management_budget_returned: number;
+    total_budget_remaining_all_units: number;
+    total_profit: number;
+    legacy: {
+      total_budget_remaining: number;
+      total_profit: number;
+      as_of_date: string;
+      note: string | null;
+    } | null;
+  } | null>(null);
 
   searchControl = this.fb.control('');
 
@@ -387,6 +489,20 @@ export class SalesListComponent implements OnInit {
     const s = this.summary();
     if (!s) return 0;
     return (s.total_budget_remaining_all_units ?? 0) + (s.pool_budget_remaining ?? 0);
+  });
+
+  /** ผลต่าง งบคงเหลือรวม: ระบบใหม่ - ระบบเก่า */
+  readonly legacyBudgetDiff = computed(() => {
+    const s = this.summary();
+    if (!s?.legacy) return 0;
+    return this.totalRemaining() - s.legacy.total_budget_remaining;
+  });
+
+  /** ผลต่าง กำไร: ระบบใหม่ - ระบบเก่า */
+  readonly legacyProfitDiff = computed(() => {
+    const s = this.summary();
+    if (!s?.legacy) return 0;
+    return s.total_profit - s.legacy.total_profit;
   });
 
   ngOnInit(): void {
@@ -497,6 +613,23 @@ export class SalesListComponent implements OnInit {
     this.statusFilter.set('');
     this.tblCfg.saveFilters(TABLE_ID, {});
     this.loadData();
+  }
+
+  openLegacyDialog(): void {
+    const ref = this.dialog.open(LegacyReconciliationDialogComponent, {
+      data: {
+        projectId: this.projectId(),
+        current: this.summary()?.legacy ?? null,
+        isAdmin: this.auth.currentUser()?.role === 'admin',
+      },
+      width: '500px',
+      maxHeight: '90vh',
+    });
+    ref.afterClosed().subscribe(result => {
+      if (result?.saved || result?.deleted) {
+        this.loadData();
+      }
+    });
   }
 
   openCancelDialog(row: SalesTransaction): void {
