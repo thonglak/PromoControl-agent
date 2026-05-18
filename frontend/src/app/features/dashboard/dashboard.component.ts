@@ -13,6 +13,7 @@ import { DashboardApiService, Phase, DashboardData, DiscountResult } from './das
 import { ProjectService } from '../../core/services/project.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SectionCardComponent } from '../../shared/components/section-card/section-card.component';
+import { ThaiDatePipe } from '../../shared/pipes/thai-date.pipe';
 
 @Component({
   selector: 'app-dashboard',
@@ -22,6 +23,7 @@ import { SectionCardComponent } from '../../shared/components/section-card/secti
     MatSelectModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatTooltipModule, MatProgressSpinnerModule,
     PageHeaderComponent, SectionCardComponent,
+    ThaiDatePipe,
   ],
   templateUrl: './dashboard.component.html',
 })
@@ -40,6 +42,46 @@ export class DashboardComponent implements OnInit {
   calculatingDiscount = signal(false);
 
   projectName = computed(() => this.project.selectedProject()?.name ?? '');
+
+  // ── Legacy computed signals ───────────────────────────────────────────
+
+  /** มีข้อมูลระบบเก่าหรือไม่ */
+  hasLegacy = computed(() => this.dashboardData()?.legacy != null);
+
+  /** จำนวนยูนิตรวม (ระบบเก่า + ระบบใหม่) */
+  combinedSoldUnits = computed(() => {
+    const data = this.dashboardData();
+    if (!data) return 0;
+    return (data.legacy?.sold_units ?? 0) + data.sold_units;
+  });
+
+  /** มูลค่าขายสุทธิรวม (ระบบเก่า + ระบบใหม่) */
+  combinedSoldNetPrice = computed(() => {
+    const data = this.dashboardData();
+    if (!data) return 0;
+    return (data.legacy?.sold_net_price ?? 0) + data.sold_net_price;
+  });
+
+  /** ราคาเฉลี่ยต่อยูนิตรวม คำนวณจาก combined */
+  combinedAvgPriceSold = computed(() => {
+    const units = this.combinedSoldUnits();
+    const net = this.combinedSoldNetPrice();
+    return units > 0 ? net / units : 0;
+  });
+
+  /** มูลค่าส่วนลดรวม (ระบบเก่า + ระบบใหม่) — ดึงจาก discountResult */
+  combinedTotalDiscountAmount = computed(() => {
+    const result = this.discountResult();
+    if (!result) return 0;
+    return (result.legacy?.total_discount_amount ?? 0) + result.total_discount_amount;
+  });
+
+  /** มูลค่าโครงการที่ทำได้รวม (ระบบเก่า + ระบบใหม่) — ดึงจาก discountResult */
+  combinedValueAchieved = computed(() => {
+    const result = this.discountResult();
+    if (!result) return 0;
+    return (result.legacy?.value_achieved ?? 0) + result.value_achieved;
+  });
 
   get projectId(): number {
     const id = this.project.selectedProject()?.id;

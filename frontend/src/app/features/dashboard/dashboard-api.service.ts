@@ -9,6 +9,15 @@ export interface Phase {
   sort_order: number;
 }
 
+export interface LegacyDashboard {
+  sold_units: number;
+  sold_net_price: number;
+  total_discount_amount: number;
+  value_achieved: number;
+  as_of_date: string;     // YYYY-MM-DD
+  note: string | null;
+}
+
 export interface DashboardData {
   sold_units: number;
   sold_net_price: number;
@@ -18,6 +27,7 @@ export interface DashboardData {
   avg_price_remaining: number;
   total_units: number;
   approved_project_value: number;
+  legacy: LegacyDashboard | null;
 }
 
 export interface DiscountResult {
@@ -35,6 +45,7 @@ export interface DiscountResult {
   stock_value: number;
   sold_net_price: number;
   total_units: number;
+  legacy: LegacyDashboard | null;
 }
 
 @Injectable({ providedIn: 'root' })
