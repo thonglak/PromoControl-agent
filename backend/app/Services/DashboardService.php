@@ -34,6 +34,32 @@ class DashboardService
         return (new PhaseModel())->getByProject($projectId);
     }
 
+    // ─── Legacy Reconciliation ────────────────────────────────────────────
+
+    /**
+     * getLegacyData — ดึงข้อมูลกระทบยอดระบบเก่าของโครงการ
+     * คืน null ถ้ายังไม่มีข้อมูล (project-level, ไม่กรองตาม phase)
+     */
+    public function getLegacyData(int $projectId): ?array
+    {
+        $row = $this->db->table('project_legacy_reconciliation')
+            ->where('project_id', $projectId)
+            ->get()->getRowArray();
+
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'sold_units'             => (int) ($row['legacy_sold_units'] ?? 0),
+            'sold_net_price'         => (float) ($row['legacy_sold_net_price'] ?? 0),
+            'total_discount_amount'  => (float) ($row['legacy_total_discount_amount'] ?? 0),
+            'value_achieved'         => (float) ($row['legacy_value_achieved'] ?? 0),
+            'as_of_date'             => $row['as_of_date'],
+            'note'                   => $row['note'],
+        ];
+    }
+
     // ─── Dashboard Summary ────────────────────────────────────────────────
 
     /**

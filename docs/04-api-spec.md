@@ -20,10 +20,20 @@ GET /api/dashboard response:
     "stock_value": 528990000.00,
     "avg_price_remaining": 7148513.51,
     "total_units": 82,
-    "approved_project_value": 584430000.00
+    "approved_project_value": 584430000.00,
+    "legacy": {
+      "sold_units": 30,
+      "sold_net_price": 120000000.00,
+      "total_discount_amount": 5000000.00,
+      "value_achieved": 130000000.00,
+      "as_of_date": "2025-12-31",
+      "note": "ข้อมูล cutoff จากระบบเก่า Q4/2568"
+    }
   }
 }
 ```
+หมายเหตุ: `legacy` = `null` ถ้ายังไม่มีข้อมูลใน `project_legacy_reconciliation`
+`legacy` คือข้อมูล project-level (ไม่กรองตาม phase) — frontend combine เอง
 
 POST /api/dashboard/calculate-discount request:
 ```json
@@ -51,10 +61,19 @@ POST /api/dashboard/calculate-discount response:
     "remaining_units": 74,
     "stock_value": 528990000.00,
     "sold_net_price": 53390600.00,
-    "total_units": 82
+    "total_units": 82,
+    "legacy": {
+      "sold_units": 30,
+      "sold_net_price": 120000000.00,
+      "total_discount_amount": 5000000.00,
+      "value_achieved": 130000000.00,
+      "as_of_date": "2025-12-31",
+      "note": "ข้อมูล cutoff จากระบบเก่า Q4/2568"
+    }
   }
 }
 ```
+หมายเหตุ: `legacy` = `null` ถ้ายังไม่มีข้อมูลใน `project_legacy_reconciliation`
 
 GET /api/phases response:
 ```json
@@ -114,6 +133,10 @@ Response 200 (มีข้อมูล):
     "project_id": "1",
     "legacy_total_budget_remaining": 12345678.00,
     "legacy_total_profit": 3456789.00,
+    "legacy_sold_units": 30,
+    "legacy_sold_net_price": 120000000.00,
+    "legacy_total_discount_amount": 5000000.00,
+    "legacy_value_achieved": 130000000.00,
     "as_of_date": "2025-12-31",
     "note": "ข้อมูล cutoff จากระบบเก่า Q4/2568",
     "updated_at": "2026-05-18 10:00:00",
@@ -131,6 +154,10 @@ Body:
 {
   "legacy_total_budget_remaining": 12345678.00,
   "legacy_total_profit": 3456789.00,
+  "legacy_sold_units": 30,
+  "legacy_sold_net_price": 120000000.00,
+  "legacy_total_discount_amount": 5000000.00,
+  "legacy_value_achieved": 130000000.00,
   "as_of_date": "2025-12-31",
   "note": "..."
 }
@@ -139,6 +166,10 @@ Body:
 Validation:
 - `legacy_total_budget_remaining` (DECIMAL) — บังคับ, อนุญาตติดลบ
 - `legacy_total_profit` (DECIMAL) — บังคับ, อนุญาตติดลบ
+- `legacy_sold_units` (INT) — optional, จำนวนเต็ม >= 0 (default 0)
+- `legacy_sold_net_price` (DECIMAL) — optional, อนุญาตติดลบ (default 0)
+- `legacy_total_discount_amount` (DECIMAL) — optional, อนุญาตติดลบ (default 0)
+- `legacy_value_achieved` (DECIMAL) — optional, อนุญาตติดลบ (default 0)
 - `as_of_date` (DATE, YYYY-MM-DD) — บังคับ
 - `note` (TEXT) — optional, ≤ 1000 ตัวอักษร
 

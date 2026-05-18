@@ -25,6 +25,10 @@ class ProjectLegacyReconciliationModel extends Model
         'project_id',
         'legacy_total_budget_remaining',
         'legacy_total_profit',
+        'legacy_sold_units',
+        'legacy_sold_net_price',
+        'legacy_total_discount_amount',
+        'legacy_value_achieved',
         'as_of_date',
         'note',
         'created_by',
@@ -61,15 +65,19 @@ class ProjectLegacyReconciliationModel extends Model
         if ($existing === 0) {
             // INSERT
             return $this->insert([
-                'project_id'                   => $projectId,
+                'project_id'                    => $projectId,
                 'legacy_total_budget_remaining' => $data['legacy_total_budget_remaining'],
                 'legacy_total_profit'           => $data['legacy_total_profit'],
-                'as_of_date'                   => $data['as_of_date'],
-                'note'                         => $data['note'] ?? null,
-                'created_by'                   => $userId,
-                'created_at'                   => $now,
-                'updated_by'                   => $userId,
-                'updated_at'                   => $now,
+                'legacy_sold_units'             => $data['legacy_sold_units'] ?? 0,
+                'legacy_sold_net_price'         => $data['legacy_sold_net_price'] ?? 0,
+                'legacy_total_discount_amount'  => $data['legacy_total_discount_amount'] ?? 0,
+                'legacy_value_achieved'         => $data['legacy_value_achieved'] ?? 0,
+                'as_of_date'                    => $data['as_of_date'],
+                'note'                          => $data['note'] ?? null,
+                'created_by'                    => $userId,
+                'created_at'                    => $now,
+                'updated_by'                    => $userId,
+                'updated_at'                    => $now,
             ]) !== false;
         }
 
@@ -77,10 +85,14 @@ class ProjectLegacyReconciliationModel extends Model
         return $this->where('project_id', $projectId)->set([
             'legacy_total_budget_remaining' => $data['legacy_total_budget_remaining'],
             'legacy_total_profit'           => $data['legacy_total_profit'],
-            'as_of_date'                   => $data['as_of_date'],
-            'note'                         => $data['note'] ?? null,
-            'updated_by'                   => $userId,
-            'updated_at'                   => $now,
+            'legacy_sold_units'             => $data['legacy_sold_units'] ?? 0,
+            'legacy_sold_net_price'         => $data['legacy_sold_net_price'] ?? 0,
+            'legacy_total_discount_amount'  => $data['legacy_total_discount_amount'] ?? 0,
+            'legacy_value_achieved'         => $data['legacy_value_achieved'] ?? 0,
+            'as_of_date'                    => $data['as_of_date'],
+            'note'                          => $data['note'] ?? null,
+            'updated_by'                    => $userId,
+            'updated_at'                    => $now,
         ])->update();
     }
 

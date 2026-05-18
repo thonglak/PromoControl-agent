@@ -45,7 +45,8 @@ class DashboardController extends BaseController
         $phaseParam = $this->request->getGet('phase');
         $phaseId = $phaseParam !== null && $phaseParam !== '' ? (int) $phaseParam : null;
 
-        $data = $this->svc->getSalesDashboard($projectId, $phaseId);
+        $data           = $this->svc->getSalesDashboard($projectId, $phaseId);
+        $data['legacy'] = $this->svc->getLegacyData($projectId);
 
         return $this->response->setJSON(['data' => $data]);
     }
@@ -75,7 +76,8 @@ class DashboardController extends BaseController
             return $this->response->setStatusCode(400)->setJSON(['error' => 'ส่วนลดต้องมีค่ามากกว่าหรือเท่ากับ 0']);
         }
 
-        $data = $this->svc->calculateDiscount($projectId, $phaseId, $discount);
+        $data           = $this->svc->calculateDiscount($projectId, $phaseId, $discount);
+        $data['legacy'] = $this->svc->getLegacyData($projectId);
 
         return $this->response->setJSON(['data' => $data]);
     }
