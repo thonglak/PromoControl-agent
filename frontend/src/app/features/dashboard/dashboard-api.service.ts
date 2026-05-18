@@ -26,6 +26,12 @@ export interface DashboardData {
   avg_price_remaining: number;
   total_units: number;
   approved_project_value: number;
+  /** true = user กรอกใน projects.approved_project_value (Section 4 ไม่ต้องบวก legacy units อีก) */
+  approved_from_user_input: boolean;
+  /** จำนวน unit ที่ flag legacy_source (caldiscount) — ใช้คำนวณ combined ใน Section 4 */
+  legacy_unit_count: number;
+  /** SUM(unit_cost) ของ legacy units — ใช้รวมกับ approved_project_value */
+  legacy_unit_cost_sum: number;
   legacy: LegacyDashboard | null;
 }
 
@@ -37,6 +43,7 @@ export interface DiscountResult {
   project_net_sales: number;
   avg_price_project: number;
   approved_project_value: number;
+  approved_from_user_input: boolean;
   value_achieved: number;
   value_difference: number;
   difference_percent: number;
@@ -44,6 +51,8 @@ export interface DiscountResult {
   stock_value: number;
   sold_net_price: number;
   total_units: number;
+  legacy_unit_count: number;
+  legacy_unit_cost_sum: number;
   legacy: LegacyDashboard | null;
 }
 

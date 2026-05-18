@@ -100,6 +100,53 @@ export class DashboardComponent {
     return (result.legacy?.value_achieved ?? 0) + result.value_achieved;
   });
 
+  // ── Section 4 (สรุปการขาย ทั้งโครงการ) combined ─────────────────────────
+  // legacy_unit_count + legacy_unit_base_price_sum มาจาก project_units ที่ flag = caldiscount
+  // (ราย unit จริง) ต่างจาก legacy aggregate (projects.legacy_*) ที่ user กรอกเองเป็น aggregate
+
+  /** จำนวนยูนิตทั้งโครงการ = ระบบใหม่ + caldiscount units */
+  combinedTotalUnits = computed(() => {
+    const r = this.discountResult();
+    if (!r) return 0;
+    return r.total_units + (r.legacy_unit_count ?? 0);
+  });
+
+  /** มูลค่าโครงการที่อนุมัติ — ถ้า user กรอกเองใน projects → ใช้ค่าตรง (สมมุติรวมแล้ว)
+   *  ไม่งั้น approved (SUM unit_cost ระบบใหม่) + unit_cost ของ caldiscount units */
+  combinedApprovedProjectValue = computed(() => {
+    const r = this.discountResult();
+    if (!r) return 0;
+    if (r.approved_from_user_input) return r.approved_project_value;
+    return r.approved_project_value + (r.legacy_unit_cost_sum ?? 0);
+  });
+
+  /** มูลค่าขายสุทธิทั้งโครงการ = project_net_sales (new) + legacy aggregate sold_net_price */
+  combinedProjectNetSales = computed(() => {
+    const r = this.discountResult();
+    if (!r) return 0;
+    return r.project_net_sales + (r.legacy?.sold_net_price ?? 0);
+  });
+
+  /** ราคาเฉลี่ย/ยูนิต ทั้งโครงการ — combined sales / combined units */
+  combinedAvgPriceProject = computed(() => {
+    const units = this.combinedTotalUnits();
+    return units > 0 ? this.combinedProjectNetSales() / units : 0;
+  });
+
+  /** มูลค่าส่วนต่าง = achieved (combined) − approved (combined) */
+  combinedValueDifference = computed(() => {
+    return this.combinedValueAchieved() - this.combinedApprovedProjectValue();
+  });
+
+  /** % ส่วนต่าง = diff / approved (combined) × 100 */
+  combinedDifferencePercent = computed(() => {
+    const approved = this.combinedApprovedProjectValue();
+    return approved > 0 ? (this.combinedValueDifference() / approved) * 100 : 0;
+  });
+
+  /** มีข้อมูล legacy unit (caldiscount sync) — ใช้แสดง breakdown */
+  hasLegacyUnits = computed(() => (this.dashboardData()?.legacy_unit_count ?? 0) > 0);
+
   get projectId(): number {
     const id = this.project.selectedProject()?.id;
     return id ? Number(id) : 0;

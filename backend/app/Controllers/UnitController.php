@@ -486,11 +486,11 @@ class UnitController extends BaseController
         ];
 
         $optionals = ['floor', 'building', 'land_area_sqw', 'unit_type_id', 'house_model_id',
-                      'appraisal_price', 'customer_name', 'salesperson',
+                      'phase_id', 'appraisal_price', 'customer_name', 'salesperson',
                       'sale_date', 'transfer_date', 'remark', 'status', 'legacy_source'];
 
         // ฟิลด์ที่อนุญาตให้เป็น null (FK ที่ไม่บังคับ + flag ระบบเก่า)
-        $nullableFields = ['house_model_id', 'legacy_source'];
+        $nullableFields = ['house_model_id', 'phase_id', 'legacy_source'];
 
         foreach ($optionals as $field) {
             if (array_key_exists($field, $body)) {

@@ -13,6 +13,8 @@ export interface Project {
   approval_required: boolean | number;
   allow_over_budget: boolean | number;
   pool_budget_amount: number;
+  /** มูลค่าโครงการที่อนุมัติ — ถ้า null/0 Dashboard fallback SUM(base_price) */
+  approved_project_value?: number | null;
   common_fee_rate?: number;
   electric_meter_fee?: number;
   water_meter_fee?: number;
@@ -33,6 +35,7 @@ export interface ProjectCreatePayload {
   approval_required?: boolean;
   allow_over_budget?: boolean;
   pool_budget_amount?: number;
+  approved_project_value?: number | null;
   common_fee_rate?: number;
   electric_meter_fee?: number;
   water_meter_fee?: number;
@@ -51,6 +54,7 @@ export interface ProjectUpdatePayload {
   approval_required?: boolean;
   allow_over_budget?: boolean;
   pool_budget_amount?: number;
+  approved_project_value?: number | null;
   common_fee_rate?: number;
   electric_meter_fee?: number;
   water_meter_fee?: number;

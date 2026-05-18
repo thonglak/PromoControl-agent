@@ -89,28 +89,49 @@ class DashboardService
     public function getSalesDashboard(int $projectId, ?int $phaseId = null): array
     {
         // === จำนวนยูนิตแยกตามกลุ่ม ===
-        $soldUnits      = $this->countUnits($projectId, $phaseId, ['sold', 'transferred']);
+        // sold_units / total_units / approved_project_value → exclude legacy_source
+        // เพราะตัวเลขเหล่านี้จะถูกบวกกับ aggregate ของระบบเก่า (projects.legacy_sold_units ฯลฯ)
+        // ใน frontend combinedX → ถ้านับ legacy units ที่นี่ด้วยจะซ้ำ
+        $soldUnits      = $this->countUnits($projectId, $phaseId, ['sold', 'transferred'], true);
         $remainingUnits = $this->countUnits($projectId, $phaseId, ['available', 'reserved']);
-        $totalUnits     = $this->countUnits($projectId, $phaseId);
+        $totalUnits     = $this->countUnits($projectId, $phaseId, null, true);
 
         // === มูลค่าขายสุทธิ (จาก active transactions) ===
+        // sales_transactions ไม่มี legacy entries (sync caldiscount จะ skip ยูนิตที่มี active tx)
         $soldNetPrice = $this->sumSalesNetPrice($projectId, $phaseId);
 
         // === มูลค่า stock ที่เหลือ (SUM base_price ของ unit ที่ยังไม่ขาย) ===
         $stockValue = $this->sumBasePrice($projectId, $phaseId, ['available', 'reserved']);
 
-        // === มูลค่าโครงการที่อนุมัติ = SUM(base_price) ทุก unit ===
-        $approvedProjectValue = $this->sumBasePrice($projectId, $phaseId);
+        // === มูลค่าโครงการที่อนุมัติ ===
+        // ถ้า user กรอกใน projects.approved_project_value > 0 → ใช้ override + ไม่บวก legacy ที่ frontend
+        // ถ้า NULL/0 → fallback SUM(unit_cost) ของระบบใหม่ + frontend บวก legacy_unit_cost_sum
+        $project = $this->db->table('projects')
+            ->select('approved_project_value')
+            ->where('id', $projectId)
+            ->get()->getRowArray();
+        $userApproved = $project['approved_project_value'] ?? null;
+        $approvedFromUserInput = $userApproved !== null && (float) $userApproved > 0;
+        $approvedProjectValue = $approvedFromUserInput
+            ? (float) $userApproved
+            : $this->sumUnitCost($projectId, $phaseId, null, true);
+
+        // === Legacy units stats (ราย unit ที่ flag legacy_source = caldiscount) ===
+        // ใช้ frontend คำนวณ combined ใน Section 4 "สรุปทั้งโครงการ"
+        $legacyUnitStats = $this->getLegacyUnitStats($projectId, $phaseId);
 
         return [
-            'sold_units'              => $soldUnits,
-            'sold_net_price'          => $soldNetPrice,
-            'avg_price_sold'          => $soldUnits > 0 ? round($soldNetPrice / $soldUnits, 2) : 0,
-            'remaining_units'         => $remainingUnits,
-            'stock_value'             => $stockValue,
-            'avg_price_remaining'     => $remainingUnits > 0 ? round($stockValue / $remainingUnits, 2) : 0,
-            'total_units'             => $totalUnits,
-            'approved_project_value'  => $approvedProjectValue,
+            'sold_units'                  => $soldUnits,
+            'sold_net_price'              => $soldNetPrice,
+            'avg_price_sold'              => $soldUnits > 0 ? round($soldNetPrice / $soldUnits, 2) : 0,
+            'remaining_units'             => $remainingUnits,
+            'stock_value'                 => $stockValue,
+            'avg_price_remaining'         => $remainingUnits > 0 ? round($stockValue / $remainingUnits, 2) : 0,
+            'total_units'                 => $totalUnits,
+            'approved_project_value'      => $approvedProjectValue,
+            'approved_from_user_input'    => $approvedFromUserInput,
+            'legacy_unit_count'           => $legacyUnitStats['count'],
+            'legacy_unit_cost_sum'        => $legacyUnitStats['cost_sum'],
         ];
     }
 
@@ -144,31 +165,84 @@ class DashboardService
 
         return [
             // Section 3 ขวา — มูลค่าประมาณการ
-            'net_after_discount'      => round($netAfterDiscount, 2),
-            'avg_after_discount'      => $avgAfterDiscount,
-            'total_discount_amount'   => round($totalDiscountAmount, 2),
-            'discount_percent'        => $discountPercent,
-            // Section 4 — สรุปทั้งโครงการ
-            'project_net_sales'       => round($projectNetSales, 2),
-            'avg_price_project'       => $avgPriceProject,
-            'approved_project_value'  => $approvedProjectValue,
-            'value_achieved'          => round($valueAchieved, 2),
-            'value_difference'        => round($valueDifference, 2),
-            'difference_percent'      => $differencePercent,
+            'net_after_discount'         => round($netAfterDiscount, 2),
+            'avg_after_discount'         => $avgAfterDiscount,
+            'total_discount_amount'      => round($totalDiscountAmount, 2),
+            'discount_percent'           => $discountPercent,
+            // Section 4 — สรุปทั้งโครงการ (ค่า "ระบบใหม่ล้วน" — frontend คำนวณ combined เอง)
+            'project_net_sales'          => round($projectNetSales, 2),
+            'avg_price_project'          => $avgPriceProject,
+            'approved_project_value'     => $approvedProjectValue,
+            'approved_from_user_input'   => $dashboard['approved_from_user_input'],
+            'value_achieved'             => round($valueAchieved, 2),
+            'value_difference'           => round($valueDifference, 2),
+            'difference_percent'         => $differencePercent,
             // echo back สำหรับ frontend
-            'remaining_units'         => $remainingUnits,
-            'stock_value'             => $stockValue,
-            'sold_net_price'          => $soldNetPrice,
-            'total_units'             => $totalUnits,
+            'remaining_units'            => $remainingUnits,
+            'stock_value'                => $stockValue,
+            'sold_net_price'             => $soldNetPrice,
+            'total_units'                => $totalUnits,
+            // legacy unit stats — ส่งต่อให้ frontend ใช้คำนวณ combined ใน Section 4
+            'legacy_unit_count'          => $dashboard['legacy_unit_count'],
+            'legacy_unit_cost_sum'       => $dashboard['legacy_unit_cost_sum'],
         ];
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────
 
     /**
-     * นับจำนวน unit ตาม status (ถ้าไม่ระบุ = นับทั้งหมด)
+     * Stats ของ unit ที่ flag legacy_source (เช่น caldiscount) — สำหรับ Section 4 combined
+     * cost_sum = SUM(unit_cost) ใช้รวมกับ approved_project_value (= ต้นทุนรวม)
      */
-    private function countUnits(int $projectId, ?int $phaseId, ?array $statuses = null): int
+    private function getLegacyUnitStats(int $projectId, ?int $phaseId): array
+    {
+        $builder = $this->db->table('project_units')
+            ->where('project_id', $projectId)
+            ->where('legacy_source IS NOT NULL', null, false);
+
+        if ($phaseId !== null) {
+            $builder->where('phase_id', $phaseId);
+        }
+
+        $row = $builder->select('COUNT(*) AS cnt, COALESCE(SUM(unit_cost), 0) AS cost_sum')
+            ->get()->getRowArray();
+
+        return [
+            'count'    => (int) ($row['cnt'] ?? 0),
+            'cost_sum' => (float) ($row['cost_sum'] ?? 0),
+        ];
+    }
+
+    /**
+     * SUM(unit_cost) ของ unit ตาม status (ใช้กับ approved_project_value)
+     * $excludeLegacy = true → ข้าม unit ที่ flag legacy_source
+     */
+    private function sumUnitCost(int $projectId, ?int $phaseId, ?array $statuses = null, bool $excludeLegacy = false): float
+    {
+        $builder = $this->db->table('project_units')
+            ->selectSum('unit_cost', 'total')
+            ->where('project_id', $projectId);
+
+        if ($phaseId !== null) {
+            $builder->where('phase_id', $phaseId);
+        }
+
+        if ($statuses !== null) {
+            $builder->whereIn('status', $statuses);
+        }
+
+        if ($excludeLegacy) {
+            $builder->where('legacy_source IS NULL', null, false);
+        }
+
+        return (float) ($builder->get()->getRowArray()['total'] ?? 0);
+    }
+
+    /**
+     * นับจำนวน unit ตาม status (ถ้าไม่ระบุ = นับทั้งหมด)
+     * $excludeLegacy = true → ข้าม unit ที่ flag legacy_source (เช่น caldiscount)
+     */
+    private function countUnits(int $projectId, ?int $phaseId, ?array $statuses = null, bool $excludeLegacy = false): int
     {
         $builder = $this->db->table('project_units')
             ->where('project_id', $projectId);
@@ -181,13 +255,18 @@ class DashboardService
             $builder->whereIn('status', $statuses);
         }
 
+        if ($excludeLegacy) {
+            $builder->where('legacy_source IS NULL', null, false);
+        }
+
         return (int) $builder->countAllResults();
     }
 
     /**
      * SUM(base_price) ของ unit ตาม status (ถ้าไม่ระบุ = ทุก unit)
+     * $excludeLegacy = true → ข้าม unit ที่ flag legacy_source
      */
-    private function sumBasePrice(int $projectId, ?int $phaseId, ?array $statuses = null): float
+    private function sumBasePrice(int $projectId, ?int $phaseId, ?array $statuses = null, bool $excludeLegacy = false): float
     {
         $builder = $this->db->table('project_units')
             ->selectSum('base_price', 'total')
@@ -199,6 +278,10 @@ class DashboardService
 
         if ($statuses !== null) {
             $builder->whereIn('status', $statuses);
+        }
+
+        if ($excludeLegacy) {
+            $builder->where('legacy_source IS NULL', null, false);
         }
 
         return (float) ($builder->get()->getRowArray()['total'] ?? 0);

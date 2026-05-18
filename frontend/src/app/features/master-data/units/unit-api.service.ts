@@ -6,6 +6,8 @@ import { map } from 'rxjs/operators';
 export interface Unit {
   id: number;
   project_id: number;
+  phase_id?: number | null;
+  phase_name?: string | null;
   house_model_id?: number | null;
   house_model_code?: string | null;
   house_model_name?: string | null;
@@ -31,6 +33,7 @@ export interface Unit {
 
 export interface UnitPayload {
   project_id?: number;
+  phase_id?: number | null;
   house_model_id?: number | null;
   unit_code: string;
   unit_number?: string | null;

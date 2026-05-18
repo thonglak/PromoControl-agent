@@ -14,6 +14,7 @@ import { CurrencyMaskDirective } from '../../../../shared/directives/currency-ma
 import { UnitApiService, Unit, UnitPayload } from '../unit-api.service';
 import { HouseModelApiService, HouseModel } from '../../house-models/house-model-api.service';
 import { UnitTypeApiService, UnitType } from '../unit-type-api.service';
+import { PhaseApiService, Phase } from '../../phases/phase-api.service';
 import { UnitTypeDialogComponent } from '../unit-type-dialog/unit-type-dialog.component';
 
 export interface UnitFormDialogData {
@@ -52,7 +53,17 @@ export interface UnitFormDialogData {
           <input matInput formControlName="unit_number">
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="sm:col-span-2">
+        <mat-form-field appearance="outline">
+          <mat-label>Phase</mat-label>
+          <mat-select formControlName="phase_id">
+            <mat-option [value]="null">— ไม่ระบุ —</mat-option>
+            @for (p of phases(); track p.id) {
+              <mat-option [value]="p.id">{{ p.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
           <mat-label>แบบบ้าน (ไม่บังคับ)</mat-label>
           <mat-select formControlName="house_model_id" (selectionChange)="onModelChange($event.value)">
             <mat-option [value]="null">— ไม่ระบุ —</mat-option>
@@ -180,7 +191,9 @@ export class UnitFormDialogComponent implements OnInit {
   private api      = inject(UnitApiService);
   private modelApi = inject(HouseModelApiService);
   private unitTypeApi = inject(UnitTypeApiService);
+  private phaseApi = inject(PhaseApiService);
   unitTypes = signal<UnitType[]>([]);
+  phases    = signal<Phase[]>([]);
   private fb       = inject(FormBuilder);
 
   saving      = signal(false);
@@ -190,6 +203,7 @@ export class UnitFormDialogComponent implements OnInit {
   form = this.fb.group({
     unit_code:       [this.data.unit?.unit_code ?? '', Validators.required],
     unit_number:     [this.data.unit?.unit_number ?? ''],
+    phase_id:        [this.data.unit?.phase_id ?? null],
     house_model_id:  [this.data.unit?.house_model_id ?? null],
     building:        [this.data.unit?.building ?? ''],
     floor:           [this.data.unit?.floor ?? null],
@@ -208,6 +222,9 @@ export class UnitFormDialogComponent implements OnInit {
     this.modelApi.getList(this.data.projectId).subscribe({
       next: models => this.houseModels.set(models),
     });
+    this.phaseApi.getAll(this.data.projectId).subscribe({
+      next: list => this.phases.set(list),
+    });
   }
 
   onModelChange(_modelId: number | null): void {
@@ -222,6 +239,7 @@ export class UnitFormDialogComponent implements OnInit {
     const v = this.form.value;
     const payload: UnitPayload = {
       project_id:      this.data.projectId,
+      phase_id:        v.phase_id ?? null,
       house_model_id:  v.house_model_id ?? null,
       unit_code:       v.unit_code!,
       unit_number:     v.unit_number || null,

@@ -252,9 +252,16 @@
             <!-- จำนวนยูนิตทั้งโครงการ -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">จำนวนยูนิตทั้งโครงการ</span>
-              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-                {{ formatInteger(discountResult()!.total_units) }}
-              </span>
+              <div class="text-right">
+                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
+                  {{ hasLegacyUnits() ? formatInteger(combinedTotalUnits()) : formatInteger(discountResult()!.total_units) }}
+                </span>
+                @if (hasLegacyUnits()) {
+                  <span class="text-xs text-gray-500 font-mono tabular-nums">
+                    ระบบเก่า: {{ formatInteger(discountResult()!.legacy_unit_count) }} ยูนิต
+                  </span>
+                }
+              </div>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -262,9 +269,16 @@
             <!-- มูลค่าขายสุทธิทั้งโครงการ -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าขายสุทธิทั้งโครงการ</span>
-              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-                {{ formatNumber(discountResult()!.project_net_sales) }}
-              </span>
+              <div class="text-right">
+                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
+                  {{ hasLegacy() ? formatNumber(combinedProjectNetSales()) : formatNumber(discountResult()!.project_net_sales) }}
+                </span>
+                @if (hasLegacy()) {
+                  <span class="text-xs text-gray-500 font-mono tabular-nums">
+                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy!.sold_net_price) }}
+                  </span>
+                }
+              </div>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -273,7 +287,7 @@
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">ราคาเฉลี่ยต่อยูนิต ทั้งโครงการ</span>
               <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-                {{ formatNumber(discountResult()!.avg_price_project) }}
+                {{ (hasLegacyUnits() || hasLegacy()) ? formatNumber(combinedAvgPriceProject()) : formatNumber(discountResult()!.avg_price_project) }}
               </span>
             </div>
           </div>
@@ -283,9 +297,16 @@
             <!-- มูลค่าโครงการที่อนุมัติ -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าโครงการที่อนุมัติ</span>
-              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
-                {{ formatNumber(discountResult()!.approved_project_value) }}
-              </span>
+              <div class="text-right">
+                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
+                  {{ hasLegacyUnits() ? formatNumber(combinedApprovedProjectValue()) : formatNumber(discountResult()!.approved_project_value) }}
+                </span>
+                @if (hasLegacyUnits()) {
+                  <span class="text-xs text-gray-500 font-mono tabular-nums">
+                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy_unit_cost_sum) }}
+                  </span>
+                }
+              </div>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -318,10 +339,11 @@
             <!-- มูลค่าส่วนต่าง -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าส่วนต่าง</span>
+              @let valDiff = (hasLegacyUnits() || hasLegacy()) ? combinedValueDifference() : discountResult()!.value_difference;
               <span class="text-body-lg font-semibold tabular-nums"
-                    [class.text-profit]="discountResult()!.value_difference >= 0"
-                    [class.text-loss]="discountResult()!.value_difference < 0">
-                {{ formatNumber(discountResult()!.value_difference) }}
+                    [class.text-profit]="valDiff >= 0"
+                    [class.text-loss]="valDiff < 0">
+                {{ formatNumber(valDiff) }}
               </span>
             </div>
 
@@ -330,10 +352,11 @@
             <!-- % ส่วนต่าง -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">% ส่วนต่าง</span>
+              @let diffPct = (hasLegacyUnits() || hasLegacy()) ? combinedDifferencePercent() : discountResult()!.difference_percent;
               <span class="text-body-lg font-semibold tabular-nums"
-                    [class.text-profit]="discountResult()!.difference_percent >= 0"
-                    [class.text-loss]="discountResult()!.difference_percent < 0">
-                {{ formatNumber(discountResult()!.difference_percent) }}
+                    [class.text-profit]="diffPct >= 0"
+                    [class.text-loss]="diffPct < 0">
+                {{ formatNumber(diffPct) }}
               </span>
             </div>
           </div>

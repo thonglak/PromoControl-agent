@@ -11,7 +11,7 @@ class UnitModel extends Model
     protected $returnType = 'array';
 
     protected $allowedFields = [
-        'project_id', 'house_model_id', 'unit_code', 'unit_number',
+        'project_id', 'phase_id', 'house_model_id', 'unit_code', 'unit_number',
         'floor', 'building', 'unit_type_id',
         'base_price', 'unit_cost', 'appraisal_price', 'standard_budget',
         'status', 'legacy_source', 'sale_date', 'transfer_date', 'remark',

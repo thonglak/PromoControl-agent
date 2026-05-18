@@ -104,6 +104,17 @@ export interface ProjectFormDialogData {
           }
         </mat-form-field>
 
+        <!-- Approved project value -->
+        <mat-form-field appearance="outline">
+          <mat-label>มูลค่าโครงการที่อนุมัติ (บาท)</mat-label>
+          <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
+          <input matInput currencyMask formControlName="approved_project_value" placeholder="0">
+          <mat-hint>ปล่อยว่างหรือ 0 = ใช้ผลรวม base_price ของยูนิตอัตโนมัติ</mat-hint>
+          @if (form.get('approved_project_value')?.hasError('min')) {
+            <mat-error>มูลค่าโครงการที่อนุมัติต้องไม่ติดลบ</mat-error>
+          }
+        </mat-form-field>
+
         <!-- Common fee rate -->
         <mat-form-field appearance="outline">
           <mat-label>อัตราค่าส่วนกลาง</mat-label>
@@ -276,6 +287,7 @@ export class ProjectFormDialogComponent {
     status:       [this.data.project?.status ?? 'active'],
     location:     [this.data.project?.location ?? ''],
     pool_budget_amount:  [this.data.project?.pool_budget_amount ?? 0, Validators.min(0)],
+    approved_project_value: [this.data.project?.approved_project_value ?? null, Validators.min(0)],
     common_fee_rate:     [this.data.project?.common_fee_rate ?? 0, Validators.min(0)],
     electric_meter_fee:  [this.data.project?.electric_meter_fee ?? 0, Validators.min(0)],
     water_meter_fee:     [this.data.project?.water_meter_fee ?? 0, Validators.min(0)],
@@ -322,6 +334,7 @@ export class ProjectFormDialogComponent {
           project_type:       val.project_type!,
           location:           val.location || undefined,
           pool_budget_amount: val.pool_budget_amount ?? 0,
+          approved_project_value: val.approved_project_value ?? null,
           common_fee_rate:    val.common_fee_rate ?? 0,
           electric_meter_fee: val.electric_meter_fee ?? 0,
           water_meter_fee:    val.water_meter_fee ?? 0,
@@ -339,6 +352,7 @@ export class ProjectFormDialogComponent {
           status:             val.status!,
           location:           val.location || undefined,
           pool_budget_amount: val.pool_budget_amount ?? 0,
+          approved_project_value: val.approved_project_value ?? null,
           common_fee_rate:    val.common_fee_rate ?? 0,
           electric_meter_fee: val.electric_meter_fee ?? 0,
           water_meter_fee:    val.water_meter_fee ?? 0,
