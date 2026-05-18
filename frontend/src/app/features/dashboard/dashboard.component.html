@@ -74,10 +74,11 @@
           <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
             <span class="text-body text-gray-700 flex items-center gap-1">
               มูลค่าขายสุทธิที่ขายได้
-              <mat-icon
-                class="text-base text-gray-400 cursor-help"
+              <app-icon
+                name="information-circle"
+                class="w-4 h-4 text-gray-400 cursor-help"
                 matTooltip="ผลรวมราคาขายสุทธิ (net_price) จากรายการขายที่ active ทั้งหมด"
-                matTooltipPosition="above">info_outline</mat-icon>
+                matTooltipPosition="above" />
             </span>
             <div class="text-right">
               <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
@@ -148,11 +149,12 @@
         <div class="flex flex-col gap-4">
           <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
             <mat-label>จำนวนส่วนลด (บาท/ยูนิต)</mat-label>
+            <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
             <input matInput
-                   type="number"
-                   min="0"
+                   currencyMask
+                   [options]="{ allowNegative: false }"
                    [ngModel]="discountInput()"
-                   (ngModelChange)="discountInput.set($event)"
+                   (ngModelChange)="discountInput.set($event ?? 0)"
                    placeholder="0"
                    (keyup.enter)="onCalculateDiscount()">
           </mat-form-field>
@@ -219,10 +221,11 @@
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700 flex items-center gap-1">
                 % ส่วนลด
-                <mat-icon
-                  class="text-base text-gray-400 cursor-help"
+                <app-icon
+                  name="information-circle"
+                  class="w-4 h-4 text-gray-400 cursor-help"
                   matTooltip="มูลค่าส่วนลดรวม / มูลค่าสุทธิที่เหลือ × 100"
-                  matTooltipPosition="above">info_outline</mat-icon>
+                  matTooltipPosition="above" />
               </span>
               <span class="text-body-lg font-semibold tabular-nums text-discount-color">
                 {{ formatNumber(discountResult()!.discount_percent) }}
@@ -291,10 +294,11 @@
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700 flex items-center gap-1">
                 มูลค่าโครงการที่ทำได้
-                <mat-icon
-                  class="text-base text-gray-400 cursor-help"
+                <app-icon
+                  name="information-circle"
+                  class="w-4 h-4 text-gray-400 cursor-help"
                   matTooltip="มูลค่าขายสุทธิทั้งโครงการ = ยอดขายจริง + ประมาณการหลังหักส่วนลด"
-                  matTooltipPosition="above">info_outline</mat-icon>
+                  matTooltipPosition="above" />
               </span>
               <div class="text-right">
                 <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
