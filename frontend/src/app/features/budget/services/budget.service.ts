@@ -76,6 +76,8 @@ export interface UnitBudgetSettingRow {
   unit_code: string;
   house_model_id: number | null;
   house_model_name: string | null;
+  unit_cost: number;
+  base_price: number;
   current_budget: number;
   calculated_budget: number;
   diff: number;

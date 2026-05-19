@@ -181,6 +181,40 @@ type DiffFilter = 'all' | 'changed' | 'increase' | 'decrease' | 'unchanged';
                 </td>
               </ng-container>
 
+              <ng-container matColumnDef="unit_cost">
+                <th mat-header-cell *matHeaderCellDef class="num-th" matTooltip="ราคาทุนต่อยูนิต (project_units.unit_cost)">ราคาทุน</th>
+                <td mat-cell *matCellDef="let row" class="num">
+                  @if (row.unit_cost > 0) {
+                    {{ row.unit_cost | number }}
+                  } @else {
+                    <span style="color: var(--color-gray-400)">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="base_price">
+                <th mat-header-cell *matHeaderCellDef class="num-th" matTooltip="ราคาขายฐาน (project_units.base_price)">ราคาขาย</th>
+                <td mat-cell *matCellDef="let row" class="num">
+                  @if (row.base_price > 0) {
+                    {{ row.base_price | number }}
+                  } @else {
+                    <span style="color: var(--color-gray-400)">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="cost_diff">
+                <th mat-header-cell *matHeaderCellDef class="num-th" matTooltip="ราคาขาย − ราคาทุน (ส่วนต่างกำไรขั้นต้น)">ส่วนต่าง</th>
+                <td mat-cell *matCellDef="let row" class="num font-semibold"
+                    [style.color]="matchColor(row)">
+                  @if (row.unit_cost > 0 && row.base_price > 0) {
+                    {{ (row.base_price - row.unit_cost) | number }}
+                  } @else {
+                    <span style="color: var(--color-gray-400); font-weight: 400">—</span>
+                  }
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="current_budget">
                 <th mat-header-cell *matHeaderCellDef class="num-th">งบเดิม</th>
                 <td mat-cell *matCellDef="let row" class="num">{{ row.current_budget | number }}</td>
@@ -188,7 +222,8 @@ type DiffFilter = 'all' | 'changed' | 'increase' | 'decrease' | 'unchanged';
 
               <ng-container matColumnDef="calculated_budget">
                 <th mat-header-cell *matHeaderCellDef class="num-th">งบที่คำนวณได้</th>
-                <td mat-cell *matCellDef="let row" class="num font-semibold" style="color: var(--color-primary)">
+                <td mat-cell *matCellDef="let row" class="num font-semibold"
+                    [style.color]="matchColor(row)">
                   {{ row.calculated_budget | number }}
                 </td>
               </ng-container>
@@ -331,6 +366,7 @@ export class UnitBudgetSettingsComponent implements OnInit {
 
   readonly displayedColumns = [
     'select', 'unit_code', 'house_model', 'item_count',
+    'unit_cost', 'base_price', 'cost_diff',
     'current_budget', 'calculated_budget', 'diff', 'actions',
   ];
 
@@ -443,6 +479,19 @@ export class UnitBudgetSettingsComponent implements OnInit {
       list.forEach(r => next.delete(r.unit_id));
     }
     this.selectedIds.set(next);
+  }
+
+  /**
+   * สีของคอลัมน์ "ส่วนต่าง" และ "งบที่คำนวณได้" — ใช้ตรวจสอบความถูกต้อง
+   *  - เขียว เมื่อ (base_price − unit_cost) == calculated_budget (epsilon 0.01 บาท)
+   *  - แดง เมื่อไม่เท่ากัน
+   *  - เทา เมื่อ unit_cost หรือ base_price ยังไม่ใส่ (= 0) เพราะเทียบไม่ได้
+   */
+  matchColor(row: UnitBudgetSettingRow): string {
+    if (row.unit_cost <= 0 || row.base_price <= 0) return 'var(--color-text-secondary)';
+    const margin = row.base_price - row.unit_cost;
+    const equal = Math.abs(margin - row.calculated_budget) < 0.01;
+    return equal ? 'var(--color-success)' : 'var(--color-loss, #d32f2f)';
   }
 
   diffBarPct(row: UnitBudgetSettingRow): number {

@@ -35,6 +35,7 @@ class UnitBudgetSettingsService
      *
      * @return array<int, array{
      *   unit_id:int, unit_code:string, house_model_id:?int, house_model_name:?string,
+     *   unit_cost:float, base_price:float,
      *   current_budget:float, calculated_budget:float, diff:float,
      *   item_count:int, items:array<int, array{id:int, code:string, name:string, value:float}>
      * }>
@@ -43,7 +44,7 @@ class UnitBudgetSettingsService
     {
         // 1. ดึงยูนิต status=available ของโครงการ
         $units = $this->db->table('project_units pu')
-            ->select('pu.id, pu.unit_code, pu.house_model_id, pu.standard_budget, hm.name as house_model_name')
+            ->select('pu.id, pu.unit_code, pu.house_model_id, pu.unit_cost, pu.base_price, pu.standard_budget, hm.name as house_model_name')
             ->join('house_models hm', 'hm.id = pu.house_model_id', 'left')
             ->where('pu.project_id', $projectId)
             ->where('pu.status', 'available')
@@ -70,6 +71,8 @@ class UnitBudgetSettingsService
                 'unit_code'         => $u['unit_code'],
                 'house_model_id'    => $u['house_model_id'] !== null ? (int) $u['house_model_id'] : null,
                 'house_model_name'  => $u['house_model_name'],
+                'unit_cost'         => (float) $u['unit_cost'],
+                'base_price'        => (float) $u['base_price'],
                 'current_budget'    => (float) $u['standard_budget'],
                 'calculated_budget' => 0.0,
                 'diff'              => 0.0 - (float) $u['standard_budget'],
@@ -143,6 +146,8 @@ class UnitBudgetSettingsService
                 'unit_code'         => $u['unit_code'],
                 'house_model_id'    => $hmId,
                 'house_model_name'  => $u['house_model_name'],
+                'unit_cost'         => (float) $u['unit_cost'],
+                'base_price'        => (float) $u['base_price'],
                 'current_budget'    => $current,
                 'calculated_budget' => $sum,
                 'diff'              => $sum - $current,
