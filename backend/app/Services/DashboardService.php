@@ -96,7 +96,8 @@ class DashboardService
         $remainingUnits = $this->countUnits($projectId, $phaseId, ['available', 'reserved']);
         $totalUnits     = $this->countUnits($projectId, $phaseId, null, true);
 
-        // === มูลค่าขายสุทธิ (จาก active transactions) ===
+        // === มูลค่าขายสุทธิหลังของแถม (จาก active transactions) ===
+        // = SUM(net_price - total_promo_burden) → ตัวเลขเดียวกับคอลัมน์ "สุทธิหลังของแถม" ในรายงาน Sales
         // sales_transactions ไม่มี legacy entries (sync caldiscount จะ skip ยูนิตที่มี active tx)
         $soldNetPrice = $this->sumSalesNetPrice($projectId, $phaseId);
 
@@ -288,12 +289,14 @@ class DashboardService
     }
 
     /**
-     * SUM(net_price) จาก active sales_transactions (JOIN ผ่าน project_units เพื่อ filter phase)
+     * SUM(net_price - total_promo_burden) จาก active sales_transactions
+     * = ผลรวม "สุทธิหลังหักของแถม" (เทียบเท่า net_after_promo ในรายงาน Sales)
+     * JOIN ผ่าน project_units เพื่อ filter phase
      */
     private function sumSalesNetPrice(int $projectId, ?int $phaseId): float
     {
         $builder = $this->db->table('sales_transactions st')
-            ->select('COALESCE(SUM(st.net_price), 0) AS total')
+            ->select('COALESCE(SUM(st.net_price - st.total_promo_burden), 0) AS total')
             ->where('st.project_id', $projectId)
             ->where('st.status', 'active');
 

@@ -36,6 +36,11 @@ GET /api/dashboard response:
 `legacy` คือข้อมูล project-level (ไม่กรองตาม phase) — frontend combine เอง
 ไม่มี `note` ใน legacy ของ Dashboard — note อยู่ใน `/api/projects/{id}/legacy-reconciliation` เท่านั้น
 
+**นิยาม `sold_net_price` (ระบบใหม่)** = `SUM(net_price − total_promo_burden)` ของ `sales_transactions` ที่ `status='active'`
+= ผลรวม "สุทธิหลังหักของแถม" (เทียบเท่าคอลัมน์ `net_after_promo` ในรายงาน Sales)
+→ มีผลต่อเนื่อง: `avg_price_sold = sold_net_price / sold_units` และ `project_net_sales = sold_net_price + net_after_discount` (Section 4) ใช้ค่านี้เช่นกัน
+หมายเหตุ: `legacy.sold_net_price` ยังคงเป็นค่าที่ user กรอกใน `projects.legacy_sold_net_price` ตามเดิม (ระบบเก่าไม่มี breakdown ของแถม)
+
 POST /api/dashboard/calculate-discount request:
 ```json
 {
