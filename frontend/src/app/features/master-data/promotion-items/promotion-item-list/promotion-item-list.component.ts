@@ -89,6 +89,20 @@ export class PromotionItemListComponent implements OnInit {
   dataSource = new MatTableDataSource<PromotionItem>([]);
   loading    = signal(false);
 
+  // signal สะท้อนแถวที่ผ่าน filter ปัจจุบัน — ใช้ขับ summary cards ให้ reactive
+  filteredRows = signal<PromotionItem[]>([]);
+
+  summary = computed(() => {
+    const rows = this.filteredRows();
+    let usedTotal = 0;
+    let maxTotal = 0;
+    for (const r of rows) {
+      if (r.default_used_value != null) usedTotal += Number(r.default_used_value);
+      if (r.max_value != null)          maxTotal  += Number(r.max_value);
+    }
+    return { count: rows.length, usedTotal, maxTotal };
+  });
+
   canWrite = computed(() => this.project.canEdit());
   projectId = computed(() => Number(this.project.selectedProject()?.id ?? 0));
 
@@ -143,6 +157,7 @@ export class PromotionItemListComponent implements OnInit {
       is_active: v.is_active ?? '',
     });
     this.dataSource.paginator?.firstPage();
+    this.filteredRows.set(this.dataSource.filteredData ?? []);
     const sortState = this.sortRef ? { sortActive: this.sortRef.active, sortDirection: this.sortRef.direction } : {};
     this.tblCfg.saveFilters(TABLE_ID, { ...v, ...sortState });
   }
