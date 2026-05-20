@@ -251,6 +251,27 @@ POST   /api/bottom-line-mappings
 PUT    /api/bottom-line-mappings/{id}
 DELETE /api/bottom-line-mappings/{id}
 
+## Premium Import (นำเข้าของแถมจากไฟล์ Premium.xlsx ลง staging)
+POST /api/premium-imports/upload         (upload Excel → parse ทุกชีต → return preview + temp_file) — role: admin, manager
+POST /api/premium-imports/import         (ยืนยัน → เขียนลง staging 1 batch/ชีต) — role: admin, manager
+POST /api/premium-imports/{id}/validate  (จับคู่ staging กับ DB จริง → status=validated) — role: admin, manager
+POST /api/premium-imports/{id}/sync      (เขียนลง project_units + promotion → status=synced) — role: admin, manager
+GET  /api/premium-imports                (ประวัติ batch ทั้งหมด, filter ?project_id=)
+GET  /api/premium-imports/{id}           (รายละเอียด batch พร้อม units[] + premiums[] ต่อ unit)
+
+หมายเหตุ:
+- 1 ชีต = 1 โครงการ — จับคู่ projects.code จากช่อง "โครงการ" ในชีต
+- คอลัมน์ของแถมไม่คงที่ → เก็บแบบ long-format; หมวด: discount / premium / expense_support
+- import = staging เท่านั้น (premium_import_batches/_units/_values) ยังไม่แตะ project_units
+- body ของ /import: `{ temp_file, sheet_names?: string[], file_name? }` (sheet_names ว่าง = ทุกชีต)
+
+flow: import (pending) → validate (validated) → sync (synced)
+- validate: จับคู่ plot_no↔project_units.unit_number, house_model_code↔house_models.code,
+  premium_label↔promotion_item_master.name — เติม matched_* ใน staging (อ่านอย่างเดียวจาก DB จริง)
+- sync: เขียน bottom_line_price→project_units.unit_cost, land_area_sqw→project_units.land_area_sqw,
+  จำนวนเงินของแถม→promotion_item_unit_values (upsert); sync เฉพาะ unit ที่ match_status=matched
+- premium_label ที่ยังไม่มี → auto-create promotion_item_master (value_mode=fixed, default_value=0)
+
 ## Promotion Items (แยกตามโครงการ — ต้อง filter project_id เสมอ)
 GET    /api/promotion-items?project_id=  (รายการทั้งหมดของโครงการที่เลือก พร้อม eligibility: eligible_house_models[], eligible_units[], sort_order, eligible_start_date, eligible_end_date)
 GET    /api/promotion-items/{id}         (รายละเอียดรายการ พร้อม eligibility — ต้องตรวจว่า item อยู่ในโครงการที่เลือก)

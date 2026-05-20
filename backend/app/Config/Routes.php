@@ -222,7 +222,19 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->put('(:num)',     'BottomLineMappingController::update/$1');
         $routes->delete('(:num)',  'BottomLineMappingController::delete/$1');
     });
-    
+
+    // Premium Import (นำเข้าของแถมจากไฟล์ Premium.xlsx ลง staging)
+    $routes->group('premium-imports', static function (RouteCollection $routes): void {
+        $routes->get('/',        'PremiumImportController::index');
+        $routes->get('(:num)',   'PremiumImportController::show/$1');
+    });
+    $routes->group('premium-imports', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
+        $routes->post('upload',          'PremiumImportController::upload');
+        $routes->post('import',          'PremiumImportController::import');
+        $routes->post('(:num)/validate', 'PremiumImportController::validateImport/$1');
+        $routes->post('(:num)/sync',     'PremiumImportController::sync/$1');
+    });
+
     // Number Series (เลขที่เอกสาร)
     $routes->group('number-series', static function (RouteCollection $routes): void {
         $routes->get('/',              'NumberSeriesController::index');
