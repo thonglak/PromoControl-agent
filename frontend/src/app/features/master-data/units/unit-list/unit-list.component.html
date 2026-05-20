@@ -213,10 +213,10 @@
           สถานะ: {{ statusLabel(filterForm.get("status")!.value!) }}
         </span>
       }
-      @if (sortRef.active) {
+      @if (sortRef?.active) {
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
           <app-icon name="arrows-up-down" class="w-3 h-3" />
-          เรียงตาม {{ sortRef.active }}
+          เรียงตาม {{ sortRef?.active }}
         </span>
       }
       <button type="button" (click)="resetAll()"
