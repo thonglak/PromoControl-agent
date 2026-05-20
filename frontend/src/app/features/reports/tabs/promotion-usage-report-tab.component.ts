@@ -27,6 +27,42 @@ import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.c
     MatProgressSpinnerModule, SvgIconComponent,
   ],
   template: `
+    <!-- Summary Bar -->
+    @if (report()) {
+      <div class="mb-4 bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div class="flex flex-wrap sm:flex-nowrap sm:divide-x sm:divide-slate-100">
+
+          <!-- จำนวนครั้งที่ใช้ -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">จำนวนครั้งที่ใช้</span>
+            <div class="flex items-baseline gap-1 mt-1.5">
+              <span class="text-sm font-semibold tabular-nums text-slate-800">{{ report()!.summary.total_items_used | number:'1.0-0' }}</span>
+              <span class="text-xs text-slate-400">ครั้ง</span>
+            </div>
+          </div>
+
+          <!-- มูลค่าส่วนลดรวม -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-slate-100 sm:border-b-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">มูลค่าส่วนลดรวม</span>
+            <span class="text-sm font-semibold tabular-nums text-red-600 mt-1.5">฿{{ report()!.summary.total_discount_amount | number:'1.0-0' }}</span>
+          </div>
+
+          <!-- มูลค่าของแถมรวม -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-r border-slate-100 sm:border-r-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">มูลค่าของแถมรวม</span>
+            <span class="text-sm font-semibold tabular-nums text-slate-800 mt-1.5">฿{{ report()!.summary.total_premium_amount | number:'1.0-0' }}</span>
+          </div>
+
+          <!-- มูลค่าแปลงเป็นส่วนลด -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">มูลค่าแปลงเป็นส่วนลด</span>
+            <span class="text-sm font-semibold tabular-nums text-red-600 mt-1.5">฿{{ report()!.summary.total_converted_to_discount | number:'1.0-0' }}</span>
+          </div>
+
+        </div>
+      </div>
+    }
+
     <!-- Filter bar -->
     <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
       <form [formGroup]="filterForm" class="flex flex-wrap gap-3 items-end">
@@ -61,33 +97,7 @@ import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.c
       </form>
     </div>
 
-    <!-- Summary cards -->
     @if (report()) {
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">จำนวนครั้งที่ใช้</p>
-          <p class="text-xl font-bold text-slate-800">{{ report()!.summary.total_items_used | number:'1.0-0' }}</p>
-        </div>
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">มูลค่าส่วนลดรวม</p>
-          <p class="text-xl font-bold" style="color: var(--color-warning)">
-            {{ '\u0E3F' }}{{ report()!.summary.total_discount_amount | number:'1.0-0' }}
-          </p>
-        </div>
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">มูลค่าของแถมรวม</p>
-          <p class="text-xl font-bold" style="color: var(--color-primary)">
-            {{ '\u0E3F' }}{{ report()!.summary.total_premium_amount | number:'1.0-0' }}
-          </p>
-        </div>
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">มูลค่าแปลงเป็นส่วนลด</p>
-          <p class="text-xl font-bold" style="color: var(--color-loss)">
-            {{ '\u0E3F' }}{{ report()!.summary.total_converted_to_discount | number:'1.0-0' }}
-          </p>
-        </div>
-      </div>
-
       <!-- Top Used Items - horizontal bar chart -->
       @if (topItems().length > 0) {
         <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">

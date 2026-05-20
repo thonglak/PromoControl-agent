@@ -32,6 +32,58 @@ import { ThaiDatePipe } from '../../../shared/pipes/thai-date.pipe';
     MatProgressSpinnerModule, SvgIconComponent,
   ],
   template: `
+    <!-- Summary Bar -->
+    @if (report()) {
+      <div class="mb-4 bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div class="flex flex-wrap sm:flex-nowrap sm:divide-x sm:divide-slate-100">
+
+          <!-- ยอดขายรวม -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ยอดขายรวม</span>
+            <span class="text-sm font-semibold tabular-nums text-slate-800 mt-1.5">฿{{ report()!.summary.total_base_price | number:'1.0-0' }}</span>
+            <span class="text-[10px] text-slate-400 leading-none mt-0.5">{{ report()!.summary.total_transactions_active }} รายการ (ปกติ)</span>
+          </div>
+
+          <!-- ส่วนลดรวม -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-slate-100 sm:border-b-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ส่วนลดรวม</span>
+            <span class="text-sm font-semibold tabular-nums text-red-600 mt-1.5">฿{{ report()!.summary.total_discount | number:'1.0-0' }}</span>
+          </div>
+
+          <!-- ราคาสุทธิรวม -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ราคาสุทธิรวม</span>
+            <span class="text-sm font-semibold tabular-nums text-slate-800 mt-1.5">฿{{ report()!.summary.total_net_price | number:'1.0-0' }}</span>
+          </div>
+
+          <!-- ต้นทุนจากของแถม -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-slate-100 sm:border-b-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ต้นทุนจากของแถม</span>
+            <span class="text-sm font-semibold tabular-nums text-red-600 mt-1.5">฿{{ report()!.summary.total_promo_burden | number:'1.0-0' }}</span>
+          </div>
+
+          <!-- กำไรรวม -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-r border-slate-100 sm:border-r-0">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">กำไรรวม</span>
+            <span class="text-sm font-semibold tabular-nums mt-1.5"
+                  [class.text-green-600]="report()!.summary.total_profit > 0"
+                  [class.text-red-600]="report()!.summary.total_profit <= 0">฿{{ report()!.summary.total_profit | number:'1.0-0' }}</span>
+            <span class="text-[10px] text-slate-400 leading-none mt-0.5">เฉลี่ย {{ report()!.summary.avg_profit_margin_percent | number:'1.1-1' }}%</span>
+          </div>
+
+          <!-- งบผู้บริหารคงเหลือ -->
+          <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5">
+            <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบผู้บริหารคงเหลือ</span>
+            <span class="text-sm font-semibold tabular-nums mt-1.5"
+                  [class.text-blue-600]="report()!.summary.management_budget_remaining > 0"
+                  [class.text-red-600]="report()!.summary.management_budget_remaining <= 0">฿{{ report()!.summary.management_budget_remaining | number:'1.0-0' }}</span>
+            <span class="text-[10px] text-slate-400 leading-none mt-0.5">ยอด ณ ปัจจุบัน</span>
+          </div>
+
+        </div>
+      </div>
+    }
+
     <!-- Filter bar -->
     <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
       <form [formGroup]="filterForm" class="flex flex-wrap gap-3 items-end">
@@ -80,59 +132,6 @@ import { ThaiDatePipe } from '../../../shared/pipes/thai-date.pipe';
         </button>
       </form>
     </div>
-
-    <!-- Summary cards -->
-    @if (report()) {
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
-        <!-- ยอดขายรวม -->
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">ยอดขายรวม</p>
-          <p class="text-xl font-bold" style="color: var(--color-primary)">
-            {{ '\u0E3F' }}{{ report()!.summary.total_base_price | number:'1.0-0' }}
-          </p>
-          <p class="text-xs text-slate-400 mt-1">{{ report()!.summary.total_transactions_active }} รายการ (ปกติ)</p>
-        </div>
-        <!-- ส่วนลดรวม -->
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">ส่วนลดรวม</p>
-          <p class="text-xl font-bold" style="color: var(--color-warning)">
-            {{ '\u0E3F' }}{{ report()!.summary.total_discount | number:'1.0-0' }}
-          </p>
-        </div>
-        <!-- ราคาสุทธิรวม -->
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">ราคาสุทธิรวม</p>
-          <p class="text-xl font-bold" style="color: var(--color-primary)">
-            {{ '\u0E3F' }}{{ report()!.summary.total_net_price | number:'1.0-0' }}
-          </p>
-        </div>
-        <!-- ต้นทุนจากของแถม -->
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">ต้นทุนจากของแถม</p>
-          <p class="text-xl font-bold" style="color: var(--color-loss)">
-            {{ '\u0E3F' }}{{ report()!.summary.total_promo_burden | number:'1.0-0' }}
-          </p>
-        </div>
-        <!-- กำไรรวม -->
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">กำไรรวม</p>
-          <p class="text-xl font-bold"
-             [style.color]="report()!.summary.total_profit > 0 ? 'var(--color-profit)' : 'var(--color-loss)'">
-            {{ '\u0E3F' }}{{ report()!.summary.total_profit | number:'1.0-0' }}
-          </p>
-          <p class="text-xs text-slate-400 mt-1">เฉลี่ย {{ report()!.summary.avg_profit_margin_percent | number:'1.1-1' }}%</p>
-        </div>
-        <!-- งบผู้บริหารคงเหลือ -->
-        <div class="section-card">
-          <p class="text-xs text-slate-500 mb-1">งบผู้บริหารคงเหลือ</p>
-          <p class="text-xl font-bold"
-             [style.color]="report()!.summary.management_budget_remaining > 0 ? 'var(--color-primary)' : 'var(--color-loss)'">
-            {{ '฿' }}{{ report()!.summary.management_budget_remaining | number:'1.0-0' }}
-          </p>
-          <p class="text-xs text-slate-400 mt-1">ยอด ณ ปัจจุบัน</p>
-        </div>
-      </div>
-    }
 
     <!-- Data table -->
     <div class="bg-white rounded-lg border border-slate-200 overflow-hidden relative">

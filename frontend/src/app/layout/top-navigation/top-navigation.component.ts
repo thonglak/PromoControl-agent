@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, inject, computed } from '@angular/core';
-import { Router, NavigationEnd } from '@angular/router';
+import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs/operators';
 import { MatMenuModule } from '@angular/material/menu';
@@ -42,7 +42,7 @@ const ROUTE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-top-navigation',
   standalone: true,
-  imports: [MatMenuModule, MatDividerModule, MatDialogModule, MatTooltipModule, SvgIconComponent],
+  imports: [RouterLink, MatMenuModule, MatDividerModule, MatDialogModule, MatTooltipModule, SvgIconComponent],
   templateUrl: './top-navigation.component.html',
   host: { class: 'block flex-shrink-0' },
 })
@@ -77,6 +77,11 @@ export class TopNavigationComponent {
     }
     return '';
   });
+
+  /** เมนูลัด "บันทึกขาย" — แสดงเฉพาะ role ที่บันทึกขายได้ (ตรงกับสิทธิ์ route /sales) */
+  readonly canCreateSale = computed(() =>
+    ['admin', 'manager', 'sales'].includes(this.currentUser()?.role ?? '')
+  );
 
   /** อักษรย่อ (initials) สำหรับ avatar */
   readonly initials = computed(() => {

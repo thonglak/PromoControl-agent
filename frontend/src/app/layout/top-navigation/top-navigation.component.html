@@ -22,6 +22,22 @@
     }
   </div>
 
+  <!-- ── Quick action: บันทึกขาย ──────────────────────────────────────── -->
+  @if (canCreateSale()) {
+    <a
+      routerLink="/sales"
+      matTooltip="บันทึกการขายใหม่"
+      matTooltipPosition="below"
+      class="flex items-center gap-1.5 h-8 px-3 mr-3 flex-shrink-0 no-underline
+             transition-colors cursor-pointer"
+      style="border-radius: var(--radius-md); background-color: var(--color-primary); color: #fff"
+      onmouseover="this.style.backgroundColor='var(--color-primary-700)'"
+      onmouseout="this.style.backgroundColor='var(--color-primary)'">
+      <app-icon name="plus" class="w-4 h-4" />
+      <span class="text-sm font-medium hidden sm:inline">บันทึกขาย</span>
+    </a>
+  }
+
   <!-- ── Font size controls (pill) ────────────────────────────────────── -->
   <div class="flex items-center mr-3 flex-shrink-0 rounded-full overflow-hidden"
        style="background-color: var(--color-gray-100);">
