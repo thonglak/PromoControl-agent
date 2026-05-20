@@ -257,6 +257,7 @@ POST /api/premium-imports/import         (ยืนยัน → เขียน
 POST /api/premium-imports/{id}/validate  (จับคู่ staging กับ DB จริง → status=validated) — role: admin, manager
 POST /api/premium-imports/{id}/sync      (เขียนลง project_units + promotion → status=synced) — role: admin, manager
 GET  /api/premium-imports                (ประวัติ batch ทั้งหมด, filter ?project_id=)
+GET  /api/premium-imports/sample         (ดาวน์โหลดไฟล์ Excel ตัวอย่างสำหรับนำเข้า — .xlsx พร้อมชีตคำอธิบาย)
 GET  /api/premium-imports/{id}           (รายละเอียด batch พร้อม units[] + premiums[] ต่อ unit)
 
 หมายเหตุ:

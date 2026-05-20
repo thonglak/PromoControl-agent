@@ -270,4 +270,99 @@ class PremiumImportController extends BaseController
 
         return $this->response->setStatusCode(200)->setJSON($batch);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GET /api/premium-imports/sample — ดาวน์โหลดไฟล์ Excel ตัวอย่าง
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function downloadSample(): ResponseInterface
+    {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('โครงการตัวอย่าง');
+
+        // เน้นหัวตาราง: ตัวหนา + พื้นเทาอ่อน
+        $emphasize = static function (string $cell) use ($sheet): void {
+            $sheet->getStyle($cell)->getFont()->setBold(true);
+            $sheet->getStyle($cell)->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('E2E8F0');
+        };
+
+        // แถวบนสุด: ช่อง "โครงการ" + รหัสโครงการ (ช่องถัดไป) — แก้เป็นรหัสจริงก่อนนำเข้า
+        $sheet->setCellValue('A1', 'โครงการ');
+        $sheet->setCellValue('B1', 'P001');
+        $emphasize('A1');
+
+        // หัวตารางชั้นบน (แถว 3)
+        foreach (['A3' => 'ลำดับ', 'B3' => 'เลขแปลง', 'C3' => 'เนื้อที่ดิน',
+                  'D3' => 'แบบบ้าน', 'E3' => 'ราคา', 'F3' => 'Premium'] as $cell => $val) {
+            $sheet->setCellValue($cell, $val);
+            $emphasize($cell);
+        }
+
+        // หัวตารางชั้นล่าง (แถว 4): "Bottom Line" ใต้คอลัมน์ราคา + ชื่อของแถมแต่ละรายการ
+        // ชื่อของแถมถูกจัดหมวดอัตโนมัติ: มีคำว่า "ลด" → discount, "ฟรี/คชจ/ค่าใช้จ่าย" → expense_support, อื่นๆ → premium
+        foreach (['E4' => 'Bottom Line', 'F4' => 'แอร์ปรับอากาศ',
+                  'G4' => 'ส่วนลดเงินสด', 'H4' => 'ฟรีค่าส่วนกลาง 1 ปี'] as $cell => $val) {
+            $sheet->setCellValue($cell, $val);
+            $emphasize($cell);
+        }
+
+        // ข้อมูลตัวอย่าง: ลำดับ, เลขแปลง, เนื้อที่ดิน, แบบบ้าน, ราคา, แอร์, ส่วนลด, ฟรีค่าส่วนกลาง
+        $samples = [
+            [1, 'A-101', 50.5, 'TYPE-A', 2500000, 40000, 0,      12000],
+            [2, 'A-102', 52.0, 'TYPE-A', 2600000, 40000, 50000,  12000],
+            [3, 'B-201', 60.0, 'TYPE-B', 3200000, 45000, 0,      12000],
+            [4, 'B-202', 61.5, 'TYPE-B', 3300000, 45000, 100000, 12000],
+        ];
+        $row = 5;
+        foreach ($samples as $d) {
+            foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as $i => $col) {
+                $sheet->setCellValue($col . $row, $d[$i]);
+            }
+            foreach (['C', 'E', 'F', 'G', 'H'] as $col) {
+                $sheet->getStyle($col . $row)->getNumberFormat()->setFormatCode('#,##0');
+            }
+            $row++;
+        }
+
+        foreach (['A' => 8, 'B' => 12, 'C' => 12, 'D' => 14,
+                  'E' => 14, 'F' => 16, 'G' => 16, 'H' => 20] as $col => $width) {
+            $sheet->getColumnDimension($col)->setWidth($width);
+        }
+
+        // คำอธิบายการใช้งาน — วางใต้ตารางข้อมูลในชีตเดียวกัน
+        // หมายเหตุ: ห้ามแยกเป็นชีตใหม่ เพราะระบบถือว่า 1 ชีต = 1 โครงการ และจะอ่านหัวตาราง
+        //          ทุกชีต — ชีตที่ไม่มีหัวตาราง ("ลำดับ") จะทำให้ import ล้มเหลว
+        //          แถวคำอธิบายไม่มี "เลขแปลง" จึงถูกข้ามอัตโนมัติตอนนำเข้า
+        $notes = [
+            'คำอธิบาย (แถวด้านล่างนี้จะถูกข้ามตอนนำเข้า เพราะไม่มีเลขแปลง):',
+            '- ช่อง "โครงการ" (B1): แก้ P001 เป็นรหัสโครงการจริงในระบบก่อนนำเข้า',
+            '- คอลัมน์ของแถม = คอลัมน์ขวาของ "ราคา" — ตั้งชื่อที่แถวหัวตารางชั้นล่าง',
+            '- หมวดจัดอัตโนมัติจากชื่อ: มี "ลด" = ส่วนลด, "ฟรี/คชจ/ค่าใช้จ่าย" = สนับสนุนค่าใช้จ่าย, นอกนั้น = ของแถม',
+            '- "เลขแปลง" ต้องตรงกับยูนิตในระบบ — แถวที่เลขแปลงว่างจะถูกข้าม',
+            '- จำนวนเงินของแถมใส่เป็นตัวเลข, 0 = แปลงนั้นไม่มีของแถมรายการนั้น',
+            '- นำเข้าหลายโครงการได้โดยเพิ่มชีต (1 ชีต = 1 โครงการ) — ทุกชีตต้องมีหัวตารางแบบนี้',
+        ];
+        $noteRow = $row + 1; // เว้น 1 แถวใต้ข้อมูล
+        foreach ($notes as $line) {
+            $sheet->setCellValue('A' . $noteRow, $line);
+            $noteRow++;
+        }
+        $sheet->getStyle('A' . ($row + 1))->getFont()->setBold(true)->setItalic(true);
+        $sheet->getStyle('A' . ($row + 2) . ':A' . ($noteRow - 1))->getFont()->setItalic(true);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'premium_sample_') . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmpFile);
+        $content = file_get_contents($tmpFile);
+        @unlink($tmpFile);
+
+        return $this->response
+            ->setStatusCode(200)
+            ->setContentType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->setHeader('Content-Disposition', 'attachment; filename="premium_import_sample.xlsx"')
+            ->setHeader('Content-Length', (string) strlen($content))
+            ->setBody($content);
+    }
 }

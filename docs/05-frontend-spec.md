@@ -145,8 +145,12 @@ Import ราคาต้นทุนจาก Excel — ใช้ `MatStepperMo
 ### Promotion Item Master
 Manage promotion items.
 - List view: `mat-table` with sort and filter
-  - คอลัมน์: Code, Name, Category, Value Mode, Max Value, Sort Order, Eligibility (สรุปเงื่อนไข), Status
+  - คอลัมน์: (Checkbox เลือกแถว), Code, Name, Category, Value Mode, Max Value, Sort Order, Eligibility (สรุปเงื่อนไข), Status
   - คอลัมน์ Eligibility แสดง chips สรุป: "ทุกแบบบ้าน" / "3 แบบบ้าน", "ไม่จำกัดเวลา" / "01/01/68 - 31/12/68", "ทุกยูนิต" / "5 ยูนิต"
+- **ส่งออก/นำเข้า JSON** (ใช้ย้ายของแถมข้ามโครงการ):
+  - คอลัมน์ checkbox แรกสุด (`SelectionModel`) — เลือกแถวเพื่อส่งออกเฉพาะบางรายการ; checkbox หัวตาราง = เลือกทั้งหมดที่ผ่าน filter
+  - ปุ่ม **ส่งออก JSON**: ถ้าติ๊กเลือกแถวไว้ → ส่งออกเฉพาะรายการที่เลือก (ป้ายปุ่มแสดงจำนวน); ถ้าไม่เลือก → ส่งออกทุกแถวที่ผ่าน filter
+  - ปุ่ม **นำเข้า JSON** → `POST /api/promotion-items/import-json` เข้าโครงการที่เลือกอยู่
 - Create/Edit: `MatDialogModule` with form fields
   - Form: `mat-form-field` + `matInput` + `mat-select`
   - **รหัส (code) สร้างอัตโนมัติ** — ไม่มีช่องกรอก, แสดง read-only หลังสร้าง

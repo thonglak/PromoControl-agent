@@ -66,6 +66,23 @@ export class PremiumImportComponent {
     if (file) this.selectedFile.set(file);
   }
 
+  /** ดาวน์โหลดไฟล์ Excel ตัวอย่างสำหรับนำเข้าของแถม */
+  downloadSample(): void {
+    this.api.downloadSample().subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href     = url;
+        a.download = 'premium_import_sample.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.snack.open('ดาวน์โหลดไฟล์ตัวอย่างไม่สำเร็จ', 'ปิด', { duration: 3000 }),
+    });
+  }
+
   onDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragOver.set(false);

@@ -10,8 +10,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { SelectionModel } from '@angular/cdk/collections';
 
 import { PromotionItemApiService, PromotionItem, PromotionItemExportFile, PromotionItemJson } from '../promotion-item-api.service';
 import { PromotionItemFormDialogComponent } from '../dialogs/promotion-item-form-dialog.component';
@@ -55,6 +57,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     MatTableModule, MatSortModule, MatPaginatorModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatTooltipModule, MatProgressSpinnerModule,
+    MatCheckboxModule,
     MatDialogModule, MatSnackBarModule, SvgIconComponent,
   ],
   templateUrl: './promotion-item-list.component.html',
@@ -84,10 +87,14 @@ export class PromotionItemListComponent implements OnInit {
 
   // ── Table config ──
   columnDefs       = signal<ColumnDef[]>(this.tblCfg.getConfig(TABLE_ID, DEFAULT_COLUMNS));
-  displayedColumns = computed(() => this.tblCfg.getVisibleKeys(this.columnDefs()));
+  // คอลัมน์ checkbox 'select' บังคับแสดงเสมอ (ไม่อยู่ใน table settings) — ใช้เลือกแถวเพื่อส่งออก
+  displayedColumns = computed(() => ['select', ...this.tblCfg.getVisibleKeys(this.columnDefs())]);
 
   dataSource = new MatTableDataSource<PromotionItem>([]);
   loading    = signal(false);
+
+  /** แถวที่ผู้ใช้ติ๊กเลือกไว้ — ใช้กำหนดว่าจะส่งออกรายการไหนบ้าง */
+  selection = new SelectionModel<PromotionItem>(true, []);
 
   // signal สะท้อนแถวที่ผ่าน filter ปัจจุบัน — ใช้ขับ summary cards ให้ reactive
   filteredRows = signal<PromotionItem[]>([]);
@@ -133,10 +140,28 @@ export class PromotionItemListComponent implements OnInit {
 
   loadData(): void {
     this.loading.set(true);
+    // ข้อมูลถูกโหลดใหม่ → reference แถวเดิมใช้ไม่ได้แล้ว เคลียร์รายการที่เลือกไว้
+    this.selection.clear();
     this.api.getList(this.projectId()).subscribe({
       next: items => { this.dataSource.data = items; this.loading.set(false); this.applyFilter(); },
       error: () => { this.snack.open('โหลดข้อมูลไม่สำเร็จ', 'ปิด', { duration: 3000 }); this.loading.set(false); },
     });
+  }
+
+  /** true เมื่อทุกแถวที่ผ่าน filter ปัจจุบันถูกเลือกครบ */
+  isAllFilteredSelected(): boolean {
+    const rows = this.dataSource.filteredData ?? [];
+    return rows.length > 0 && rows.every(r => this.selection.isSelected(r));
+  }
+
+  /** เลือก/ยกเลิกทุกแถวที่ผ่าน filter ปัจจุบัน */
+  toggleAllFiltered(): void {
+    const rows = this.dataSource.filteredData ?? [];
+    if (this.isAllFilteredSelected()) {
+      rows.forEach(r => this.selection.deselect(r));
+    } else {
+      rows.forEach(r => this.selection.select(r));
+    }
   }
 
   onFilterChange(): void { this.applyFilter(); }
@@ -192,10 +217,16 @@ export class PromotionItemListComponent implements OnInit {
     }).afterClosed().subscribe(r => { if (r) { this.snack.open('สร้างรายการสำเร็จ', 'ปิด', { duration: 3000 }); this.loadData(); } });
   }
 
-  /** Export รายการที่ผ่าน filter ปัจจุบัน → ไฟล์ JSON */
+  /**
+   * Export รายการโปรโมชั่น → ไฟล์ JSON
+   * - ถ้าติ๊กเลือกแถวไว้ → ส่งออกเฉพาะแถวที่เลือก
+   * - ถ้าไม่ได้เลือก → ส่งออกทุกแถวที่ผ่าน filter ปัจจุบัน
+   */
   exportJson(): void {
-    // ใช้ filteredData เพื่อ export เฉพาะที่มองเห็นใน table หลังกรอง
-    const items = this.dataSource.filteredData ?? this.dataSource.data;
+    const selected = this.selection.selected;
+    const items = selected.length > 0
+      ? selected
+      : (this.dataSource.filteredData ?? this.dataSource.data);
     if (!items || items.length === 0) {
       this.snack.open('ไม่มีรายการให้ส่งออก', 'ปิด', { duration: 3000 });
       return;

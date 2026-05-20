@@ -97,6 +97,11 @@ export interface PremiumSyncResult {
 export class PremiumImportApiService {
   private http = inject(HttpClient);
 
+  /** ดาวน์โหลดไฟล์ Excel ตัวอย่างสำหรับนำเข้าของแถม */
+  downloadSample(): Observable<Blob> {
+    return this.http.get('/api/premium-imports/sample', { responseType: 'blob' });
+  }
+
   /** อัปโหลดไฟล์ Premium.xlsx → preview ทุกชีต */
   upload(file: File): Observable<PremiumUploadResult> {
     const fd = new FormData();

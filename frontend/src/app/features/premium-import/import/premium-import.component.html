@@ -48,6 +48,14 @@
           }
         </div>
 
+        <div class="mt-3 text-center">
+          <button type="button" (click)="downloadSample()"
+                  class="text-sm text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1">
+            <app-icon name="arrow-down-tray" class="w-4 h-4" />
+            ดาวน์โหลดไฟล์ตัวอย่าง
+          </button>
+        </div>
+
         <div class="mt-6 flex justify-end">
           <button mat-flat-button color="primary" [disabled]="!selectedFile() || uploading()" (click)="upload()">
             @if (uploading()) { <mat-spinner diameter="18" class="!inline-block mr-2" /> }

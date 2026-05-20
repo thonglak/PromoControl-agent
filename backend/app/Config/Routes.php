@@ -233,6 +233,7 @@ $routes->group('api', static function (RouteCollection $routes): void {
     // Premium Import (นำเข้าของแถมจากไฟล์ Premium.xlsx ลง staging)
     $routes->group('premium-imports', static function (RouteCollection $routes): void {
         $routes->get('/',        'PremiumImportController::index');
+        $routes->get('sample',   'PremiumImportController::downloadSample');
         $routes->get('(:num)',   'PremiumImportController::show/$1');
     });
     $routes->group('premium-imports', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
