@@ -240,6 +240,7 @@ class EligiblePromotionService
             if ($resolved !== null) {
                 $result['default_value']      = $resolved;
                 $result['default_used_value'] = $resolved;
+                $result['max_value']          = $resolved;
             }
         }
 

@@ -672,13 +672,20 @@ class PremiumImportService
                     $name = $pi['proposed_name'];
                 }
 
+                $isGroup = $pi['strategy'] === 'group';
                 $data = [
-                    'name'          => $name,
-                    'category'      => $pi['category'],
-                    'value_mode'    => $pi['strategy'] === 'group' ? 'fixed' : 'unit_table',
-                    'default_value' => $pi['strategy'] === 'group' ? $pi['value'] : 0,
+                    'name'             => $name,
+                    'category'         => $pi['category'],
+                    'value_mode'       => $isGroup ? 'fixed' : 'unit_table',
+                    'default_value'    => $isGroup ? $pi['value'] : 0,
+                    'is_unit_standard' => true,   // ของแถมจากการนำเข้า = รายการมาตรฐาน
                 ];
-                if ($pi['strategy'] === 'unit_table') {
+                if ($isGroup) {
+                    // group: ค่าคงที่ → ตั้ง ค่าสูงสุด + มูลค่าเริ่มต้นที่ใช้ = ค่านั้น
+                    $data['max_value']          = $pi['value'];
+                    $data['default_used_value'] = $pi['value'];
+                } else {
+                    // unit_table: ค่าต่างรายยูนิต → engine resolve ค่าสูงสุด/ที่ใช้ ตอนทำรายการขาย
                     $data['value_source'] = 'promotion_item_unit_value';
                 }
 
@@ -691,6 +698,14 @@ class PremiumImportService
                     'value'             => $pi['value'],
                     'promotion_item_id' => $itemId,
                 ];
+            } else {
+                // รายการเดิม — เติม config ฟิลด์ให้ครบ (กันค่าว่างจาก sync เวอร์ชันเก่า)
+                $upd = ['is_unit_standard' => 1, 'updated_at' => date('Y-m-d H:i:s')];
+                if ($pi['strategy'] === 'group') {
+                    $upd['max_value']          = $pi['value'];
+                    $upd['default_used_value'] = $pi['value'];
+                }
+                $this->db->table('promotion_item_master')->where('id', $itemId)->update($upd);
             }
 
             $label = $pi['label'];

@@ -13,6 +13,8 @@ use RuntimeException;
  * - บวก max_value ของทุก item ที่ is_unit_standard=1 AND is_active=1 AND project_id ตรงกัน
  *   (ถ้า max_value = NULL ให้ fallback ใช้ default_value แทน)
  * - รวมกรณี value_mode='calculated' ด้วย (ใช้ค่า max_value ตรง ๆ ไม่ evaluate สูตร)
+ * - value_mode='unit_table': ใช้จำนวนเงินรายยูนิตจากแหล่งข้อมูล (promotion_item_unit_values)
+ *   เพราะ unit_table มี max_value/default_value = NULL/0 — ต้อง resolve รายยูนิต
  * - กรองตาม promotion_item_house_models: ถ้ามีรายการ → ต้องตรงกับ house_model ของยูนิต
  *   (ถ้าไม่มี = ใช้ได้ทุกแบบบ้าน)
  * - กรองตาม promotion_item_units: ถ้ามีรายการ → ต้องมียูนิตนี้ใน list
@@ -24,10 +26,12 @@ use RuntimeException;
 class UnitBudgetSettingsService
 {
     private BaseConnection $db;
+    private PromotionValueSourceService $valueSource;
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
+        $this->valueSource = new PromotionValueSourceService();
     }
 
     /**
@@ -57,7 +61,7 @@ class UnitBudgetSettingsService
 
         // 2. ดึง promotion items มาตรฐานของโครงการ (ดึง max_value + default_value ไว้ fallback)
         $items = $this->db->table('promotion_item_master')
-            ->select('id, code, name, max_value, default_value')
+            ->select('id, code, name, max_value, default_value, value_mode, value_source')
             ->where('project_id', $projectId)
             ->where('is_unit_standard', 1)
             ->where('is_active', 1)
@@ -101,6 +105,15 @@ class UnitBudgetSettingsService
             $unitMap[(int) $r['promotion_item_id']][(int) $r['unit_id']] = true;
         }
 
+        // 4b. pre-load ค่ารายยูนิตของ item โหมด unit_table (batch — 1 query/item)
+        $unitTableValues = []; // [item_id => [unit_id => amount]]
+        foreach ($items as $item) {
+            if (($item['value_mode'] ?? '') === 'unit_table') {
+                $unitTableValues[(int) $item['id']] = $this->valueSource
+                    ->resolveAll((string) ($item['value_source'] ?? ''), (int) $item['id']);
+            }
+        }
+
         // 5. Build response: คำนวณต่อยูนิต
         $result = [];
         foreach ($units as $u) {
@@ -127,10 +140,14 @@ class UnitBudgetSettingsService
                     }
                 }
 
-                // ใช้ค่าสูงสุด (max_value) — ถ้า NULL ให้ fallback เป็น default_value
-                $value = $item['max_value'] !== null
-                    ? (float) $item['max_value']
-                    : (float) $item['default_value'];
+                // unit_table → ค่ารายยูนิตจากแหล่งข้อมูล; โหมดอื่น → max_value (fallback default_value)
+                if (($item['value_mode'] ?? '') === 'unit_table') {
+                    $value = $unitTableValues[$itemId][$unitId] ?? (float) $item['default_value'];
+                } else {
+                    $value = $item['max_value'] !== null
+                        ? (float) $item['max_value']
+                        : (float) $item['default_value'];
+                }
                 $sum += $value;
                 $eligibleItems[] = [
                     'id'    => $itemId,

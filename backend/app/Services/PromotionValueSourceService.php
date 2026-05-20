@@ -123,6 +123,31 @@ class PromotionValueSourceService
         return $row ? (float) $row['amount'] : null;
     }
 
+    /**
+     * ดึงค่ารายยูนิตทั้งหมดของของแถม 1 รายการ (batch — ลดจำนวน query)
+     *
+     * @return array<int,float> map[unit_id => amount]
+     */
+    public function resolveAll(string $sourceKey, int $promotionItemId): array
+    {
+        $src = $this->getByKey($sourceKey);
+        if (!$src || !(int) $src['is_active'] || !$this->isSafeConfig($src)) {
+            return [];
+        }
+
+        $rows = $this->db->table($src['source_table'])
+            ->select($src['unit_column'] . ' AS uid')
+            ->select($src['amount_column'] . ' AS amount')
+            ->where($src['item_column'], $promotionItemId)
+            ->get()->getResultArray();
+
+        $map = [];
+        foreach ($rows as $r) {
+            $map[(int) $r['uid']] = (float) $r['amount'];
+        }
+        return $map;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // CRUD (หน้าจัดการ — admin)
     // ═══════════════════════════════════════════════════════════════════════
