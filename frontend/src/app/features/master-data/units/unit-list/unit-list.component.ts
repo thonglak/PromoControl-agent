@@ -12,9 +12,11 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 import { UnitApiService, Unit, BulkCreateRow, BulkCreateResult } from '../unit-api.service';
 import { UnitFormDialogComponent } from '../dialogs/unit-form-dialog.component';
+import { BulkHouseModelDialogComponent, BulkHouseModelDialogResult } from '../dialogs/bulk-house-model-dialog.component';
 import { PriceRecalculateDialogComponent, PriceRecalculateDialogData } from '../dialogs/price-recalculate-dialog.component';
 import { CaldiscountSyncDialogComponent, CaldiscountSyncDialogData } from '../dialogs/caldiscount-sync-dialog.component';
 import { CaldiscountSoldSyncDialogComponent, CaldiscountSoldSyncDialogData } from '../dialogs/caldiscount-sold-sync-dialog.component';
@@ -52,7 +54,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     MatTableModule, MatSortModule, MatPaginatorModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatDialogModule, MatSnackBarModule,
-    MatTooltipModule, MatProgressSpinnerModule,
+    MatTooltipModule, MatProgressSpinnerModule, MatCheckboxModule,
     SvgIconComponent,
   ],
   templateUrl: './unit-list.component.html',
@@ -81,9 +83,22 @@ export class UnitListComponent implements OnInit, AfterViewInit {
 
   // ── Table config ──
   columnDefs       = signal<ColumnDef[]>(this.tblCfg.getConfig(TABLE_ID, DEFAULT_COLUMNS));
-  displayedColumns = computed(() => this.tblCfg.getVisibleKeys(this.columnDefs()));
+  displayedColumns = computed(() => {
+    const keys = this.tblCfg.getVisibleKeys(this.columnDefs());
+    // คอลัมน์ checkbox เลือกหลายยูนิต — แสดงเฉพาะผู้มีสิทธิ์แก้ไข
+    return this.canWrite() ? ['select', ...keys] : keys;
+  });
 
   dataSource       = new MatTableDataSource<Unit>([]);
+
+  // รายการยูนิต (signal) — ใช้ render การ์ดบนมือถือ
+  units            = signal<Unit[]>([]);
+
+  // ── Multi-select ──
+  selectedIds = signal<Set<number>>(new Set());
+
+  // ── สรุปยอด (คิดตามตัวกรองที่ใช้อยู่) ──
+  summary = signal({ count: 0, basePrice: 0, unitCost: 0, modelCount: 0, standardBudget: 0 });
 
   loading     = signal(false);
   houseModels = signal<HouseModel[]>([]);
@@ -154,6 +169,9 @@ export class UnitListComponent implements OnInit, AfterViewInit {
     }).subscribe({
       next: units => {
         this.dataSource.data = units;
+        this.units.set(units);
+        this.selectedIds.set(new Set());   // ล้างการเลือกเมื่อข้อมูลเปลี่ยน
+        this.summary.set(this.computeSummary(units));
         this.loading.set(false);
       },
       error: () => {
@@ -161,6 +179,25 @@ export class UnitListComponent implements OnInit, AfterViewInit {
         this.loading.set(false);
       },
     });
+  }
+
+  /** สรุปยอดจากรายการยูนิตที่แสดงอยู่ (ผ่านตัวกรองแล้ว) */
+  private computeSummary(units: Unit[]) {
+    const modelIds = new Set<number>();
+    let basePrice = 0, unitCost = 0, standardBudget = 0;
+    for (const u of units) {
+      basePrice      += Number(u.base_price)      || 0;
+      unitCost       += Number(u.unit_cost)       || 0;
+      standardBudget += Number(u.standard_budget) || 0;
+      if (u.house_model_id != null) modelIds.add(Number(u.house_model_id));
+    }
+    return {
+      count:          units.length,
+      basePrice:      Math.round(basePrice),
+      unitCost:       Math.round(unitCost),
+      modelCount:     modelIds.size,
+      standardBudget: Math.round(standardBudget),
+    };
   }
 
   onFilterChange(): void {
@@ -173,6 +210,68 @@ export class UnitListComponent implements OnInit, AfterViewInit {
     const current = this.tblCfg.loadFilters<any>(TABLE_ID) ?? this.filterForm.value;
     this.tblCfg.saveFilters(TABLE_ID, { ...current, sortActive: sort.active, sortDirection: sort.direction });
     this.loadUnits();
+  }
+
+  // ── Multi-select ──────────────────────────────────────────────────────
+
+  isSelected(id: number): boolean {
+    return this.selectedIds().has(id);
+  }
+
+  toggleRow(id: number): void {
+    this.selectedIds.update(s => {
+      const next = new Set(s);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  }
+
+  /** id ของทุกยูนิตที่แสดงผลอยู่ปัจจุบัน (ทุกหน้า ตาม filter) */
+  private visibleIds(): number[] {
+    return this.dataSource.data.map(u => u.id);
+  }
+
+  allSelected(): boolean {
+    const ids = this.visibleIds();
+    const sel = this.selectedIds();
+    return ids.length > 0 && ids.every(id => sel.has(id));
+  }
+
+  someSelected(): boolean {
+    const sel = this.selectedIds();
+    return this.visibleIds().some(id => sel.has(id)) && !this.allSelected();
+  }
+
+  toggleAll(): void {
+    this.selectedIds.set(this.allSelected() ? new Set() : new Set(this.visibleIds()));
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  /** เปิด dialog เลือกแบบบ้าน แล้วอัปเดตยูนิตที่เลือกแบบกลุ่ม */
+  openBulkHouseModel(): void {
+    const ids = [...this.selectedIds()];
+    if (!ids.length) return;
+    this.dialog.open(BulkHouseModelDialogComponent, {
+      data: { count: ids.length, houseModels: this.houseModels() },
+      width: '440px',
+      disableClose: true,
+    }).afterClosed().subscribe((result?: BulkHouseModelDialogResult) => {
+      if (!result) return;
+      this.api.bulkUpdateHouseModel(ids, result.houseModelId).subscribe({
+        next: res => {
+          let msg = 'อัปเดตแบบบ้านสำเร็จ ' + res.updated + ' ยูนิต';
+          if (res.skipped.length) msg += ' · ข้าม ' + res.skipped.length + ' ยูนิต';
+          this.snack.open(msg, 'ปิด', { duration: 5000 });
+          this.loadUnits();
+        },
+        error: err => {
+          this.snack.open(err.error?.error ?? 'อัปเดตแบบบ้านไม่สำเร็จ', 'ปิด', { duration: 5000 });
+        },
+      });
+    });
   }
 
   hasActiveFilters(): boolean {

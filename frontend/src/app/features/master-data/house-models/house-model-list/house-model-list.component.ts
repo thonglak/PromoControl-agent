@@ -63,6 +63,9 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
   dataSource       = new MatTableDataSource<HouseModel>([]);
   loading          = signal(false);
 
+  // สรุปจำนวนยูนิตรวมของแบบบ้านที่แสดงอยู่
+  totalUnits       = signal(0);
+
   isAdmin   = computed(() => this.auth.currentUser()?.role === 'admin');
   isManager = computed(() => this.auth.currentUser()?.role === 'manager');
   canWrite  = computed(() => this.project.canEdit());
@@ -74,6 +77,7 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
     const saved = this.tblCfg.loadFilters<any>(TABLE_ID);
     if (saved) this.filterForm.patchValue(saved, { emitEvent: false });
     this.loadModels();
+    this.loadTotalUnits();
   }
 
   ngAfterViewInit(): void {
@@ -120,6 +124,16 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
     this.loadModels();
   }
 
+  /** ดึงยอดยูนิตรวมทั้งโครงการ — ไม่ส่ง search เพื่อให้ยอดไม่ขึ้นกับตัวกรอง */
+  loadTotalUnits(): void {
+    if (!this.projectId) return;
+    this.api.getList(this.projectId).subscribe({
+      next: models => {
+        this.totalUnits.set(models.reduce((sum, m) => sum + (Number(m.unit_count) || 0), 0));
+      },
+    });
+  }
+
   openCreate(): void {
     this.dialog.open(HouseModelFormDialogComponent, {
       data: { mode: 'create', projectId: this.projectId },
@@ -130,6 +144,7 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
       if (result) {
         this.snack.open('สร้างแบบบ้านสำเร็จ', 'ปิด', { duration: 3000 });
         this.loadModels();
+        this.loadTotalUnits();
       }
     });
   }
@@ -144,6 +159,7 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
       if (result) {
         this.snack.open('แก้ไขแบบบ้านสำเร็จ', 'ปิด', { duration: 3000 });
         this.loadModels();
+        this.loadTotalUnits();
       }
     });
   }
@@ -154,6 +170,7 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
       next: () => {
         this.snack.open('ลบแบบบ้านสำเร็จ', 'ปิด', { duration: 3000 });
         this.loadModels();
+        this.loadTotalUnits();
       },
       error: err => {
         this.snack.open(err.error?.error ?? 'ลบแบบบ้านไม่สำเร็จ', 'ปิด', { duration: 5000 });

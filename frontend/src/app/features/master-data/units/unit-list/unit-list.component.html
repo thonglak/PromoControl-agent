@@ -1,30 +1,30 @@
-<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+<div class="p-4 sm:p-6" style="max-width: 1440px; margin: 0 auto;">
 
   <!-- Header -->
   <app-page-header title="ยูนิต" subtitle="จัดการยูนิตในโครงการ">
-    <div actions class="flex items-center gap-2">
+    <div actions class="flex flex-wrap items-center justify-end gap-2">
       <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700"><app-icon name="adjustments-horizontal" class="w-5 h-5" /></button>
       @if (canWrite()) {
         <button mat-stroked-button (click)="openCaldiscountSync()" matTooltip="ดึงต้นทุน/ราคาประเมินจาก Caldiscount">
-          <app-icon name="arrow-path" class="w-4 h-4 mr-1"></app-icon>
-          Sync จาก Caldiscount
+          <app-icon name="arrow-path" class="w-4 h-4 lg:mr-1"></app-icon>
+          <span class="hidden lg:inline">Sync จาก Caldiscount</span>
         </button>
         <button mat-stroked-button (click)="openCaldiscountSoldStatusSync()"
                 matTooltip="ดึงสถานะขาย/โอนจาก Caldiscount มาอัปเดตยูนิต">
-          <app-icon name="cloud-arrow-down" class="w-4 h-4 mr-1"></app-icon>
-          ดึงสถานะขาย/โอน
+          <app-icon name="cloud-arrow-down" class="w-4 h-4 lg:mr-1"></app-icon>
+          <span class="hidden lg:inline">ดึงสถานะขาย/โอน</span>
         </button>
         <button mat-stroked-button (click)="openPriceRecalculate()" matTooltip="กำหนดราคาประเมิน / ต้นทุน ด้วยสูตรเป็น batch">
-          <app-icon name="cog-6-tooth" class="w-4 h-4 mr-1"></app-icon>
-          ตั้งค่าราคา
+          <app-icon name="cog-6-tooth" class="w-4 h-4 lg:mr-1"></app-icon>
+          <span class="hidden lg:inline">ตั้งค่าราคา</span>
         </button>
-        <button mat-stroked-button (click)="toggleImport()">
-          <app-icon name="arrow-up-tray" class="w-4 h-4 mr-1"></app-icon>
-          นำเข้า CSV
+        <button mat-stroked-button (click)="toggleImport()" matTooltip="นำเข้ายูนิตจาก CSV">
+          <app-icon name="arrow-up-tray" class="w-4 h-4 lg:mr-1"></app-icon>
+          <span class="hidden lg:inline">นำเข้า CSV</span>
         </button>
-        <button mat-flat-button color="primary" (click)="openCreate()">
-          <app-icon name="plus" class="w-4 h-4 mr-1"></app-icon>
-          สร้างยูนิต
+        <button mat-flat-button color="primary" (click)="openCreate()" matTooltip="สร้างยูนิต">
+          <app-icon name="plus" class="w-4 h-4 sm:mr-1"></app-icon>
+          <span class="hidden sm:inline">สร้างยูนิต</span>
         </button>
       }
     </div>
@@ -132,17 +132,44 @@
     </div>
   }
 
+  <!-- Summary (คิดตามตัวกรองที่ใช้อยู่) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs font-semibold text-slate-600 mb-2">จำนวนยูนิตรวม</p>
+      <p class="text-2xl font-bold tabular-nums text-slate-800">{{ summary().count | number:'1.0-0' }}</p>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs font-semibold text-slate-600 mb-2">ราคาขายรวม</p>
+      <p class="text-2xl font-bold tabular-nums text-slate-800">฿{{ summary().basePrice | number:'1.0-0' }}</p>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs font-semibold text-slate-600 mb-2">ต้นทุนรวม</p>
+      <p class="text-2xl font-bold tabular-nums text-loss">฿{{ summary().unitCost | number:'1.0-0' }}</p>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs font-semibold text-slate-600 mb-2">จำนวนแบบบ้าน</p>
+      <p class="text-2xl font-bold tabular-nums text-slate-800">{{ summary().modelCount | number:'1.0-0' }}</p>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
+      <p class="text-xs font-semibold text-slate-600 mb-2">งบมาตรฐานรวม</p>
+      <p class="text-2xl font-bold tabular-nums text-primary-700">฿{{ summary().standardBudget | number:'1.0-0' }}</p>
+    </div>
+  </div>
+
   <!-- Filters -->
   <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
     <form [formGroup]="filterForm" class="flex flex-wrap gap-3 items-end">
 
-      <mat-form-field appearance="outline" class="flex-1 min-w-[180px]">
+      <mat-form-field appearance="outline" class="w-full sm:flex-1 sm:min-w-[260px]">
         <mat-label>ค้นหา</mat-label>
-        <input matInput formControlName="search" placeholder="รหัส, เลขที่, ลูกค้า..." (input)="onFilterChange()">
+        <input matInput formControlName="search"
+               placeholder="รหัส/เลขที่ยูนิต — วางหลายเลขคั่นด้วย , ได้"
+               (input)="onFilterChange()">
         <app-icon matSuffix name="magnifying-glass" class="w-4 h-4 text-slate-400 mr-2"></app-icon>
+        <mat-hint>ค้นหลายยูนิต เช่น 1, 19, 20 — ระบบจะแสดงตามลำดับที่กรอก</mat-hint>
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="min-w-[200px]">
+      <mat-form-field appearance="outline" class="w-full sm:w-auto sm:min-w-[200px]">
         <mat-label>แบบบ้าน</mat-label>
         <mat-select formControlName="house_model_id" (selectionChange)="onFilterChange()">
           <mat-option [value]="null">ทั้งหมด</mat-option>
@@ -152,7 +179,7 @@
         </mat-select>
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="min-w-[160px]">
+      <mat-form-field appearance="outline" class="w-full sm:w-auto sm:min-w-[160px]">
         <mat-label>สถานะ</mat-label>
         <mat-select formControlName="status" (selectionChange)="onFilterChange()">
           <mat-option value="">ทั้งหมด</mat-option>
@@ -169,7 +196,7 @@
 
   <!-- Active filter indicator -->
   @if (hasActiveFilters()) {
-    <div class="flex items-center gap-2 mb-4 ml-1">
+    <div class="flex flex-wrap items-center gap-2 mb-4 ml-1">
       <span class="text-xs text-slate-400">ตัวกรองที่ใช้:</span>
       @if (filterForm.get("search")?.value) {
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-medium">
@@ -202,6 +229,21 @@
     </div>
   }
 
+  <!-- Bulk action bar -->
+  @if (canWrite() && selectedIds().size > 0) {
+    <div class="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 px-4 py-2.5 rounded-lg border border-primary-300 bg-primary-100">
+      <span class="text-sm font-medium text-primary-700">
+        เลือก {{ selectedIds().size }} ยูนิต
+      </span>
+      <span class="hidden sm:block flex-1"></span>
+      <button mat-flat-button color="primary" (click)="openBulkHouseModel()">
+        <app-icon name="pencil-square" class="w-4 h-4 mr-1" />
+        อัปเดตแบบบ้าน
+      </button>
+      <button mat-stroked-button (click)="clearSelection()">ล้างการเลือก</button>
+    </div>
+  }
+
   <!-- Table -->
   <app-section-card [noPadding]="true">
     <div class="relative">
@@ -210,8 +252,86 @@
     @if (loading()) {
       <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10"><mat-spinner diameter="36" /></div>
     }
-    <div class="overflow-x-auto">
+
+    <!-- Mobile: card list -->
+    <div class="md:hidden divide-y divide-slate-100">
+      @for (u of units(); track u.id) {
+        <div class="p-4">
+          <div class="flex items-start gap-2">
+            @if (canWrite()) {
+              <mat-checkbox class="-ml-1.5 -mt-1" [checked]="isSelected(u.id)" (change)="toggleRow(u.id)"></mat-checkbox>
+            }
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono font-semibold text-slate-800">{{ u.unit_code }}</span>
+                <app-status-chip type="unit_status" [value]="u.status" />
+                @if (u.legacy_source === 'caldiscount') {
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none border"
+                        style="background-color: var(--color-accent-light); color: var(--color-accent-warm); border-color: var(--color-accent-warm);">
+                    ระบบเก่า
+                  </span>
+                }
+              </div>
+              <p class="text-xs text-slate-500 mt-1">
+                เลขที่ {{ u.unit_number ?? '—' }}
+                @if (u.house_model_code) {
+                  · {{ u.house_model_code }} <span class="text-slate-400">{{ u.house_model_name }}</span>
+                }
+              </p>
+            </div>
+            @if (canWrite()) {
+              <button mat-icon-button (click)="openEdit(u)" matTooltip="แก้ไข" class="!text-slate-500 hover:!text-blue-600 -mt-1 -mr-2">
+                <app-icon name="pencil-square" class="w-4 h-4"></app-icon>
+              </button>
+              @if (isAdmin()) {
+                <button mat-icon-button (click)="confirmDelete(u)" matTooltip="ลบ" class="!text-slate-400 hover:!text-red-600 -mt-1 -mr-2">
+                  <app-icon name="trash" class="w-4 h-4"></app-icon>
+                </button>
+              }
+            }
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-xs text-slate-400">ราคาขาย</span>
+              <span class="tabular-nums font-medium text-slate-800">{{ formatCurrency(u.base_price) }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-xs text-slate-400">ต้นทุน</span>
+              <span class="tabular-nums font-medium" style="color:#DC2626">{{ formatCurrency(u.unit_cost) }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-xs text-slate-400">ราคาประเมิน</span>
+              <span class="tabular-nums text-slate-600">{{ formatCurrency(u.appraisal_price) }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-xs text-slate-400">งบมาตรฐาน</span>
+              <span class="tabular-nums font-medium" style="color:#0284C7">{{ formatCurrency(u.standard_budget) }}</span>
+            </div>
+          </div>
+        </div>
+      }
+      @if (!units().length && !loading()) {
+        <div class="text-center py-12 text-slate-400">
+          <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+          <p>ไม่พบข้อมูลยูนิต</p>
+        </div>
+      }
+    </div>
+
+    <!-- Desktop: table -->
+    <div class="overflow-x-auto hidden md:block">
         <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" class="w-full">
+
+          <ng-container matColumnDef="select">
+            <th mat-header-cell *matHeaderCellDef class="!bg-slate-50 !w-10">
+              <mat-checkbox [checked]="allSelected()" [indeterminate]="someSelected()"
+                            (change)="toggleAll()" matTooltip="เลือก/ยกเลิกทั้งหมด"></mat-checkbox>
+            </th>
+            <td mat-cell *matCellDef="let u">
+              <mat-checkbox [checked]="isSelected(u.id)" (change)="toggleRow(u.id)"></mat-checkbox>
+            </td>
+          </ng-container>
 
           <ng-container matColumnDef="unit_code">
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">รหัสยูนิต</th>
@@ -303,7 +423,7 @@
         </table>
       </div>
 
-    <mat-paginator [pageSizeOptions]="[25, 50, 100]" pageSize="25" showFirstLastButtons></mat-paginator>
+    <mat-paginator class="hidden md:block" [pageSizeOptions]="[25, 50, 100]" pageSize="25" showFirstLastButtons></mat-paginator>
     </div>
   </app-section-card>
 </div>

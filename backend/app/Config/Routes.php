@@ -77,6 +77,7 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->put('(:num)',                         'UnitController::update/$1');
         $routes->delete('(:num)',                      'UnitController::delete/$1');
         $routes->post('bulk',                          'UnitController::bulkCreate');
+        $routes->post('bulk-house-model',              'UnitController::bulkUpdateHouseModel');
         $routes->post('preview-recalculate',           'UnitController::previewRecalculate');
         $routes->post('bulk-recalculate',              'UnitController::bulkRecalculate');
         $routes->post('sync-caldiscount/apply',        'UnitController::syncCaldiscountApply');

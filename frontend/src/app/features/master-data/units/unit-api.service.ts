@@ -68,6 +68,11 @@ export interface BulkCreateResult {
   errors: Array<{ row: number; unit_code: string; error: string }>;
 }
 
+export interface BulkHouseModelResult {
+  updated: number;
+  skipped: Array<{ unit_code: string; reason: string }>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class UnitApiService {
   private http = inject(HttpClient);
@@ -101,6 +106,16 @@ export class UnitApiService {
   bulkCreate(projectId: number, rows: BulkCreateRow[]): Observable<BulkCreateResult> {
     return this.http
       .post<{ message: string; data: BulkCreateResult }>('/api/units/bulk', { project_id: projectId, units: rows })
+      .pipe(map(r => r.data));
+  }
+
+  /** อัปเดตแบบบ้าน (house_model_id) ของหลายยูนิตพร้อมกัน — houseModelId = null เพื่อล้างแบบบ้าน */
+  bulkUpdateHouseModel(unitIds: number[], houseModelId: number | null): Observable<BulkHouseModelResult> {
+    return this.http
+      .post<{ message: string; data: BulkHouseModelResult }>('/api/units/bulk-house-model', {
+        unit_ids:       unitIds,
+        house_model_id: houseModelId,
+      })
       .pipe(map(r => r.data));
   }
 

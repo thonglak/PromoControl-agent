@@ -30,8 +30,7 @@ class UnitModel extends Model
             ->join('house_models hm', 'hm.id = pu.house_model_id', 'left')
             ->join('unit_types ut', 'ut.id = pu.unit_type_id', 'left')
             ->join('projects p', 'p.id = pu.project_id', 'left')
-            ->where('pu.project_id', $projectId)
-            ->orderBy('pu.unit_code', 'ASC');
+            ->where('pu.project_id', $projectId);
 
         if (!empty($filters['house_model_id'])) {
             $builder->where('pu.house_model_id', (int) $filters['house_model_id']);
@@ -39,12 +38,22 @@ class UnitModel extends Model
         if (!empty($filters['status'])) {
             $builder->where('pu.status', $filters['status']);
         }
-        if (!empty($filters['search'])) {
-            $s = $filters['search'];
-            $builder->groupStart()
-                ->like('pu.unit_code', $s)
-                ->orLike('pu.unit_number', $s)
-                ->groupEnd();
+
+        if (!empty($filters['unit_numbers']) && is_array($filters['unit_numbers'])) {
+            // ค้นหาหลายเลขที่ยูนิตพร้อมกัน — match แบบตรงตัว แล้วเรียงตามลำดับที่กรอก
+            $numbers = array_values(array_unique($filters['unit_numbers']));
+            $builder->whereIn('pu.unit_number', $numbers);
+            $escaped = array_map(static fn ($n) => $db->escape($n), $numbers);
+            $builder->orderBy('FIELD(pu.unit_number, ' . implode(', ', $escaped) . ')', '', false);
+        } else {
+            if (!empty($filters['search'])) {
+                $s = $filters['search'];
+                $builder->groupStart()
+                    ->like('pu.unit_code', $s)
+                    ->orLike('pu.unit_number', $s)
+                    ->groupEnd();
+            }
+            $builder->orderBy('pu.unit_code', 'ASC');
         }
 
         return $builder->get()->getResultArray();

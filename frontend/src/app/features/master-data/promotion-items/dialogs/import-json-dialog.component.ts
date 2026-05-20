@@ -43,8 +43,8 @@ export class ImportJsonDialogComponent {
   saving    = signal(false);
   result    = signal<ImportJsonResult | null>(null);
 
-  // คอลัมน์สำหรับ preview ตาราง
-  readonly previewColumns = ['code', 'name', 'category', 'value_mode', 'eligibility'];
+  // คอลัมน์สำหรับ preview ตาราง — ไม่แสดงรหัสเพราะระบบสร้างรหัสใหม่ตอนนำเข้า
+  readonly previewColumns = ['name', 'category', 'value_mode', 'eligibility'];
 
   itemCount     = computed(() => this.parsed()?.items.length ?? 0);
   previewItems  = computed(() => this.parsed()?.items.slice(0, 20) ?? []);

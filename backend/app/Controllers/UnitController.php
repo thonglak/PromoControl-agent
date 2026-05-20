@@ -55,6 +55,37 @@ class UnitController extends BaseController
         return $this->response->setStatusCode(404)->setJSON(['error' => 'ไม่พบยูนิต']);
     }
 
+    /**
+     * สร้าง filters สำหรับ getListWithModel จาก query string
+     * รองรับการค้นหลายเลขที่ยูนิตพร้อมกัน — วางรายการคั่นด้วย , ; เว้นวรรค
+     * หรือขึ้นบรรทัดใหม่ (วงเล็บจะถูกตัดทิ้ง) เช่น "(1, 19, 20, 53)"
+     */
+    private function buildListFilters(): array
+    {
+        $filters = [
+            'house_model_id' => $this->request->getGet('house_model_id'),
+            'status'         => $this->request->getGet('status'),
+        ];
+
+        $rawSearch = trim((string) ($this->request->getGet('search') ?? ''));
+        if ($rawSearch !== '') {
+            $tokens = preg_split('/[\s,;]+/', $rawSearch, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $tokens = array_values(array_filter(
+                array_map(static fn ($t) => trim($t, " \t()[]"), $tokens),
+                static fn ($t) => $t !== ''
+            ));
+            if (count($tokens) > 1) {
+                // หลายค่า → ค้นเลขที่ยูนิต (unit_number) แบบตรงตัว เรียงตามลำดับที่กรอก
+                $filters['unit_numbers'] = $tokens;
+            } else {
+                // ค่าเดียว → ค้นแบบเดิม (LIKE รหัสยูนิต / เลขที่ยูนิต)
+                $filters['search'] = $rawSearch;
+            }
+        }
+
+        return $filters;
+    }
+
     // ── GET /api/units?project_id= ────────────────────────────────────────
 
     public function index(): ResponseInterface
@@ -67,13 +98,7 @@ class UnitController extends BaseController
             return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
         }
 
-        $filters = [
-            'house_model_id' => $this->request->getGet('house_model_id'),
-            'status'         => $this->request->getGet('status'),
-            'search'         => $this->request->getGet('search'),
-        ];
-
-        $units = $this->unitModel->getListWithModel($projectId, $filters);
+        $units = $this->unitModel->getListWithModel($projectId, $this->buildListFilters());
 
         // Compute unit_type_label
         $typeMap = ["condo" => "คอนโด", "house" => "บ้านเดี่ยว", "townhouse" => "ทาวน์โฮม"];
@@ -173,6 +198,87 @@ class UnitController extends BaseController
         ]);
     }
 
+    // ── POST /api/units/bulk-house-model ──────────────────────────────────
+    // อัปเดตแบบบ้าน (house_model_id) ของหลายยูนิตพร้อมกัน
+    // body: { unit_ids: number[], house_model_id: number|null }
+
+    public function bulkUpdateHouseModel(): ResponseInterface
+    {
+        $body    = $this->request->getJSON(true) ?? [];
+        $unitIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($body['unit_ids'] ?? [])),
+            static fn ($id) => $id > 0
+        )));
+
+        $hmRaw        = $body['house_model_id'] ?? null;
+        $houseModelId = ($hmRaw === null || $hmRaw === '' || (int) $hmRaw <= 0) ? null : (int) $hmRaw;
+
+        if (empty($unitIds)) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาเลือกยูนิตอย่างน้อย 1 รายการ']);
+        }
+
+        // โหลดยูนิตที่เลือก
+        $units = $this->unitModel->whereIn('id', $unitIds)->findAll();
+        if (empty($units)) {
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'ไม่พบยูนิตที่เลือก']);
+        }
+
+        // ยูนิตที่เลือกต้องอยู่ในโครงการเดียวกัน
+        $projectIds = array_values(array_unique(array_map(static fn ($u) => (int) $u['project_id'], $units)));
+        if (count($projectIds) > 1) {
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'ยูนิตที่เลือกต้องอยู่ในโครงการเดียวกัน']);
+        }
+        $projectId = (int) $projectIds[0];
+
+        if (!$this->canWriteProject($projectId)) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์แก้ไขยูนิตในโครงการนี้']);
+        }
+
+        // ตรวจสอบแบบบ้าน (ถ้าระบุ) ต้องเป็นแบบบ้านของโครงการเดียวกัน
+        if ($houseModelId !== null) {
+            $hm = $this->houseModel->find($houseModelId);
+            if (!$hm || (int) $hm['project_id'] !== $projectId) {
+                return $this->response->setStatusCode(400)->setJSON(['error' => 'ไม่พบแบบบ้าน หรือแบบบ้านไม่ได้อยู่ในโครงการนี้']);
+            }
+        }
+
+        $isAdmin = $this->isAdmin();
+        $now     = date('Y-m-d H:i:s');
+        $updated = 0;
+        $skipped = [];
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        foreach ($units as $u) {
+            // ห้ามแก้ยูนิตที่ขาย/โอนแล้ว ยกเว้น admin (logic เดียวกับแก้ทีละยูนิต)
+            if (!$isAdmin && in_array($u['status'], ['sold', 'transferred'], true)) {
+                $skipped[] = ['unit_code' => $u['unit_code'], 'reason' => 'ยูนิตขาย/โอนแล้ว ไม่มีสิทธิ์แก้ไข'];
+                continue;
+            }
+            // ข้ามยูนิตที่เป็นแบบบ้านเดิมอยู่แล้ว
+            $currentModelId = $u['house_model_id'] !== null ? (int) $u['house_model_id'] : null;
+            if ($currentModelId === $houseModelId) {
+                $skipped[] = ['unit_code' => $u['unit_code'], 'reason' => 'เป็นแบบบ้านนี้อยู่แล้ว'];
+                continue;
+            }
+            $db->table('project_units')
+                ->where('id', (int) $u['id'])
+                ->update(['house_model_id' => $houseModelId, 'updated_at' => $now]);
+            $updated++;
+        }
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON(['error' => 'เกิดข้อผิดพลาดระหว่างอัปเดต กรุณาลองใหม่']);
+        }
+
+        return $this->response->setStatusCode(200)->setJSON([
+            'message' => "อัปเดตแบบบ้านสำเร็จ {$updated} ยูนิต",
+            'data'    => ['updated' => $updated, 'skipped' => $skipped],
+        ]);
+    }
+
     // ── DELETE /api/units/:id ─────────────────────────────────────────────
 
     public function delete(int $id): ResponseInterface
@@ -266,13 +372,7 @@ class UnitController extends BaseController
             return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์เข้าถึงโครงการนี้']);
         }
 
-        $filters = [
-            'house_model_id' => $this->request->getGet('house_model_id'),
-            'status'         => $this->request->getGet('status'),
-            'search'         => $this->request->getGet('search'),
-        ];
-
-        $units = $this->unitModel->getListWithModel($projectId, $filters);
+        $units = $this->unitModel->getListWithModel($projectId, $this->buildListFilters());
 
         // สร้าง Spreadsheet
         $spreadsheet = new Spreadsheet();

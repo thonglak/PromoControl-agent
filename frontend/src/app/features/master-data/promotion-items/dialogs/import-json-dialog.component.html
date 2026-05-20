@@ -75,7 +75,8 @@
     <div class="mt-4 text-xs text-slate-500 leading-relaxed">
       <p class="font-semibold text-slate-600 mb-1">หมายเหตุ</p>
       <ul class="list-disc pl-5 space-y-1">
-        <li>รหัส (code) ที่ซ้ำกับโครงการนี้จะถูกข้าม</li>
+        <li>ระบบจะตรวจรายการซ้ำจาก<span class="font-medium text-slate-600">ชื่อรายการ</span> — ชื่อที่มีในโครงการนี้แล้วจะถูกข้าม</li>
+        <li>รหัส (code) จะถูกสร้างขึ้นใหม่อัตโนมัติเสมอ — ไม่ใช้รหัสจากไฟล์</li>
         <li>เงื่อนไขแบบบ้าน/ยูนิต จะถูกจับคู่ตามชื่อ/รหัสในโครงการปลายทาง — หากไม่พบจะข้ามเฉพาะเงื่อนไขนั้น</li>
         <li>สูตรค่าธรรมเนียม (fee_formula) ไม่รวมในการนำเข้า — ต้องสร้างใหม่หลัง import</li>
       </ul>
@@ -113,11 +114,6 @@
     <!-- Preview table -->
     <div class="border border-slate-200 rounded-lg overflow-hidden">
       <table mat-table [dataSource]="previewItems()" [trackBy]="trackByIdx" class="w-full">
-
-        <ng-container matColumnDef="code">
-          <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">รหัส</th>
-          <td mat-cell *matCellDef="let r" class="!font-mono !text-sm !text-slate-700">{{ r.code || '—' }}</td>
-        </ng-container>
 
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50">ชื่อ</th>

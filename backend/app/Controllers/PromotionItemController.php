@@ -400,6 +400,8 @@ class PromotionItemController extends BaseController
     // ═══════════════════════════════════════════════════════════════════════
     // POST /api/promotion-items/import-json
     // ─── นำเข้ารายการโปรโมชั่นจากไฟล์ JSON ที่ export มา (ข้ามโครงการได้)
+    //     ตรวจรายการซ้ำด้วย "ชื่อ" (ไม่ใช่รหัส) — ชื่อซ้ำในโครงการจะถูกข้าม
+    //     รหัส (code) สร้างขึ้นใหม่อัตโนมัติเสมอ ไม่ใช้รหัสจากไฟล์
     //     resolve eligible_house_model_names / eligible_unit_codes → ids
     //     ของโครงการปลายทาง (ถ้าไม่พบจะข้ามเฉพาะส่วนเงื่อนไขนั้น)
     // ═══════════════════════════════════════════════════════════════════════
@@ -439,11 +441,21 @@ class PromotionItemController extends BaseController
             $unitMap[mb_strtolower(trim((string) $u['unit_code']))] = (int) $u['id'];
         }
 
-        // โหลดรหัสที่มีอยู่แล้วในโครงการปลายทาง — ใช้ตรวจซ้ำตอน insert
+        // โหลดรหัสที่มีอยู่แล้ว — ใช้สำหรับ generate รหัสใหม่เท่านั้น
+        // (รหัสสร้างขึ้นใหม่เสมอ ไม่ใช้รหัสจากไฟล์ JSON)
         $existingCodes = array_flip(array_column(
             $db->table('promotion_item_master')->select('code')->where('project_id', $projectId)->get()->getResultArray(),
             'code'
         ));
+
+        // โหลดชื่อรายการที่มีอยู่แล้วในโครงการปลายทาง — ใช้ตรวจรายการซ้ำด้วย "ชื่อ" (ไม่สนตัวพิมพ์)
+        $existingNames = [];
+        foreach ($db->table('promotion_item_master')->select('name')->where('project_id', $projectId)->get()->getResultArray() as $r) {
+            $key = mb_strtolower(trim((string) $r['name']));
+            if ($key !== '') {
+                $existingNames[$key] = true;
+            }
+        }
 
         $now      = date('Y-m-d H:i:s');
         $created  = 0;
@@ -455,8 +467,7 @@ class PromotionItemController extends BaseController
 
         foreach ($items as $idx => $raw) {
             $name = trim((string) ($raw['name'] ?? ''));
-            $code = trim((string) ($raw['code'] ?? ''));
-            $ref  = $code !== '' ? $code : ('#' . ($idx + 1) . ' ' . $name);
+            $ref  = $name !== '' ? $name : ('#' . ($idx + 1));
 
             try {
                 if ($name === '') {
@@ -473,14 +484,16 @@ class PromotionItemController extends BaseController
                     $valueMode = 'fixed';
                 }
 
-                // ถ้ามี code ในไฟล์ และ code นั้นมีในโครงการแล้ว → ข้าม
-                if ($code !== '' && isset($existingCodes[$code])) {
-                    $skipped[] = ['ref' => $ref, 'reason' => 'รหัสมีในโครงการนี้แล้ว'];
+                // ตรวจรายการซ้ำด้วย "ชื่อ" — ถ้าชื่อนี้มีในโครงการแล้ว
+                // หรือซ้ำกับรายการก่อนหน้าในไฟล์เดียวกัน → ข้าม
+                $nameKey = mb_strtolower($name);
+                if (isset($existingNames[$nameKey])) {
+                    $skipped[] = ['ref' => $ref, 'reason' => 'ชื่อรายการนี้มีในโครงการนี้แล้ว'];
                     continue;
                 }
 
-                // ถ้าไม่ระบุ code → generate ใหม่
-                $useCode = $code !== '' ? $code : $this->generateNextCode($existingCodes);
+                // รหัสสร้างขึ้นใหม่เสมอ (ไม่ใช้รหัสจากไฟล์ JSON)
+                $useCode = $this->generateNextCode($existingCodes);
 
                 $db->transBegin();
 
@@ -528,6 +541,7 @@ class PromotionItemController extends BaseController
 
                 $db->transCommit();
                 $existingCodes[$useCode] = true;
+                $existingNames[$nameKey] = true;
                 $created++;
             } catch (\Throwable $e) {
                 $db->transRollback();
