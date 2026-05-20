@@ -34,7 +34,7 @@ export interface HouseModelFormDialogData {
         <!-- รหัส -->
         <mat-form-field appearance="outline">
           <mat-label>รหัสแบบบ้าน</mat-label>
-          <input matInput formControlName="code" [readonly]="data.mode === 'edit'">
+          <input matInput formControlName="code">
           @if (form.get('code')?.hasError('required')) {
             <mat-error>กรุณากรอกรหัสแบบบ้าน</mat-error>
           }
