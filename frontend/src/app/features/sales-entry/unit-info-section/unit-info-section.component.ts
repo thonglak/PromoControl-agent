@@ -251,37 +251,7 @@ function toISODateStr(d: any): string {
               <mat-radio-button value="add_to_net" class="text-sm">
                 ค่าธรรมเนียมโอนบวกเพิ่ม (ลูกค้าจ่ายเอง)
               </mat-radio-button>
-              <mat-radio-button value="as_unit_expense" class="text-sm">
-                ค่าธรรมเนียมโอนบวกเพิ่ม (ใช้งบยูนิต)
-              </mat-radio-button>
-
-              <!-- เลือกรายการ expense_support ที่จะผูก (เฉพาะ mode=as_unit_expense) — อยู่ใต้ radio "ใช้งบยูนิต" -->
-              @if (additionalExpenseModeControl.value === 'as_unit_expense') {
-                <div class="pl-7">
-                  @if (expenseSupportItems().length > 0) {
-                    <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic">
-                      <mat-label>ใช้กับรายการไหน</mat-label>
-                      <mat-select [formControl]="linkedItemControl">
-                        @for (opt of expenseSupportItems(); track opt.id) {
-                          <mat-option [value]="opt.id">{{ opt.name }}</mat-option>
-                        }
-                      </mat-select>
-                    </mat-form-field>
-                    @if (linkedItemControl.value == null) {
-                      <p class="text-xs mt-1 flex items-center gap-1" style="color: var(--color-warning)">
-                        <app-icon name="exclamation-triangle" class="w-3 h-3" />
-                        กรุณาเลือกรายการค่าใช้จ่ายที่จะผูกค่าธรรมเนียมโอน
-                      </p>
-                    }
-                  } @else {
-                    <p class="text-xs flex items-center gap-1" style="color: var(--color-warning)">
-                      <app-icon name="exclamation-triangle" class="w-3 h-3" />
-                      ยูนิตนี้ไม่มีรายการค่าใช้จ่ายใน Panel A — เลือกโหมดอื่น
-                    </p>
-                  }
-                </div>
-              }
-
+              <!-- ตัวเลือก "ใช้งบยูนิต" (as_unit_expense) ถูกซ่อน — ไม่เปิดให้เลือกในหน้านี้ -->
               <mat-radio-button value="as_premium" class="text-sm">
                 ค่าธรรมเนียมโอนบวกเพิ่ม (ใช้งบผู้บริหาร)
               </mat-radio-button>
