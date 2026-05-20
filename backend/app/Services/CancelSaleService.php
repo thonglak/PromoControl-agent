@@ -11,9 +11,6 @@ use RuntimeException;
  * แนวคิด: ยกเลิก = "เหมือนไม่มีอะไรเกิดขึ้น" — void ทุก movement ที่เกี่ยวข้อง
  * ไม่สร้าง RETURN ใหม่ ไม่ดันเงินเข้า Pool (balance ทุกแหล่งเด้งกลับสู่สภาพก่อนขาย)
  *
- * void ทั้ง movement สถานะ approved และ pending — เผื่อข้อมูลเดิมที่ยังค้าง
- * สถานะ pending จากระบบอนุมัติงบเก่า (ปัจจุบัน movement เป็น approved ทันทีเสมอ)
- *
  * กฎสำคัญ:
  * 1. ยกเลิกได้เฉพาะ transaction status = 'active'
  * 2. ห้ามยกเลิกถ้ายูนิต status = 'transferred'
@@ -101,7 +98,7 @@ class CancelSaleService
                 ->where('project_id', $projectId)
                 ->where('budget_source_type', 'UNIT_STANDARD')
                 ->whereIn('movement_type', ['USE', 'SPECIAL_BUDGET_USE'])
-                ->whereIn('status', ['approved', 'pending'])
+                ->where('status', 'approved')
                 ->get()->getResultArray();
 
             foreach ($useMovements as $movement) {
@@ -127,7 +124,7 @@ class CancelSaleService
                     'ALLOCATE', 'SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE',
                     'USE', 'SPECIAL_BUDGET_USE',
                 ])
-                ->whereIn('status', ['approved', 'pending'])
+                ->where('status', 'approved')
                 ->get()->getResultArray();
 
             foreach ($poolMovements as $movement) {
@@ -155,7 +152,7 @@ class CancelSaleService
                     'ALLOCATE', 'SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE',
                     'USE', 'SPECIAL_BUDGET_USE',
                 ])
-                ->whereIn('status', ['approved', 'pending'])
+                ->where('status', 'approved')
                 ->get()->getResultArray();
 
             foreach ($mgmtMovements as $movement) {
