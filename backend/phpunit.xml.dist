@@ -50,9 +50,13 @@
         <const name="CONFIGPATH" value="./app/Config/"/>
         <!-- Directory containing the front controller (index.php) -->
         <const name="PUBLICPATH" value="./public/"/>
-        <!-- Database configuration — ใช้ MySQL ใน Docker container -->
+        <!-- บังคับ environment เป็น testing เพื่อให้ App\Config\Database
+             สลับ defaultGroup ไปใช้ group 'tests' (กัน test เขียนทับ DB จริง) -->
+        <env name="CI_ENVIRONMENT" value="testing" force="true"/>
+        <!-- Database สำหรับ test — ต้องเป็น DB แยกต่างหาก ห้ามชี้ promo_db เด็ดขาด
+             เพราะ integration test สั่ง TRUNCATE ทุกตารางก่อนรัน -->
             <env name="database.tests.hostname" value="promo_mysql"/>
-            <env name="database.tests.database" value="promo_db"/>
+            <env name="database.tests.database" value="promo_db_test"/>
             <env name="database.tests.username" value="promo_user"/>
             <env name="database.tests.password" value="promo_pass"/>
             <env name="database.tests.DBDriver" value="MySQLi"/>
