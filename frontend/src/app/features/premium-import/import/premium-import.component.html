@@ -1,0 +1,286 @@
+<div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+  <app-page-header title="นำเข้าของแถม (Premium)"
+    subtitle="นำเข้าของแถมจากไฟล์ Premium.xlsx — แต่ละชีต = 1 โครงการ" />
+
+  <mat-stepper #stepper class="bg-white rounded-xl shadow-sm border border-slate-200">
+
+    <ng-template matStepperIcon="edit"><app-icon name="pencil-square" class="w-4 h-4 text-white" /></ng-template>
+    <ng-template matStepperIcon="done"><app-icon name="check" class="w-4 h-4 text-white" /></ng-template>
+    <ng-template matStepperIcon="number" let-index="index">
+      <span class="text-xs font-bold">{{ index + 1 }}</span>
+    </ng-template>
+
+    <!-- ══════ Step 1: อัปโหลดไฟล์ ══════ -->
+    <mat-step label="อัปโหลดไฟล์">
+      <div class="py-6 px-2">
+        <div class="mb-6 flex items-start gap-2 p-3 bg-slate-50 rounded-lg">
+          <app-icon name="information-circle" class="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+          <span class="text-sm text-slate-600">
+            ไฟล์ Premium.xlsx มีหลายชีต — แต่ละชีตจับคู่กับโครงการตามรหัสในชีต
+            ระบบจะอ่านทุกชีตให้เลือกนำเข้าในขั้นถัดไป
+          </span>
+        </div>
+
+        <!-- Drag & Drop -->
+        <div
+          (drop)="onDrop($event)" (dragover)="onDragOver($event)" (dragleave)="onDragLeave()"
+          [class.border-blue-400]="dragOver()" [class.bg-blue-50]="dragOver()"
+          class="border-dashed border-2 border-slate-300 rounded-xl p-8 text-center
+                 transition-colors cursor-pointer hover:border-slate-400"
+          (click)="fileInput.click()">
+          <input #fileInput type="file" accept=".xlsx,.xls" class="hidden" (change)="onFileSelected($event)" />
+          @if (!selectedFile()) {
+            <app-icon name="arrow-up-tray" class="w-10 h-10 text-slate-400 mx-auto mb-3" />
+            <p class="text-sm text-slate-600 font-medium">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือก</p>
+            <p class="text-xs text-slate-400 mt-1">รองรับ .xlsx, .xls (สูงสุด 50MB)</p>
+          } @else {
+            <div class="flex items-center justify-center gap-3">
+              <app-icon name="document-text" class="w-8 h-8 text-green-600" />
+              <div class="text-left">
+                <p class="text-sm font-medium text-slate-800">{{ selectedFile()!.name }}</p>
+                <p class="text-xs text-slate-400">{{ formatFileSize(selectedFile()!.size) }}</p>
+              </div>
+              <button type="button" (click)="clearFile($event)"
+                      class="ml-4 p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                <app-icon name="x-mark" class="w-5 h-5" />
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button mat-flat-button color="primary" [disabled]="!selectedFile() || uploading()" (click)="upload()">
+            @if (uploading()) { <mat-spinner diameter="18" class="!inline-block mr-2" /> }
+            อัปโหลดและอ่านไฟล์
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- ══════ Step 2: เลือกชีต ══════ -->
+    <mat-step label="เลือกชีตที่จะนำเข้า">
+      <div class="py-6 px-2">
+        @if (uploadResult(); as r) {
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-slate-700">
+              พบ {{ r.sheets.length }} ชีตในไฟล์ — เลือกชีตที่ต้องการนำเข้า
+            </h3>
+            <span class="text-sm text-slate-500">เลือกแล้ว {{ selectedCount() }} ชีต</span>
+          </div>
+
+          <div class="space-y-3 mb-6">
+            @for (sheet of r.sheets; track sheet.sheet_name) {
+              <div class="border rounded-lg p-4 transition-colors"
+                [class.border-blue-300]="selectedNames().has(sheet.sheet_name)"
+                [class.bg-blue-50]="selectedNames().has(sheet.sheet_name)"
+                [class.border-slate-200]="!selectedNames().has(sheet.sheet_name)"
+                [class.opacity-60]="!sheet.importable">
+                <div class="flex items-start gap-3">
+                  <input type="checkbox" class="mt-1 w-4 h-4 accent-blue-600"
+                    [checked]="selectedNames().has(sheet.sheet_name)"
+                    [disabled]="!sheet.importable"
+                    (change)="toggleSheet(sheet.sheet_name)" />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-sm font-semibold text-slate-800">{{ sheet.sheet_name }}</span>
+                      @if (sheet.project_name) {
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          {{ sheet.project_code }} · {{ sheet.project_name }}
+                        </span>
+                      } @else {
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                          ไม่พบโครงการรหัส "{{ sheet.project_code ?? '-' }}"
+                        </span>
+                      }
+                      <span class="text-xs text-slate-500">{{ formatNumber(sheet.data_rows) }} แปลง</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap mt-2">
+                      @for (p of sheet.premium_labels; track p.label) {
+                        <span class="text-xs px-2 py-0.5 rounded-full font-medium" [class]="categoryClass(p.category)">
+                          {{ p.label }}
+                        </span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="flex justify-between">
+            <button mat-stroked-button matStepperPrevious>ย้อนกลับ</button>
+            <button mat-flat-button color="primary"
+              [disabled]="selectedCount() === 0 || importing()" (click)="confirmImport()">
+              @if (importing()) { <mat-spinner diameter="18" class="!inline-block mr-2" /> }
+              นำเข้าลง staging ({{ selectedCount() }} ชีต)
+            </button>
+          </div>
+        }
+      </div>
+    </mat-step>
+
+    <!-- ══════ Step 3: ตรวจสอบ ══════ -->
+    <mat-step label="ตรวจสอบ">
+      <div class="py-6 px-2">
+        @if (validating()) {
+          <div class="py-10 text-center">
+            <mat-spinner diameter="32" class="!inline-block" />
+            <p class="text-sm text-slate-500 mt-3">กำลังตรวจสอบและจับคู่ข้อมูล...</p>
+          </div>
+        } @else {
+          @if (importResult()?.skipped?.length) {
+            <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+              <app-icon name="exclamation-triangle" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div class="text-sm text-amber-800">
+                <p class="font-medium mb-0.5">ข้ามบางชีต:</p>
+                @for (s of importResult()!.skipped; track s.sheet_name) {
+                  <p>{{ s.sheet_name }} — {{ s.reason }}</p>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-slate-50 rounded-lg p-4 text-center">
+              <p class="text-2xl font-bold text-slate-700">{{ formatNumber(batches().length) }}</p>
+              <p class="text-xs text-slate-500 mt-1">ชีตที่นำเข้า</p>
+            </div>
+            <div class="bg-green-50 rounded-lg p-4 text-center">
+              <p class="text-2xl font-bold text-green-700">{{ formatNumber(totalMatched()) }}</p>
+              <p class="text-xs text-green-600 mt-1">แปลงที่จับคู่ได้</p>
+            </div>
+            <div class="bg-red-50 rounded-lg p-4 text-center">
+              <p class="text-2xl font-bold text-red-700">{{ formatNumber(totalUnmatched()) }}</p>
+              <p class="text-xs text-red-600 mt-1">จับคู่ไม่ได้</p>
+            </div>
+          </div>
+
+          <div class="space-y-4 mb-6">
+            @for (b of batches(); track b.batch_id) {
+              @if (validateOf(b.batch_id); as v) {
+                <div class="border border-slate-200 rounded-lg overflow-hidden">
+                  <!-- หัว batch -->
+                  <div class="flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                    <span class="text-sm font-semibold text-slate-800">{{ b.sheet_name }} · {{ b.project_code }}</span>
+                    <div class="flex items-center gap-2 text-sm">
+                      <span class="text-green-700">จับคู่ {{ formatNumber(v.matched_rows) }}/{{ formatNumber(v.total_rows) }} แปลง</span>
+                      @if (v.unmatched_rows + v.ambiguous_rows > 0) {
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                          จับคู่ไม่ได้ {{ formatNumber(v.unmatched_rows + v.ambiguous_rows) }}
+                        </span>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- แผนรายการของแถม -->
+                  <div class="p-3">
+                    <p class="text-xs text-slate-500 px-1 mb-2">
+                      รายการของแถมที่จะสร้าง ({{ v.plan.length }}) — แก้ชื่อได้ก่อน Sync
+                    </p>
+                    <div class="space-y-2">
+                      @for (p of v.plan; track p.key) {
+                        <div class="p-2.5 rounded-lg border"
+                          [class.border-slate-100]="p.existing_item_id !== null"
+                          [class.bg-slate-50]="p.existing_item_id !== null"
+                          [class.border-slate-200]="p.existing_item_id === null">
+                          @if (p.existing_item_id === null) {
+                            <input type="text" [ngModel]="nameEdits()[p.key]"
+                              (ngModelChange)="setName(p.key, $event)"
+                              placeholder="ชื่อรายการของแถม"
+                              class="w-full text-sm font-medium text-slate-800 px-2 py-1 rounded
+                                     border border-slate-300 focus:border-blue-400 focus:outline-none" />
+                          } @else {
+                            <p class="text-sm font-medium text-slate-700 px-2 py-1">
+                              {{ p.existing_item_name }}
+                              <span class="text-xs text-slate-400 ml-1">— ใช้รายการเดิม (ไม่สร้างใหม่)</span>
+                            </p>
+                          }
+                          <div class="flex items-center gap-1.5 flex-wrap mt-1.5 px-1">
+                            <span class="text-xs px-2 py-0.5 rounded-full font-medium" [class]="categoryClass(p.category)">
+                              {{ categoryLabel(p.category) }}
+                            </span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"
+                              [matTooltip]="p.strategy === 'unit_table' ? 'จำนวนเงินต่างกันเกือบทุกแปลง — ดึงรายยูนิตจากตาราง' : ''">
+                              {{ strategyLabel(p.strategy) }}<!--
+                              -->@if (p.strategy === 'group') { · ฿{{ formatNumber(p.value) }} }
+                            </span>
+                            <span class="text-xs text-slate-500">· {{ eligText(p) }}</span>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+
+          <div class="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-6">
+            <app-icon name="information-circle" class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <span class="text-sm text-blue-800">
+              ขั้นตอน Sync จะเขียนราคาทุน/ขนาดที่ดินลงยูนิต และสร้างรายการของแถมให้อัตโนมัติ
+              (เฉพาะแปลงที่จับคู่ได้)
+            </span>
+          </div>
+
+          <div class="flex justify-between">
+            <button mat-stroked-button matStepperPrevious [disabled]="syncing()">ย้อนกลับ</button>
+            <button mat-flat-button color="primary"
+              [disabled]="totalMatched() === 0 || syncing()" (click)="confirmSync()">
+              @if (syncing()) { <mat-spinner diameter="18" class="!inline-block mr-2" /> }
+              ยืนยันและ Sync
+            </button>
+          </div>
+        }
+      </div>
+    </mat-step>
+
+    <!-- ══════ Step 4: ผลลัพธ์ ══════ -->
+    <mat-step label="ผลลัพธ์">
+      <div class="py-8 px-2">
+        @if (syncResults().length) {
+          <div class="text-center mb-8">
+            <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <app-icon name="check-circle" class="w-10 h-10 text-green-500" />
+            </div>
+            <h2 class="text-lg font-semibold text-green-700 mb-1">Sync สำเร็จ</h2>
+            <p class="text-sm text-slate-500">
+              อัปเดต {{ formatNumber(totalSynced()) }} ยูนิต · สร้างรายการของแถม {{ formatNumber(totalCreated()) }} รายการ
+            </p>
+          </div>
+
+          <div class="space-y-3 mb-8 max-w-3xl mx-auto">
+            @for (r of syncResults(); track r.batch_id) {
+              <div class="border border-slate-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-semibold text-slate-800">{{ batchName(r.batch_id) }}</span>
+                  <span class="text-sm text-green-700">Sync {{ formatNumber(r.synced_units) }} ยูนิต</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  @for (item of r.created_items; track item.promotion_item_id) {
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                      {{ item.name }}
+                      <span class="text-slate-400">
+                        ({{ item.strategy === 'group' ? '฿' + formatNumber(item.value) : 'รายยูนิต' }})
+                      </span>
+                    </span>
+                  }
+                  @if (r.created_items.length === 0) {
+                    <span class="text-xs text-slate-400">ใช้รายการของแถมเดิมทั้งหมด</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="flex justify-center">
+            <button mat-flat-button color="primary" (click)="reset()">
+              <app-icon name="arrow-path" class="w-4 h-4 mr-1" /> นำเข้าไฟล์ใหม่
+            </button>
+          </div>
+        }
+      </div>
+    </mat-step>
+
+  </mat-stepper>
+</div>

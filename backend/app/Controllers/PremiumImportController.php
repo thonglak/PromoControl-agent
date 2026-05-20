@@ -190,7 +190,9 @@ class PremiumImportController extends BaseController
 
     public function sync(int $id): ResponseInterface
     {
-        return $this->runBatchAction($id, fn () => $this->service->syncBatch($id));
+        $body      = $this->request->getJSON(true) ?? [];
+        $overrides = is_array($body['name_overrides'] ?? null) ? $body['name_overrides'] : [];
+        return $this->runBatchAction($id, fn () => $this->service->syncBatch($id, $overrides));
     }
 
     /** ตรวจสิทธิ์ + เรียก action ของ batch พร้อมจัดการ error เป็นภาษาไทย */

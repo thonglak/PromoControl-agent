@@ -14,6 +14,7 @@ import { BottomLineImportComponent } from './features/bottom-line/import/bottom-
 import { BottomLineHistoryComponent } from './features/bottom-line/history/bottom-line-history.component';
 import { BottomLineDetailComponent } from './features/bottom-line/detail/bottom-line-detail.component';
 import { BottomLineMappingComponent } from './features/bottom-line/mappings/bottom-line-mapping.component';
+import { PremiumImportComponent } from './features/premium-import/import/premium-import.component';
 
 import { FeeFormulaListComponent } from './features/fee-formula/formula-list/fee-formula-list.component';
 import { FeeRatePolicyListComponent } from './features/fee-formula/policy-list/fee-rate-policy-list.component';
@@ -54,6 +55,7 @@ export const routes: Routes = [
           { path: 'units',            component: UnitListComponent,       canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
           { path: 'promotion-items',  component: PromotionItemListComponent,     canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
           { path: 'phases',           component: PhaseListComponent,             canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
+          { path: 'premium-import',   component: PremiumImportComponent,         canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },
 
           // ── Bottom Line (ราคาต้นทุน) ────────────────────────────
           { path: 'bottom-line/import',  component: BottomLineImportComponent,  canActivate: [roleGuard], data: { roles: ['admin', 'manager'] } },

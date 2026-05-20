@@ -41,6 +41,7 @@ const MENU: MenuItem[] = [
       { label: 'แบบบ้าน',       path: '/house-models',     roles: ['admin', 'manager'] },
       { label: 'ยูนิต',         path: '/units',            roles: ['admin', 'manager'] },
       { label: 'รายการโปรโมชั่น', path: '/promotion-items', roles: ['admin', 'manager'] },
+      { label: 'นำเข้าของแถม (Premium)', path: '/premium-import', roles: ['admin', 'manager'] },
       { label: 'Phase',           path: '/phases',          roles: ['admin', 'manager'] },
     ],
   },

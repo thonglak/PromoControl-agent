@@ -323,6 +323,8 @@ class PremiumImportService
             'ambiguous_rows'    => $ambiguous,
             'resolved_labels'   => $labels['resolved'],
             'unresolved_labels' => $labels['unresolved'],
+            // แผนของแถมที่จะสร้าง — ให้ผู้ใช้ตรวจสอบ/แก้ชื่อก่อน sync
+            'plan'              => $this->computePlan($batchId, $projectId),
         ];
     }
 
@@ -341,8 +343,10 @@ class PremiumImportService
      *                        จำนวนเงินรายยูนิตเก็บใน promotion_item_unit_values
      *
      * sync เฉพาะ unit ที่ match_status = matched เท่านั้น
+     *
+     * @param array<string,string> $nameOverrides  key (จาก plan) → ชื่อรายการของแถมที่ผู้ใช้แก้
      */
-    public function syncBatch(int $batchId): array
+    public function syncBatch(int $batchId, array $nameOverrides = []): array
     {
         $batch = $this->getBatchOrFail($batchId);
         if ($batch['status'] === 'pending') {
@@ -354,9 +358,9 @@ class PremiumImportService
 
         $projectId = (int) $batch['project_id'];
 
-        // 1. สร้าง/จับคู่ promotion item ตามกลยุทธ์ของแต่ละ label
+        // 1. สร้าง/จับคู่ promotion item ตามแผน (ใช้ชื่อที่ผู้ใช้แก้ถ้ามี)
         //    (นอก transaction หลัก — PromotionItemService::create มี transaction ของตัวเอง)
-        $material = $this->materializePromotionItems($batchId, $projectId);
+        $material = $this->materializePromotionItems($batchId, $projectId, $nameOverrides);
         $plan     = $material['plan'];
 
         // 2. ดึงเฉพาะ unit ที่จับคู่สำเร็จ
@@ -401,7 +405,7 @@ class PremiumImportService
                     continue;
                 }
 
-                if ($p['strategy'] === 'per_unit') {
+                if ($p['strategy'] === 'unit_table') {
                     // จำนวนเงินรายยูนิต — เก็บเฉพาะที่ amount > 0
                     $itemId = $p['item_id'];
                     if ((float) $v['amount'] > 0) {
@@ -449,19 +453,15 @@ class PremiumImportService
     }
 
     /**
-     * สร้าง/จับคู่ promotion_item_master สำหรับทุก label ใน batch — เลือกกลยุทธ์อัตโนมัติ
+     * คำนวณ "แผน" ของแถมที่จะสร้าง — dry-run ไม่สร้างจริง
      *
-     * กลยุทธ์ต่อ label (ตัดสินจากจำนวนค่าที่ต่างกัน):
-     *   - group   : จำนวนค่า amount>0 ที่ต่างกัน ≤ จำนวนแบบบ้าน
-     *               → 1 รายการต่อ 1 ค่า, ค่าอยู่ใน default_value, ผูก eligibility
-     *   - per_unit: ค่าต่างกันมากกว่าจำนวนแบบบ้าน (เช่น คชจ ฟรีวันโอน)
-     *               → 1 รายการ, จำนวนเงินรายยูนิตเก็บ promotion_item_unit_values
+     * ใช้ logic เลือกกลยุทธ์เดียวกับตอน sync:
+     *   - group     : จำนวนค่า amount>0 ที่ต่างกัน ≤ จำนวนแบบบ้าน → 1 รายการ/1 ค่า
+     *   - unit_table: ค่าต่างกันเยอะ (เช่น คชจ ฟรีวันโอน) → 1 รายการ ดึงค่ารายยูนิต
      *
-     * idempotent: รายการที่มีอยู่แล้วจะถูกจับคู่ (group=ชื่อ+ค่า, per_unit=ชื่อ) ไม่สร้างซ้ำ
-     *
-     * @return array{plan: array<string,array>, created: array}
+     * @return array<int,array> รายการ plan item (สำหรับให้ผู้ใช้ตรวจสอบ/แก้ชื่อ + ใช้ตอน sync)
      */
-    private function materializePromotionItems(int $batchId, int $projectId): array
+    private function computePlan(int $batchId, int $projectId): array
     {
         // label + category ที่อยู่ใน batch
         $labels = $this->db->table('premium_import_values v')
@@ -472,7 +472,7 @@ class PremiumImportService
             ->groupBy('v.premium_label, v.premium_category')
             ->get()->getResultArray();
 
-        // promotion item เดิมของโครงการ — key by name → [{id, default_value}, ...]
+        // promotion item เดิมของโครงการ — key by name → [{id, name, default_value}, ...]
         $existing = [];
         foreach ($this->db->table('promotion_item_master')
                      ->select('id, name, default_value')
@@ -481,13 +481,21 @@ class PremiumImportService
             $existing[trim((string) $it['name'])][] = $it;
         }
 
+        // house model id → name (สำหรับแสดงเงื่อนไข)
+        $modelNames = [];
+        foreach ($this->db->table('house_models')
+                     ->select('id, name')
+                     ->where('project_id', $projectId)
+                     ->get()->getResultArray() as $hm) {
+            $modelNames[(int) $hm['id']] = (string) $hm['name'];
+        }
+
         // matched unit → house model
         //   matched_house_model_id (DB) ใช้ผูก eligibility — code (Excel) ใช้ตัดสินกลยุทธ์
-        //   เพราะ "แบบบ้าน" ในไฟล์ (L/M/S) อาจไม่ตรงกับ house_models.code ในระบบ
-        $unitToModel     = [];   // uid => matched_house_model_id|null
-        $modelSet        = [];   // matched_house_model_id ที่ resolve ได้
-        $codeSet         = [];   // house_model_code (Excel) ที่ไม่ว่าง
-        $dbModelResolved = true; // true = ทุก matched unit มี matched_house_model_id
+        $unitToModel     = [];
+        $modelSet        = [];
+        $codeSet         = [];
+        $dbModelResolved = true;
         foreach ($this->db->table('premium_import_units')
                      ->select('matched_unit_id, matched_house_model_id, house_model_code')
                      ->where('batch_id', $batchId)
@@ -510,12 +518,9 @@ class PremiumImportService
         }
         $totalUnits  = count($unitToModel);
         $allModelIds = array_keys($modelSet);
-        // จำนวนกลุ่มแบบบ้าน (จาก code ในไฟล์) สำหรับตัดสินกลยุทธ์ — อย่างน้อย 1
         $modelCount  = max(1, count($codeSet));
 
-        $svc     = new PromotionItemService();
-        $plan    = [];
-        $created = [];
+        $planItems = [];
 
         foreach ($labels as $lab) {
             $label    = trim((string) $lab['premium_label']);
@@ -531,10 +536,9 @@ class PremiumImportService
                 ->where('v.amount >', 0)
                 ->get()->getResultArray();
 
-            // group units ตามค่า + ตรวจว่าค่าผูกกับแบบบ้านสะอาดไหม (ใช้ code จากไฟล์)
-            $byValue    = [];   // valueKey => ['amount'=>float, 'units'=>[uid,...]]
-            $codeValues = [];   // house_model_code => set ของ valueKey
-            $allUnits   = [];   // uid ที่มี amount>0
+            $byValue    = [];
+            $codeValues = [];
+            $allUnits   = [];
             $hasNoCode  = false;
             foreach ($rows as $r) {
                 $uid = (int) $r['matched_unit_id'];
@@ -552,7 +556,6 @@ class PremiumImportService
             }
             $distinctCount = count($byValue);
 
-            // per-model-clean = ทุกแบบบ้าน (code) มีค่าเดียว และทุก unit มี code
             $clean = !$hasNoCode;
             foreach ($codeValues as $set) {
                 if (count($set) > 1) {
@@ -560,65 +563,146 @@ class PremiumImportService
                     break;
                 }
             }
-            // ผูก eligibility ระดับแบบบ้านได้ ต่อเมื่อ code สะอาด + house model ใน DB resolve ครบ
-            // มิฉะนั้น fallback เป็น eligibility ระดับยูนิต
             $useHouseModel = $clean && $dbModelResolved;
 
             if ($distinctCount >= 1 && $distinctCount <= $modelCount) {
                 // ── group-by-value ──
-                $valueItems = [];
                 foreach ($byValue as $vk => $info) {
-                    $itemId = $this->findExistingItem($existing, $label, $info['amount']);
-                    if ($itemId === null) {
-                        $elig = $this->deriveEligibility($info['units'], $unitToModel, $totalUnits, $allModelIds, $useHouseModel);
-                        $item = $svc->create($projectId, [
-                            'name'          => $label,
-                            'category'      => $category,
-                            'value_mode'    => 'fixed',
-                            'default_value' => $info['amount'],
-                        ], $elig['house_model_ids'], $elig['unit_ids']);
-                        $itemId = (int) $item['id'];
-                        $existing[$label][] = ['id' => $itemId, 'default_value' => $info['amount']];
-                        $created[] = [
-                            'label'                 => $label,
-                            'strategy'              => 'group',
-                            'value'                 => $info['amount'],
-                            'promotion_item_id'     => $itemId,
-                            'eligible_house_models' => count($elig['house_model_ids']),
-                            'eligible_units'        => count($elig['unit_ids']),
-                        ];
-                    }
-                    $valueItems[$vk] = $itemId;
+                    $elig = $this->deriveEligibility($info['units'], $unitToModel, $totalUnits, $allModelIds, $useHouseModel);
+                    $planItems[] = $this->buildPlanItem(
+                        $label, $category, 'group', $info['amount'], $vk, $elig,
+                        $this->findExistingItem($existing, $label, $info['amount']),
+                        $existing, $modelNames
+                    );
                 }
-                $plan[$label] = ['strategy' => 'group', 'value_items' => $valueItems];
             } else {
-                // ── per-unit (จำนวนเงินรายยูนิตใน promotion_item_unit_values) ──
-                $itemId = $this->findExistingItem($existing, $label, null);
-                if ($itemId === null) {
-                    $elig = $this->deriveEligibility(array_keys($allUnits), $unitToModel, $totalUnits, $allModelIds, false);
-                    // value_mode=unit_table → engine ดึงจำนวนเงินรายยูนิตจาก promotion_item_unit_values
-                    $item = $svc->create($projectId, [
-                        'name'          => $label,
-                        'category'      => $category,
-                        'value_mode'    => 'unit_table',
-                        'value_source'  => 'promotion_item_unit_value',
-                        'default_value' => 0,
-                    ], $elig['house_model_ids'], $elig['unit_ids']);
-                    $itemId = (int) $item['id'];
-                    $existing[$label][] = ['id' => $itemId, 'default_value' => 0];
-                    $created[] = [
-                        'label'             => $label,
-                        'strategy'          => 'per_unit',
-                        'promotion_item_id' => $itemId,
-                        'eligible_units'    => count($elig['unit_ids']),
-                        'distinct_values'   => $distinctCount,
-                    ];
-                }
-                $plan[$label] = ['strategy' => 'per_unit', 'item_id' => $itemId];
+                // ── unit_table ──
+                $elig = $this->deriveEligibility(array_keys($allUnits), $unitToModel, $totalUnits, $allModelIds, false);
+                $planItems[] = $this->buildPlanItem(
+                    $label, $category, 'unit_table', null, 'unit_table', $elig,
+                    $this->findExistingItem($existing, $label, null),
+                    $existing, $modelNames
+                );
             }
         }
 
-        return ['plan' => $plan, 'created' => $created];
+        return $planItems;
+    }
+
+    /**
+     * ประกอบ plan item 1 รายการ จากผลการคำนวณ
+     */
+    private function buildPlanItem(
+        string $label,
+        string $category,
+        string $strategy,
+        ?float $value,
+        string $valueKey,
+        array $elig,
+        ?int $existingId,
+        array $existing,
+        array $modelNames
+    ): array {
+        if (!empty($elig['house_model_ids'])) {
+            $scope = 'house_model';
+        } elseif (!empty($elig['unit_ids'])) {
+            $scope = 'unit';
+        } else {
+            $scope = 'all';
+        }
+
+        $hmNames = [];
+        foreach ($elig['house_model_ids'] as $mid) {
+            $hmNames[] = $modelNames[(int) $mid] ?? ('#' . $mid);
+        }
+
+        $existingName = null;
+        if ($existingId !== null) {
+            foreach ($existing[$label] ?? [] as $it) {
+                if ((int) $it['id'] === $existingId) {
+                    $existingName = (string) $it['name'];
+                    break;
+                }
+            }
+        }
+
+        return [
+            'key'                => $label . '||' . $valueKey,
+            'label'              => $label,
+            'category'           => $category,
+            'strategy'           => $strategy,
+            'value'              => $value,
+            'value_source'       => $strategy === 'unit_table' ? 'promotion_item_unit_value' : null,
+            'proposed_name'      => $label,
+            'existing_item_id'   => $existingId,
+            'existing_item_name' => $existingName,
+            'eligibility'        => [
+                'scope'        => $scope,
+                'house_models' => $hmNames,
+                'unit_count'   => count($elig['unit_ids']),
+            ],
+            'house_model_ids'    => $elig['house_model_ids'],
+            'unit_ids'           => $elig['unit_ids'],
+            'value_key'          => $valueKey,
+        ];
+    }
+
+    /**
+     * สร้าง promotion_item_master ตามแผนจาก computePlan() แล้วคืน map สำหรับ sync
+     *
+     * idempotent: รายการที่มีอยู่แล้ว (existing_item_id) จะถูกใช้ซ้ำ ไม่สร้างใหม่
+     *
+     * @param array<string,string> $nameOverrides  key (จาก plan) → ชื่อที่ผู้ใช้แก้
+     * @return array{plan: array<string,array>, created: array}
+     */
+    private function materializePromotionItems(int $batchId, int $projectId, array $nameOverrides = []): array
+    {
+        $planItems = $this->computePlan($batchId, $projectId);
+        $svc       = new PromotionItemService();
+
+        $labelMap = [];
+        $created  = [];
+
+        foreach ($planItems as $pi) {
+            $itemId = $pi['existing_item_id'];
+
+            if ($itemId === null) {
+                $name = trim((string) ($nameOverrides[$pi['key']] ?? $pi['proposed_name']));
+                if ($name === '') {
+                    $name = $pi['proposed_name'];
+                }
+
+                $data = [
+                    'name'          => $name,
+                    'category'      => $pi['category'],
+                    'value_mode'    => $pi['strategy'] === 'group' ? 'fixed' : 'unit_table',
+                    'default_value' => $pi['strategy'] === 'group' ? $pi['value'] : 0,
+                ];
+                if ($pi['strategy'] === 'unit_table') {
+                    $data['value_source'] = 'promotion_item_unit_value';
+                }
+
+                $item   = $svc->create($projectId, $data, $pi['house_model_ids'], $pi['unit_ids']);
+                $itemId = (int) $item['id'];
+                $created[] = [
+                    'label'             => $pi['label'],
+                    'name'              => $name,
+                    'strategy'          => $pi['strategy'],
+                    'value'             => $pi['value'],
+                    'promotion_item_id' => $itemId,
+                ];
+            }
+
+            $label = $pi['label'];
+            if ($pi['strategy'] === 'group') {
+                $labelMap[$label]['strategy'] = 'group';
+                $labelMap[$label]['value_items'][$pi['value_key']] = $itemId;
+            } else {
+                $labelMap[$label] = ['strategy' => 'unit_table', 'item_id' => $itemId];
+            }
+        }
+
+        return ['plan' => $labelMap, 'created' => $created];
     }
 
     /**
