@@ -299,6 +299,17 @@ value_mode: fixed | actual | manual | calculated | unit_table
 - เมื่อ value_mode=unit_table ต้องระบุ value_source เป็น key จาก /value-sources (เช่น promotion_item_unit_value)
 - engine (EligiblePromotionService) จะ resolve จำนวนเงินตาม unit แล้ว override default_value/default_used_value
 
+## Promotion Value Sources (แหล่งข้อมูลค่ารายยูนิต — value_mode=unit_table, admin only)
+GET    /api/promotion-value-sources         (รายการทั้งหมด + usage_count + schema_ok)
+POST   /api/promotion-value-sources         (เพิ่ม — source_key, label, description, source_table, item_column, unit_column, amount_column, is_active)
+PUT    /api/promotion-value-sources/{id}    (แก้ไข — source_key แก้ไม่ได้; source ระบบแก้ได้แค่ label/description/is_active)
+DELETE /api/promotion-value-sources/{id}    (ลบ — ห้ามลบ source ระบบ / source ที่มี promotion item ใช้อยู่)
+
+หมายเหตุ:
+- registry เก็บใน DB (promotion_value_sources) — resolver เป็น generic query {amount_column} จาก {source_table}
+- ชื่อตาราง/คอลัมน์ถูกตรวจกับ information_schema ว่ามีจริง ก่อนนำไป query เสมอ (กัน SQL injection)
+- is_system=1 = source ที่ระบบสร้าง (promotion_item_unit_value) ลบไม่ได้, ล็อก mapping ตาราง
+
 ## Fee Formulas (สูตรคำนวณค่าธรรมเนียม)
 GET    /api/fee-formulas                      (รายการสูตรทั้งหมด พร้อม promotion_item + policy count)
 GET    /api/fee-formulas/{id}                 (รายละเอียดสูตร พร้อม policies)

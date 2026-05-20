@@ -96,6 +96,7 @@ const MENU: MenuItem[] = [
     children: [
       { label: 'ตั้งค่าระบบ', path: '/settings/system', roles: ['admin', 'manager'] },
       { label: 'เลขที่เอกสาร', path: '/settings/number-series', roles: ['admin', 'manager'] },
+      { label: 'แหล่งข้อมูลของแถม', path: '/settings/value-sources', roles: ['admin'] },
       { label: 'รูปแบบวันที่', path: '/settings/date-format' },
     ],
   },

@@ -154,6 +154,14 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->delete('(:num)',         'PromotionItemController::delete/$1');
     });
 
+    // Promotion Value Sources (แหล่งข้อมูลค่ารายยูนิต — value_mode=unit_table, admin)
+    $routes->group('promotion-value-sources', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
+        $routes->get('/',          'PromotionValueSourceController::index');
+        $routes->post('/',         'PromotionValueSourceController::create');
+        $routes->put('(:num)',     'PromotionValueSourceController::update/$1');
+        $routes->delete('(:num)',  'PromotionValueSourceController::delete/$1');
+    });
+
     // Budget Movements (งบประมาณ)
     $routes->group('budget-movements', static function (RouteCollection $routes): void {
         $routes->get('/',                    'BudgetMovementController::index');
