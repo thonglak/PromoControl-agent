@@ -395,6 +395,7 @@ ORDER BY pim.sort_order ASC, pim.name ASC
 - **calculated items: recalculate** — ค่าจะคำนวณใหม่ทุกครั้งที่ข้อมูลฐานเปลี่ยน (เปลี่ยนยูนิต, เปลี่ยนราคา)
 - **calculated items: แสดงสูตร** — แสดง label บอกอัตราที่ใช้ เช่น "ประเมิน 3,000,000 × 0.5% = 15,000" ถ้าใช้มาตรการรัฐจะแสดงชื่อ policy ด้วย
 - **calculated items: ข้อมูลฐานไม่ครบ** — ถ้า `appraisal_price = null` แสดง warning "ยังไม่มีราคาประเมิน" และ used_value = 0
+- **unit_table items (เช่น คชจ ฟรีวันโอน)** — `used_value` default = "งบที่ตั้งไว้" รายยูนิต (resolve จาก `value_source`) พนักงานขาย**ปรับลดได้** เพราะงบที่ตั้งไว้อาจใช้ไม่หมด แต่ห้ามเกินยอดที่ตั้งไว้ (cap = ยอดรายยูนิต — validate ทั้ง frontend และ backend)
 - แหล่งงบล็อกเป็น `UNIT_STANDARD` เสมอ
 - รายการจะหักจาก **งบยูนิต** เท่านั้น
 - ถ้า category เป็น `premium` → แสดง checkbox "แปลงเป็นส่วนลด" (**Panel 3A เท่านั้น**ที่แปลงได้ Panel 3B ไม่มี)

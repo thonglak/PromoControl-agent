@@ -11,12 +11,14 @@ class SalesTransactionService
     private BaseConnection $db;
     private BudgetMovementService $budgetSvc;
     private NumberSeriesService $numberSeriesSvc;
+    private PromotionValueSourceService $valueSourceSvc;
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
         $this->budgetSvc = new BudgetMovementService();
         $this->numberSeriesSvc = new NumberSeriesService();
+        $this->valueSourceSvc = new PromotionValueSourceService();
     }
 
     public function create(array $data): array
@@ -239,8 +241,25 @@ class SalesTransactionService
             }
 
             $maxValue = $promotionItem['max_value'] !== null ? (float) $promotionItem['max_value'] : null;
+
+            // unit_table: เพดานคือยอด "งบที่ตั้งไว้" รายยูนิต (resolve จากแหล่งข้อมูล เช่น คชจ ฟรีวันโอน)
+            // พนักงานปรับลด used_value ได้ (งบอาจใช้ไม่หมด) แต่ห้ามเกินยอดที่ตั้งไว้
+            if ($promotionItem['value_mode'] === 'unit_table') {
+                $unitTableValue = $this->valueSourceSvc->resolve(
+                    (string) ($promotionItem['value_source'] ?? ''),
+                    $promotionItemId,
+                    $unitId
+                );
+                if ($unitTableValue !== null) {
+                    $maxValue = $maxValue !== null ? min($maxValue, $unitTableValue) : $unitTableValue;
+                }
+            }
+
             if ($maxValue !== null && $usedValue > $maxValue) {
-                throw new RuntimeException("มูลค่าที่ใช้ต้องไม่เกิน {$maxValue} บาท");
+                throw new RuntimeException(
+                    "มูลค่าที่ใช้ของรายการ '{$promotionItem['name']}' ต้องไม่เกิน "
+                    . number_format($maxValue, 0) . ' บาท'
+                );
             }
 
             if (!$this->checkEligibility($promotionItem, $unitId, $saleDate)) {

@@ -495,6 +495,10 @@ Field `additional_expense_mode` (ENUM, default 'add_to_net'): โหมดกา
 - `as_unit_expense` — บริษัทจ่ายให้ลูกค้า ผูกกับรายการ `expense_support` ใน Panel A (funding_source=`UNIT_STANDARD`) → `additional_expense_amount` ถูก push เข้า `used_value` ของ item ที่ผูก (เลือกจาก dropdown ในหน้า sales-entry); ไม่สร้าง budget_movement พิเศษเพราะ amount ถูกบรรจุเป็น item ปกติแล้ว → ผลกระทบ profit/budget เหมือน expense_support ทั่วไป (กิน `UNIT_STANDARD`)
   - หมายเหตุ: payload ปัจจุบันไม่เก็บ `linked_item_id` แยก — backend infer จาก items (`category=expense_support` + `funding_source=UNIT_STANDARD`)
 
+Field `items[].used_value` (DECIMAL 15,2): มูลค่าที่ใช้จริงของรายการ — หักจากงบ
+- ทั่วไป: ต้อง `used_value ≤ max_value` ของ `promotion_item_master` (ถ้ากำหนด)
+- `value_mode=unit_table`: เพดานคือ "งบที่ตั้งไว้" รายยูนิต (resolve จาก `value_source` เช่น คชจ ฟรีวันโอน) — พนักงานปรับลด `used_value` ได้ (งบที่ตั้งไว้อาจใช้ไม่หมด) แต่ห้ามเกินยอดที่ตั้งไว้ — validate ทั้ง frontend และ backend; default = ยอดที่ตั้งไว้
+
 Field `items[].discount_convert_value` (DECIMAL 15,2, default 0): ส่วนของ `used_value` ที่แปลงเป็น discount — optional
 - ใช้กับ category=`premium` + funding_source=`UNIT_STANDARD` เท่านั้น (validate)
 - ต้อง `0 ≤ discount_convert_value ≤ used_value`
