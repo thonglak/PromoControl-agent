@@ -548,6 +548,7 @@ export class AdditionalPromotionPanelComponent implements OnInit {
       updated[index] = { ...updated[index], remark: value };
       return updated;
     });
+    this.emitChanges(this.rows());
   }
 
   onManualInputChange(index: number, value: number | null): void {

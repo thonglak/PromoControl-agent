@@ -331,10 +331,6 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                       </div>
                       <div class="m-card__chips">
                         <app-status-chip type="promotion_category" [value]="item.promotion_category" />
-                        <app-status-chip type="budget_source" [value]="fundingToChipValue(item.funding_source_type)" />
-                        @if (convertState(item) === 'full') {
-                          <span class="badge badge--success">แปลงส่วนลด</span>
-                        }
                       </div>
                       @if (item.remark) {
                         <div class="m-card__remark">{{ item.remark }}</div>
@@ -354,9 +350,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                       <tr>
                         <th class="tbl-th text-left w-12 pl-6">#</th>
                         <th class="tbl-th text-left">รายการ</th>
-                        <th class="tbl-th text-left">แหล่งงบ</th>
                         <th class="tbl-th text-right">มูลค่าที่ใช้</th>
-                        <th class="tbl-th text-center w-28">แปลงส่วนลด</th>
                         <th class="tbl-th text-left pr-6">หมายเหตุ</th>
                       </tr>
                     </thead>
@@ -368,24 +362,16 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
                             <div class="font-medium" style="color: var(--color-text-primary)">{{ item.promotion_item_name || 'รายการ #' + item.promotion_item_id }}</div>
                             <app-status-chip type="promotion_category" [value]="item.promotion_category" class="mt-0.5" />
                           </td>
-                          <td class="tbl-td"><app-status-chip type="budget_source" [value]="fundingToChipValue(item.funding_source_type)" /></td>
                           <td class="tbl-td text-right tabular-nums font-semibold" style="color: var(--color-text-primary)">฿{{ n(item.used_value) | number:'1.0-0' }}</td>
-                          <td class="tbl-td text-center">
-                            @if (convertState(item) === 'full') {
-                              <app-icon name="check" class="w-4 h-4 mx-auto" style="color: var(--color-success)" />
-                            } @else {
-                              <span style="color: var(--color-gray-300)">—</span>
-                            }
-                          </td>
                           <td class="tbl-td text-xs pr-6" style="color: var(--color-text-secondary)">{{ item.remark || '—' }}</td>
                         </tr>
                       }
                     </tbody>
                     <tfoot>
                       <tr class="tbl-foot">
-                        <td colspan="3" class="tbl-td pl-6 text-right font-semibold">รวมงบอื่นๆ</td>
+                        <td colspan="2" class="tbl-td pl-6 text-right font-semibold">รวมงบอื่นๆ</td>
                         <td class="tbl-td text-right tabular-nums font-bold" style="color: var(--color-primary-700); font-size: 15px">฿{{ otherTotal() | number:'1.0-0' }}</td>
-                        <td colspan="2" class="tbl-td pr-6"></td>
+                        <td class="tbl-td pr-6"></td>
                       </tr>
                     </tfoot>
                   </table>
