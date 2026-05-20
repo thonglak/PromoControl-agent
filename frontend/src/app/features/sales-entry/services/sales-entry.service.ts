@@ -8,7 +8,7 @@ export interface EligibleItem {
   code: string;
   name: string;
   category: 'discount' | 'premium' | 'expense_support';
-  value_mode: 'fixed' | 'actual' | 'manual' | 'calculated';
+  value_mode: 'fixed' | 'actual' | 'manual' | 'calculated' | 'unit_table';
   max_value: number | null;
   default_used_value: number | null;
   discount_convert_value: number | null;

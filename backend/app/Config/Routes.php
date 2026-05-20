@@ -139,9 +139,10 @@ $routes->group('api', static function (RouteCollection $routes): void {
 
     // Promotion Items (รายการโปรโมชั่น)
     $routes->group('promotion-items', static function (RouteCollection $routes): void {
-        $routes->get('/',          'PromotionItemController::index');
-        $routes->get('eligible',   'PromotionItemController::eligible');
-        $routes->get('(:num)',     'PromotionItemController::show/$1');
+        $routes->get('/',             'PromotionItemController::index');
+        $routes->get('eligible',      'PromotionItemController::eligible');
+        $routes->get('value-sources', 'PromotionItemController::valueSources');
+        $routes->get('(:num)',        'PromotionItemController::show/$1');
     });
     $routes->group('promotion-items', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->post('/',                'PromotionItemController::create');

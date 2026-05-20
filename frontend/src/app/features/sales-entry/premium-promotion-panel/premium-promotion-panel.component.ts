@@ -117,13 +117,14 @@ export interface PanelARow {
                 <!-- มูลค่าที่ใช้ -->
                 <div>
                   <mat-form-field appearance="outline" class="!text-sm w-full" subscriptSizing="dynamic"
-                    [matTooltip]="row.promotion_item_id === lockedItemId() ? 'ผูกกับค่าธรรมเนียมโอน — แก้ที่ส่วนข้อมูลยูนิต' : ''">
+                    [matTooltip]="row.promotion_item_id === lockedItemId() ? 'ผูกกับค่าธรรมเนียมโอน — แก้ที่ส่วนข้อมูลยูนิต'
+                                  : (row.value_mode === 'unit_table' ? 'ค่าดึงรายยูนิตจากตาราง — แก้ไม่ได้' : '')">
                     <mat-label>มูลค่าที่ใช้</mat-label>
                     <span matTextPrefix>฿&nbsp;</span>
                     <input matInput currencyMask
                       [ngModel]="row.used_value"
                       (ngModelChange)="onUsedValueChange(i, $event)"
-                      [readonly]="row.promotion_item_id === lockedItemId()"
+                      [readonly]="row.promotion_item_id === lockedItemId() || row.value_mode === 'unit_table'"
                       [min]="0"
                       class="text-right">
                   </mat-form-field>

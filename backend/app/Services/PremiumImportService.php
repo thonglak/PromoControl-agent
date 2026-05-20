@@ -303,8 +303,8 @@ class PremiumImportService
                 ]);
         }
 
-        // จับคู่ premium_label ↔ promotion_item_master (ยังไม่สร้าง item ใหม่)
-        $labels = $this->resolvePremiumLabels($batchId, $projectId, false);
+        // ตรวจว่า premium_label มี promotion_item_master ชื่อตรงกันอยู่แล้วหรือยัง (ไม่สร้างใหม่)
+        $labels = $this->checkLabelsExist($batchId, $projectId);
 
         $this->db->table('premium_import_batches')
             ->where('id', $batchId)
@@ -331,11 +331,14 @@ class PremiumImportService
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * Sync batch ที่ validate แล้ว:
+     * Sync batch ที่ validate แล้ว — เขียน staging ลงฐานข้อมูลจริง
      *   - bottom_line_price → project_units.unit_cost
      *   - land_area_sqw     → project_units.land_area_sqw
-     *   - จำนวนเงินของแถม   → promotion_item_unit_values (upsert)
-     *   - premium_label ที่ยังไม่มี → auto-create promotion_item_master
+     *   - ของแถม → สร้าง promotion_item_master ตามกลยุทธ์ที่เลือกอัตโนมัติต่อ label:
+     *       group-by-value : จำนวนค่าที่ต่างกัน ≤ จำนวนแบบบ้าน → 1 รายการ/1 ค่า
+     *                        เก็บค่าใน default_value + ผูก eligibility
+     *       per-unit       : ค่าต่างกันเยอะ (เช่น คชจ ฟรีวันโอน) → 1 รายการ
+     *                        จำนวนเงินรายยูนิตเก็บใน promotion_item_unit_values
      *
      * sync เฉพาะ unit ที่ match_status = matched เท่านั้น
      */
@@ -351,10 +354,10 @@ class PremiumImportService
 
         $projectId = (int) $batch['project_id'];
 
-        // 1. จับคู่ + auto-create promotion item (นอก transaction หลัก
-        //    เพราะ PromotionItemService::create มี transaction ของตัวเอง)
-        $labels   = $this->resolvePremiumLabels($batchId, $projectId, true);
-        $labelMap = $labels['map'];
+        // 1. สร้าง/จับคู่ promotion item ตามกลยุทธ์ของแต่ละ label
+        //    (นอก transaction หลัก — PromotionItemService::create มี transaction ของตัวเอง)
+        $material = $this->materializePromotionItems($batchId, $projectId);
+        $plan     = $material['plan'];
 
         // 2. ดึงเฉพาะ unit ที่จับคู่สำเร็จ
         $units = $this->db->table('premium_import_units')
@@ -386,39 +389,34 @@ class PremiumImportService
                 $this->db->table('project_units')->where('id', $unitId)->update($unitUpdate);
             }
 
-            // 2.2 upsert จำนวนเงินของแถมรายยูนิต
+            // 2.2 ผูกของแถมรายยูนิต
             $values = $this->db->table('premium_import_values')
                 ->where('import_unit_id', $u['id'])
                 ->get()->getResultArray();
 
             foreach ($values as $v) {
-                $itemId = $labelMap[trim((string) $v['premium_label'])] ?? null;
-                if (!$itemId) {
+                $label = trim((string) $v['premium_label']);
+                $p     = $plan[$label] ?? null;
+                if (!$p) {
                     continue;
                 }
 
-                $existing = $this->db->table('promotion_item_unit_values')
-                    ->where('promotion_item_id', $itemId)
-                    ->where('unit_id', $unitId)
-                    ->get()->getRowArray();
-
-                if ($existing) {
-                    $this->db->table('promotion_item_unit_values')
-                        ->where('id', $existing['id'])
-                        ->update([
-                            'amount'          => $v['amount'],
-                            'source_batch_id' => $batchId,
-                            'updated_at'      => $now,
-                        ]);
+                if ($p['strategy'] === 'per_unit') {
+                    // จำนวนเงินรายยูนิต — เก็บเฉพาะที่ amount > 0
+                    $itemId = $p['item_id'];
+                    if ((float) $v['amount'] > 0) {
+                        $this->upsertUnitValue($itemId, $unitId, (float) $v['amount'], $batchId, $now);
+                    }
                 } else {
-                    $this->db->table('promotion_item_unit_values')->insert([
-                        'promotion_item_id' => $itemId,
-                        'unit_id'           => $unitId,
-                        'amount'            => $v['amount'],
-                        'source_batch_id'   => $batchId,
-                        'created_at'        => $now,
-                        'updated_at'        => $now,
-                    ]);
+                    // group-by-value — ค่าอยู่ใน item.default_value แล้ว ไม่ต้องเก็บรายยูนิต
+                    $itemId = $p['value_items'][$this->valueKey($v['amount'])] ?? null;
+                }
+
+                // เขียน promotion_item_id กลับ staging เพื่อ traceability
+                if ($itemId) {
+                    $this->db->table('premium_import_values')
+                        ->where('id', $v['id'])
+                        ->update(['promotion_item_id' => $itemId]);
                 }
             }
 
@@ -446,76 +444,296 @@ class PremiumImportService
             'batch_id'      => $batchId,
             'synced_units'  => $syncedCount,
             'skipped_units' => (int) $batch['total_rows'] - $syncedCount,
-            'created_items' => $labels['created'],
+            'created_items' => $material['created'],
         ];
     }
 
     /**
-     * จับคู่ premium_label ทั้งหมดของ batch กับ promotion_item_master.name
-     * และเขียน promotion_item_id กลับลง premium_import_values
+     * สร้าง/จับคู่ promotion_item_master สำหรับทุก label ใน batch — เลือกกลยุทธ์อัตโนมัติ
      *
-     * @param bool $autoCreate true = สร้าง item ที่ยังไม่มี (ใช้ตอน sync)
-     * @return array{map: array<string,int>, resolved: string[], unresolved: string[], created: array}
+     * กลยุทธ์ต่อ label (ตัดสินจากจำนวนค่าที่ต่างกัน):
+     *   - group   : จำนวนค่า amount>0 ที่ต่างกัน ≤ จำนวนแบบบ้าน
+     *               → 1 รายการต่อ 1 ค่า, ค่าอยู่ใน default_value, ผูก eligibility
+     *   - per_unit: ค่าต่างกันมากกว่าจำนวนแบบบ้าน (เช่น คชจ ฟรีวันโอน)
+     *               → 1 รายการ, จำนวนเงินรายยูนิตเก็บ promotion_item_unit_values
+     *
+     * idempotent: รายการที่มีอยู่แล้วจะถูกจับคู่ (group=ชื่อ+ค่า, per_unit=ชื่อ) ไม่สร้างซ้ำ
+     *
+     * @return array{plan: array<string,array>, created: array}
      */
-    private function resolvePremiumLabels(int $batchId, int $projectId, bool $autoCreate): array
+    private function materializePromotionItems(int $batchId, int $projectId): array
     {
-        // distinct label + category ของ batch นี้
+        // label + category ที่อยู่ใน batch
         $labels = $this->db->table('premium_import_values v')
             ->select('v.premium_label, v.premium_category')
             ->join('premium_import_units u', 'u.id = v.import_unit_id')
             ->where('u.batch_id', $batchId)
+            ->where('u.match_status', 'matched')
             ->groupBy('v.premium_label, v.premium_category')
             ->get()->getResultArray();
 
-        // promotion item ของโครงการ — key by name (ไม่กรอง is_active กัน auto-create ซ้ำ)
-        $itemMap = [];
+        // promotion item เดิมของโครงการ — key by name → [{id, default_value}, ...]
+        $existing = [];
         foreach ($this->db->table('promotion_item_master')
-                     ->select('id, name')
+                     ->select('id, name, default_value')
                      ->where('project_id', $projectId)
                      ->get()->getResultArray() as $it) {
-            $itemMap[trim((string) $it['name'])] = (int) $it['id'];
+            $existing[trim((string) $it['name'])][] = $it;
         }
 
-        $map = [];
-        $resolved = $unresolved = $created = [];
-
-        foreach ($labels as $row) {
-            $label  = trim((string) $row['premium_label']);
-            $itemId = $itemMap[$label] ?? null;
-
-            if ($itemId === null && $autoCreate) {
-                $item = (new PromotionItemService())->create($projectId, [
-                    'name'          => $label,
-                    'category'      => $row['premium_category'],
-                    'value_mode'    => 'fixed',
-                    'default_value' => 0,
-                ]);
-                $itemId            = (int) $item['id'];
-                $itemMap[$label]   = $itemId;
-                $created[]         = [
-                    'label'             => $label,
-                    'category'          => $row['premium_category'],
-                    'promotion_item_id' => $itemId,
-                ];
+        // matched unit → house model
+        //   matched_house_model_id (DB) ใช้ผูก eligibility — code (Excel) ใช้ตัดสินกลยุทธ์
+        //   เพราะ "แบบบ้าน" ในไฟล์ (L/M/S) อาจไม่ตรงกับ house_models.code ในระบบ
+        $unitToModel     = [];   // uid => matched_house_model_id|null
+        $modelSet        = [];   // matched_house_model_id ที่ resolve ได้
+        $codeSet         = [];   // house_model_code (Excel) ที่ไม่ว่าง
+        $dbModelResolved = true; // true = ทุก matched unit มี matched_house_model_id
+        foreach ($this->db->table('premium_import_units')
+                     ->select('matched_unit_id, matched_house_model_id, house_model_code')
+                     ->where('batch_id', $batchId)
+                     ->where('match_status', 'matched')
+                     ->get()->getResultArray() as $r) {
+            if ($r['matched_unit_id'] === null) {
+                continue;
             }
+            $mid  = $r['matched_house_model_id'] !== null ? (int) $r['matched_house_model_id'] : null;
+            $code = trim((string) ($r['house_model_code'] ?? ''));
+            $unitToModel[(int) $r['matched_unit_id']] = $mid;
+            if ($mid !== null) {
+                $modelSet[$mid] = true;
+            } else {
+                $dbModelResolved = false;
+            }
+            if ($code !== '') {
+                $codeSet[$code] = true;
+            }
+        }
+        $totalUnits  = count($unitToModel);
+        $allModelIds = array_keys($modelSet);
+        // จำนวนกลุ่มแบบบ้าน (จาก code ในไฟล์) สำหรับตัดสินกลยุทธ์ — อย่างน้อย 1
+        $modelCount  = max(1, count($codeSet));
 
-            if ($itemId) {
-                $map[$label] = $itemId;
-                $resolved[]  = $label;
-                // เขียน promotion_item_id กลับ staging
-                $this->db->query(
-                    'UPDATE premium_import_values v
-                     JOIN premium_import_units u ON u.id = v.import_unit_id
-                     SET v.promotion_item_id = ?
-                     WHERE u.batch_id = ? AND v.premium_label = ?',
-                    [$itemId, $batchId, $label]
-                );
+        $svc     = new PromotionItemService();
+        $plan    = [];
+        $created = [];
+
+        foreach ($labels as $lab) {
+            $label    = trim((string) $lab['premium_label']);
+            $category = $lab['premium_category'];
+
+            // จำนวนเงิน amount>0 ของ label นี้ ต่อ matched unit
+            $rows = $this->db->table('premium_import_values v')
+                ->select('u.matched_unit_id, u.house_model_code, v.amount')
+                ->join('premium_import_units u', 'u.id = v.import_unit_id')
+                ->where('u.batch_id', $batchId)
+                ->where('u.match_status', 'matched')
+                ->where('v.premium_label', $label)
+                ->where('v.amount >', 0)
+                ->get()->getResultArray();
+
+            // group units ตามค่า + ตรวจว่าค่าผูกกับแบบบ้านสะอาดไหม (ใช้ code จากไฟล์)
+            $byValue    = [];   // valueKey => ['amount'=>float, 'units'=>[uid,...]]
+            $codeValues = [];   // house_model_code => set ของ valueKey
+            $allUnits   = [];   // uid ที่มี amount>0
+            $hasNoCode  = false;
+            foreach ($rows as $r) {
+                $uid = (int) $r['matched_unit_id'];
+                $amt = (float) $r['amount'];
+                $vk  = $this->valueKey($amt);
+                $byValue[$vk]['amount']  = $amt;
+                $byValue[$vk]['units'][] = $uid;
+                $allUnits[$uid]          = true;
+                $code = trim((string) ($r['house_model_code'] ?? ''));
+                if ($code === '') {
+                    $hasNoCode = true;
+                } else {
+                    $codeValues[$code][$vk] = true;
+                }
+            }
+            $distinctCount = count($byValue);
+
+            // per-model-clean = ทุกแบบบ้าน (code) มีค่าเดียว และทุก unit มี code
+            $clean = !$hasNoCode;
+            foreach ($codeValues as $set) {
+                if (count($set) > 1) {
+                    $clean = false;
+                    break;
+                }
+            }
+            // ผูก eligibility ระดับแบบบ้านได้ ต่อเมื่อ code สะอาด + house model ใน DB resolve ครบ
+            // มิฉะนั้น fallback เป็น eligibility ระดับยูนิต
+            $useHouseModel = $clean && $dbModelResolved;
+
+            if ($distinctCount >= 1 && $distinctCount <= $modelCount) {
+                // ── group-by-value ──
+                $valueItems = [];
+                foreach ($byValue as $vk => $info) {
+                    $itemId = $this->findExistingItem($existing, $label, $info['amount']);
+                    if ($itemId === null) {
+                        $elig = $this->deriveEligibility($info['units'], $unitToModel, $totalUnits, $allModelIds, $useHouseModel);
+                        $item = $svc->create($projectId, [
+                            'name'          => $label,
+                            'category'      => $category,
+                            'value_mode'    => 'fixed',
+                            'default_value' => $info['amount'],
+                        ], $elig['house_model_ids'], $elig['unit_ids']);
+                        $itemId = (int) $item['id'];
+                        $existing[$label][] = ['id' => $itemId, 'default_value' => $info['amount']];
+                        $created[] = [
+                            'label'                 => $label,
+                            'strategy'              => 'group',
+                            'value'                 => $info['amount'],
+                            'promotion_item_id'     => $itemId,
+                            'eligible_house_models' => count($elig['house_model_ids']),
+                            'eligible_units'        => count($elig['unit_ids']),
+                        ];
+                    }
+                    $valueItems[$vk] = $itemId;
+                }
+                $plan[$label] = ['strategy' => 'group', 'value_items' => $valueItems];
+            } else {
+                // ── per-unit (จำนวนเงินรายยูนิตใน promotion_item_unit_values) ──
+                $itemId = $this->findExistingItem($existing, $label, null);
+                if ($itemId === null) {
+                    $elig = $this->deriveEligibility(array_keys($allUnits), $unitToModel, $totalUnits, $allModelIds, false);
+                    // value_mode=unit_table → engine ดึงจำนวนเงินรายยูนิตจาก promotion_item_unit_values
+                    $item = $svc->create($projectId, [
+                        'name'          => $label,
+                        'category'      => $category,
+                        'value_mode'    => 'unit_table',
+                        'value_source'  => 'promotion_item_unit_value',
+                        'default_value' => 0,
+                    ], $elig['house_model_ids'], $elig['unit_ids']);
+                    $itemId = (int) $item['id'];
+                    $existing[$label][] = ['id' => $itemId, 'default_value' => 0];
+                    $created[] = [
+                        'label'             => $label,
+                        'strategy'          => 'per_unit',
+                        'promotion_item_id' => $itemId,
+                        'eligible_units'    => count($elig['unit_ids']),
+                        'distinct_values'   => $distinctCount,
+                    ];
+                }
+                $plan[$label] = ['strategy' => 'per_unit', 'item_id' => $itemId];
+            }
+        }
+
+        return ['plan' => $plan, 'created' => $created];
+    }
+
+    /**
+     * หา promotion item เดิมที่ตรงกัน
+     *
+     * @param ?float $value null = จับคู่ด้วยชื่อ (per_unit); มีค่า = จับคู่ชื่อ+default_value (group)
+     */
+    private function findExistingItem(array $existing, string $label, ?float $value): ?int
+    {
+        foreach ($existing[$label] ?? [] as $it) {
+            if ($value === null) {
+                return (int) $it['id'];
+            }
+            if (abs((float) $it['default_value'] - $value) < 0.005) {
+                return (int) $it['id'];
+            }
+        }
+        return null;
+    }
+
+    /** แปลงจำนวนเงินเป็น key สำหรับ group (ทศนิยม 2 ตำแหน่ง) */
+    private function valueKey($amount): string
+    {
+        return number_format((float) $amount, 2, '.', '');
+    }
+
+    /**
+     * หาเงื่อนไข eligibility ของ promotion item จากเซ็ตยูนิตที่ใช้ได้
+     *   - useHouseModel=true  → ผูกด้วยแบบบ้าน (ค่าผูกกับแบบบ้านสะอาด + DB resolve ครบ)
+     *   - useHouseModel=false → ผูกด้วยรายการยูนิต
+     *   - ถ้าครอบคลุมทั้งโครงการ → คืน [] (convention: ว่าง = ใช้ได้ทุกอัน)
+     *
+     * @return array{house_model_ids: int[], unit_ids: int[]}
+     */
+    private function deriveEligibility(array $eligibleUnitIds, array $unitToModel, int $totalUnits, array $allModelIds, bool $useHouseModel): array
+    {
+        $eligibleUnitIds = array_values(array_unique(array_map('intval', $eligibleUnitIds)));
+
+        if ($useHouseModel) {
+            $models = [];
+            foreach ($eligibleUnitIds as $uid) {
+                $mid = $unitToModel[$uid] ?? null;
+                if ($mid !== null) {
+                    $models[$mid] = true;
+                }
+            }
+            $modelIds = array_keys($models);
+            if (count($modelIds) > 0 && count($modelIds) < count($allModelIds)) {
+                return ['house_model_ids' => $modelIds, 'unit_ids' => []];
+            }
+            return ['house_model_ids' => [], 'unit_ids' => []];
+        }
+
+        if (count($eligibleUnitIds) > 0 && count($eligibleUnitIds) < $totalUnits) {
+            return ['house_model_ids' => [], 'unit_ids' => $eligibleUnitIds];
+        }
+        return ['house_model_ids' => [], 'unit_ids' => []];
+    }
+
+    /** upsert จำนวนเงินของแถมรายยูนิตลง promotion_item_unit_values */
+    private function upsertUnitValue(int $itemId, int $unitId, float $amount, int $batchId, string $now): void
+    {
+        $existing = $this->db->table('promotion_item_unit_values')
+            ->where('promotion_item_id', $itemId)
+            ->where('unit_id', $unitId)
+            ->get()->getRowArray();
+
+        if ($existing) {
+            $this->db->table('promotion_item_unit_values')
+                ->where('id', $existing['id'])
+                ->update(['amount' => $amount, 'source_batch_id' => $batchId, 'updated_at' => $now]);
+        } else {
+            $this->db->table('promotion_item_unit_values')->insert([
+                'promotion_item_id' => $itemId,
+                'unit_id'           => $unitId,
+                'amount'            => $amount,
+                'source_batch_id'   => $batchId,
+                'created_at'        => $now,
+                'updated_at'        => $now,
+            ]);
+        }
+    }
+
+    /**
+     * ตรวจว่า premium_label ของ batch มี promotion_item_master ชื่อตรงกันอยู่แล้วหรือยัง
+     *
+     * @return array{resolved: string[], unresolved: string[]}
+     */
+    private function checkLabelsExist(int $batchId, int $projectId): array
+    {
+        $labels = $this->db->table('premium_import_values v')
+            ->select('v.premium_label')
+            ->join('premium_import_units u', 'u.id = v.import_unit_id')
+            ->where('u.batch_id', $batchId)
+            ->groupBy('v.premium_label')
+            ->get()->getResultArray();
+
+        $names = [];
+        foreach ($this->db->table('promotion_item_master')
+                     ->select('name')
+                     ->where('project_id', $projectId)
+                     ->get()->getResultArray() as $it) {
+            $names[trim((string) $it['name'])] = true;
+        }
+
+        $resolved = $unresolved = [];
+        foreach ($labels as $l) {
+            $label = trim((string) $l['premium_label']);
+            if (isset($names[$label])) {
+                $resolved[] = $label;
             } else {
                 $unresolved[] = $label;
             }
         }
-
-        return ['map' => $map, 'resolved' => $resolved, 'unresolved' => $unresolved, 'created' => $created];
+        return ['resolved' => $resolved, 'unresolved' => $unresolved];
     }
 
     private function getBatchOrFail(int $batchId): array

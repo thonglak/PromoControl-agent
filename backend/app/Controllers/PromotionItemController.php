@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Services\PromotionItemService;
 use App\Services\EligiblePromotionService;
+use App\Services\PromotionValueSourceService;
 use CodeIgniter\HTTP\ResponseInterface;
 use RuntimeException;
 
@@ -37,6 +38,16 @@ class PromotionItemController extends BaseController
             'search'           => $this->request->getGet('search'),
         ];
         return $this->response->setStatusCode(200)->setJSON(['data' => $this->service->getList($projectId, $filters)]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GET /api/promotion-items/value-sources — แหล่งข้อมูลสำหรับ value_mode=unit_table
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function valueSources(): ResponseInterface
+    {
+        return $this->response->setStatusCode(200)
+            ->setJSON(['data' => (new PromotionValueSourceService())->list()]);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

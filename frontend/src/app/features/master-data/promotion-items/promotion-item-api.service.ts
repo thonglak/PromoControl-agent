@@ -15,7 +15,8 @@ export interface PromotionItem {
   max_value: number | null;
   default_used_value: number | null;
   discount_convert_value: number | null;
-  value_mode: 'fixed' | 'actual' | 'manual' | 'calculated';
+  value_mode: 'fixed' | 'actual' | 'manual' | 'calculated' | 'unit_table';
+  value_source: string | null;
   is_unit_standard: boolean;
   is_active: boolean;
   sort_order: number;
@@ -27,6 +28,13 @@ export interface PromotionItem {
   fee_formula?: any;
 }
 
+/** แหล่งข้อมูลค่ารายยูนิต — ใช้กับ value_mode = unit_table */
+export interface PromotionValueSource {
+  key: string;
+  label: string;
+  description: string;
+}
+
 export interface PromotionItemPayload {
   code?: string;
   name: string;
@@ -35,6 +43,7 @@ export interface PromotionItemPayload {
   max_value?: number | null;
   default_used_value?: number | null;
   value_mode: string;
+  value_source?: string | null;
   is_unit_standard: boolean;
   is_active?: boolean;
   sort_order: number;
@@ -59,6 +68,13 @@ export class PromotionItemApiService {
 
   getById(id: number): Observable<PromotionItem> {
     return this.http.get<{ data: PromotionItem }>('/api/promotion-items/' + id).pipe(map(r => r.data));
+  }
+
+  /** ดึงรายการแหล่งข้อมูลค่ารายยูนิต (สำหรับ value_mode = unit_table) */
+  getValueSources(): Observable<PromotionValueSource[]> {
+    return this.http
+      .get<{ data: PromotionValueSource[] }>('/api/promotion-items/value-sources')
+      .pipe(map(r => r.data));
   }
 
   create(payload: PromotionItemPayload): Observable<PromotionItem> {
@@ -161,7 +177,7 @@ export interface PromotionItemJson {
   max_value: number | null;
   default_used_value: number | null;
   discount_convert_value: number | null;
-  value_mode: 'fixed' | 'actual' | 'manual' | 'calculated';
+  value_mode: 'fixed' | 'actual' | 'manual' | 'calculated' | 'unit_table';
   is_unit_standard: boolean;
   is_active: boolean;
   sort_order: number;

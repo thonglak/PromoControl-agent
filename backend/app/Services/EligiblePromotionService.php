@@ -13,11 +13,13 @@ class EligiblePromotionService
 {
     private BaseConnection $db;
     private FormulaExpressionEvaluator $evaluator;
+    private PromotionValueSourceService $valueSourceService;
 
     public function __construct()
     {
         $this->db = \Config\Database::connect();
         $this->evaluator = new FormulaExpressionEvaluator();
+        $this->valueSourceService = new PromotionValueSourceService();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -226,6 +228,20 @@ class EligiblePromotionService
             'sort_order'         => (int) $item['sort_order'],
             'is_unit_standard'   => (bool) $item['is_unit_standard'],
         ];
+
+        // unit_table — ดึงค่ารายยูนิตจากตารางตาม value_source แล้ว override ค่า
+        // (ถ้าไม่มีข้อมูลของยูนิตนั้น → คง default_value เดิมเป็น fallback)
+        if ($item['value_mode'] === 'unit_table') {
+            $resolved = $this->valueSourceService->resolve(
+                (string) ($item['value_source'] ?? ''),
+                (int) $item['id'],
+                (int) $unit['id']
+            );
+            if ($resolved !== null) {
+                $result['default_value']      = $resolved;
+                $result['default_used_value'] = $resolved;
+            }
+        }
 
         // สำหรับ calculated items — pre-calculate ค่า
         if ($item['value_mode'] === 'calculated' && $formula) {

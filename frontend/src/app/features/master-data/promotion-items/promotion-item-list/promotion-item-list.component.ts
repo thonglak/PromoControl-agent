@@ -300,10 +300,13 @@ export class PromotionItemListComponent implements OnInit {
     return c === 'discount' ? 'bg-amber-50 text-amber-700' : c === 'premium' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700';
   }
   modeLabel(m: string): string {
-    return m === 'fixed' ? 'คงที่' : m === 'actual' ? 'ตามจริง' : m === 'manual' ? 'กำหนดเอง' : 'คำนวณอัตโนมัติ';
+    return m === 'fixed' ? 'คงที่' : m === 'actual' ? 'ตามจริง' : m === 'manual' ? 'กำหนดเอง'
+      : m === 'unit_table' ? 'ดึงค่ารายยูนิต' : 'คำนวณอัตโนมัติ';
   }
   modeClass(m: string): string {
-    return m === 'fixed' ? 'bg-slate-100 text-slate-600' : m === 'actual' ? 'bg-green-50 text-green-700' : m === 'manual' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700';
+    return m === 'fixed' ? 'bg-slate-100 text-slate-600' : m === 'actual' ? 'bg-green-50 text-green-700'
+      : m === 'manual' ? 'bg-amber-50 text-amber-700' : m === 'unit_table' ? 'bg-teal-50 text-teal-700'
+      : 'bg-blue-50 text-blue-700';
   }
   formatCurrency(v: any): string {
     const n = Number(v);

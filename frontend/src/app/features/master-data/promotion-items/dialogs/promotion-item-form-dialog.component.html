@@ -42,6 +42,7 @@
             <mat-option value="actual">ตามจริง</mat-option>
             <mat-option value="manual">กำหนดเอง</mat-option>
             <mat-option value="calculated">คำนวณอัตโนมัติ</mat-option>
+            <mat-option value="unit_table">ดึงค่ารายยูนิตจากตาราง</mat-option>
           </mat-select>
         </mat-form-field>
       </div>
@@ -51,6 +52,18 @@
           <app-icon name="exclamation-triangle" class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--color-warning)" />
           <span>ต้องตั้งค่าสูตรคำนวณในหน้า Fee Formula หลังบันทึก</span>
         </div>
+      }
+
+      @if (form.get('value_mode')?.value === 'unit_table') {
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>แหล่งข้อมูลค่ารายยูนิต</mat-label>
+          <mat-select formControlName="value_source">
+            @for (src of valueSources(); track src.key) {
+              <mat-option [value]="src.key">{{ src.label }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>จำนวนเงินจะดึงตามแต่ละยูนิตจากตารางที่เลือก ตอนทำรายการขาย</mat-hint>
+        </mat-form-field>
       }
     </div>
 

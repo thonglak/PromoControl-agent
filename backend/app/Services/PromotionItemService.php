@@ -84,6 +84,7 @@ class PromotionItemService
                 'default_used_value' => isset($data['default_used_value']) ? (float) $data['default_used_value'] : null,
                 'discount_convert_value' => isset($data['discount_convert_value']) ? (float) $data['discount_convert_value'] : null,
                 'value_mode'         => $data['value_mode'] ?? 'fixed',
+                'value_source'       => ($data['value_mode'] ?? 'fixed') === 'unit_table' ? ($data['value_source'] ?? null) : null,
                 'is_unit_standard'   => !empty($data['is_unit_standard']) ? 1 : 0,
                 'is_active'          => isset($data['is_active']) ? ($data['is_active'] ? 1 : 0) : 1,
                 'sort_order'         => (int) ($data['sort_order'] ?? 0),
@@ -132,6 +133,7 @@ class PromotionItemService
                 'default_used_value' => isset($data['default_used_value']) ? (float) $data['default_used_value'] : null,
                 'discount_convert_value' => isset($data['discount_convert_value']) ? (float) $data['discount_convert_value'] : null,
                 'value_mode'         => $data['value_mode'] ?? 'fixed',
+                'value_source'       => ($data['value_mode'] ?? 'fixed') === 'unit_table' ? ($data['value_source'] ?? null) : null,
                 'is_unit_standard'   => !empty($data['is_unit_standard']) ? 1 : 0,
                 'is_active'          => isset($data['is_active']) ? ($data['is_active'] ? 1 : 0) : 1,
                 'sort_order'         => (int) ($data['sort_order'] ?? 0),
@@ -213,8 +215,11 @@ class PromotionItemService
 
         if (!in_array($data['category'] ?? '', ['discount', 'premium', 'expense_support'], true))
             $errors[] = 'ประเภทต้องเป็น discount, premium หรือ expense_support';
-        if (!in_array($data['value_mode'] ?? 'fixed', ['fixed', 'actual', 'manual', 'calculated'], true))
+        if (!in_array($data['value_mode'] ?? 'fixed', ['fixed', 'actual', 'manual', 'calculated', 'unit_table'], true))
             $errors[] = 'รูปแบบมูลค่าไม่ถูกต้อง';
+        if (($data['value_mode'] ?? '') === 'unit_table'
+            && !(new PromotionValueSourceService())->isValid((string) ($data['value_source'] ?? '')))
+            $errors[] = 'กรุณาเลือกแหล่งข้อมูลค่ารายยูนิตที่ถูกต้อง';
         if (isset($data['max_value'], $data['default_value']) && (float) $data['max_value'] < (float) $data['default_value'])
             $errors[] = 'มูลค่าสูงสุดต้องไม่น้อยกว่ามูลค่าเริ่มต้น';
         if (isset($data['default_used_value'], $data['max_value']) && (float) $data['default_used_value'] > (float) $data['max_value'])

@@ -11,7 +11,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { PromotionItemApiService, PromotionItem } from '../promotion-item-api.service';
+import { PromotionItemApiService, PromotionItem, PromotionValueSource } from '../promotion-item-api.service';
 import { HouseModelApiService, HouseModel } from '../../house-models/house-model-api.service';
 import { UnitApiService, Unit } from '../../units/unit-api.service';
 import { ProjectService } from '../../../../core/services/project.service';
@@ -57,6 +57,7 @@ export class PromotionItemFormDialogComponent implements OnInit {
   serverError  = signal<string | null>(null);
   houseModels  = signal<HouseModel[]>([]);
   units        = signal<Unit[]>([]);
+  valueSources = signal<PromotionValueSource[]>([]);
 
   private item = this.data.item;
 
@@ -64,6 +65,7 @@ export class PromotionItemFormDialogComponent implements OnInit {
     name:               [this.item?.name ?? '', Validators.required],
     category:           [this.item?.category ?? 'discount', Validators.required],
     value_mode:         [this.item?.value_mode ?? 'fixed', Validators.required],
+    value_source:       [this.item?.value_source ?? null as string | null],
     max_value:          [this.item?.max_value ?? null as number | null],
     default_used_value: [this.item?.default_used_value ?? null as number | null],
     discount_convert_value: [this.item?.discount_convert_value ?? null as number | null],
@@ -83,6 +85,7 @@ export class PromotionItemFormDialogComponent implements OnInit {
   get projectId(): number { return Number(this.project.selectedProject()?.id ?? 0); }
 
   ngOnInit(): void {
+    this.api.getValueSources().subscribe({ next: s => this.valueSources.set(s) });
     if (this.projectId) {
       this.hmApi.getList(this.projectId).subscribe({ next: m => this.houseModels.set(m) });
       this.unitApi.getList(this.projectId).subscribe({ next: u => this.units.set(u) });
@@ -101,6 +104,7 @@ export class PromotionItemFormDialogComponent implements OnInit {
       name:               v.name,
       category:           v.category,
       value_mode:         v.value_mode,
+      value_source:       v.value_mode === 'unit_table' ? (v.value_source ?? null) : null,
       default_value:      0,
       max_value:          v.max_value ?? null,
       default_used_value: v.default_used_value ?? null,
