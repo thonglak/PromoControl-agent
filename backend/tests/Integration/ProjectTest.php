@@ -234,8 +234,6 @@ final class ProjectTest extends BaseIntegrationTest
             'total_discount'        => 50000,
             'total_promo_cost'      => 0,
             'total_expense_support' => 0,
-            'customer_name'         => 'ลูกค้าทดสอบ',
-            'salesperson'           => 'พนักงานทดสอบ',
             'sale_date'             => date('Y-m-d'),
             'status'                => 'active',
             'created_by'            => 1,
@@ -528,7 +526,6 @@ final class ProjectTest extends BaseIntegrationTest
             'project_id'  => $projectId,
             'code'        => 'HM-001',
             'name'        => 'แบบบ้าน A',
-            'description' => '',
             'created_at'  => date('Y-m-d H:i:s'),
             'updated_at'  => date('Y-m-d H:i:s'),
         ]);
@@ -609,7 +606,6 @@ final class ProjectTest extends BaseIntegrationTest
             'project_id'  => $projectId,
             'code'        => 'HM-SUB-001',
             'name'        => 'แบบบ้าน Premium',
-            'description' => 'แบบบ้าน 2 ชั้น',
             'created_at'  => date('Y-m-d H:i:s'),
             'updated_at'  => date('Y-m-d H:i:s'),
         ]);
