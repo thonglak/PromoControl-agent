@@ -139,7 +139,6 @@ class ProjectController extends BaseController
                 'name'                => trim((string) $body['name']),
                 'description'         => trim((string) ($body['description']  ?? '')),
                 'project_type'        => (string) $body['project_type'],
-                'approval_required'   => (bool) ($body['approval_required'] ?? false),
                 'allow_over_budget'   => (bool) ($body['allow_over_budget'] ?? false),
                 'pool_budget_amount'  => max(0, (float) ($body['pool_budget_amount'] ?? 0)),
                 'approved_project_value' => isset($body['approved_project_value']) && $body['approved_project_value'] !== null && $body['approved_project_value'] !== ''
@@ -201,7 +200,6 @@ class ProjectController extends BaseController
         if (isset($body['name']))               $updateData['name']               = trim((string) $body['name']);
         if (isset($body['description']))        $updateData['description']        = trim((string) $body['description']);
         if (isset($body['project_type']))       $updateData['project_type']       = (string) $body['project_type'];
-        if (isset($body['approval_required']))  $updateData['approval_required']  = (bool) $body['approval_required'];
         if (isset($body['allow_over_budget']))  $updateData['allow_over_budget']  = (bool) $body['allow_over_budget'];
         if (isset($body['pool_budget_amount'])) $updateData['pool_budget_amount'] = max(0, (float) $body['pool_budget_amount']);
         if (array_key_exists('approved_project_value', $body)) {

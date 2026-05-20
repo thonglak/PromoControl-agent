@@ -10,7 +10,6 @@ export interface Project {
   project_type: 'condo' | 'house' | 'townhouse' | 'mixed';
   status: 'active' | 'inactive' | 'completed';
   location?: string;
-  approval_required: boolean | number;
   allow_over_budget: boolean | number;
   pool_budget_amount: number;
   /** มูลค่าโครงการที่อนุมัติ — ถ้า null/0 Dashboard fallback SUM(base_price) */
@@ -32,7 +31,6 @@ export interface ProjectCreatePayload {
   name: string;
   project_type: string;
   location?: string;
-  approval_required?: boolean;
   allow_over_budget?: boolean;
   pool_budget_amount?: number;
   approved_project_value?: number | null;
@@ -51,7 +49,6 @@ export interface ProjectUpdatePayload {
   project_type?: string;
   status?: string;
   location?: string;
-  approval_required?: boolean;
   allow_over_budget?: boolean;
   pool_budget_amount?: number;
   approved_project_value?: number | null;

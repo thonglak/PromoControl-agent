@@ -362,10 +362,8 @@ class BudgetMovementService
         // Generate movement_no
         $movementNo = $this->generateMovementNo($projectId);
 
-        // Check approval_required
-        $project = $this->db->table('projects')->select('approval_required')
-            ->where('id', $projectId)->get()->getRowArray();
-        $status = (!empty($project['approval_required'])) ? 'pending' : 'approved';
+        // budget_movement อนุมัติทันทีเสมอ — ไม่มีขั้นตอนรออนุมัติงบแล้ว
+        $status = 'approved';
 
         $now = date('Y-m-d H:i:s');
 
@@ -396,71 +394,6 @@ class BudgetMovementService
             'approved_at'        => $status === 'approved' ? $now : null,
             'created_at'         => $now,
         ]);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 5. approveMovement
-    // ═══════════════════════════════════════════════════════════════════════
-
-    public function approveMovement(int $movementId, int $approvedBy): array
-    {
-        $movement = $this->db->table('budget_movements')
-            ->where('id', $movementId)->get()->getRowArray();
-
-        if (!$movement) throw new RuntimeException('ไม่พบรายการเคลื่อนไหว');
-        if ($movement['status'] !== 'pending') throw new RuntimeException('รายการนี้ไม่ได้อยู่ในสถานะรอการอนุมัติ');
-
-        // ตรวจ balance ซ้ำก่อน approve (ป้องกัน race condition)
-        $moveType   = $movement['movement_type'];
-        $sourceType = $movement['budget_source_type'];
-        $amount     = (float) $movement['amount'];
-        $projectId  = (int) $movement['project_id'];
-        $unitId     = (int) $movement['unit_id'];
-
-        // MANAGEMENT_SPECIAL อนุญาตให้ติดลบได้ — ทีมการตลาดบริหารจัดการเอง (ข้าม validation)
-        if ($sourceType !== 'MANAGEMENT_SPECIAL' && in_array($moveType, self::USE_TYPES, true)) {
-            $summary   = $this->getUnitBudgetSummary($projectId, $unitId);
-            $remaining = $summary[$sourceType]['remaining'] ?? 0;
-            if ($remaining < $amount) {
-                throw new RuntimeException("งบคงเหลือไม่พอ ไม่สามารถอนุมัติได้ (คงเหลือ: " . number_format($remaining, 2) . " บาท)");
-            }
-        }
-
-        if (in_array($moveType, self::ALLOCATE_TYPES, true) && $sourceType === 'PROJECT_POOL') {
-            $poolBalance = $this->getPoolBalance($projectId);
-            if ($poolBalance < $amount) {
-                throw new RuntimeException('งบ Pool คงเหลือไม่พอ ไม่สามารถอนุมัติได้');
-            }
-        }
-
-        $now = date('Y-m-d H:i:s');
-        $this->db->table('budget_movements')
-            ->where('id', $movementId)
-            ->update(['status' => 'approved', 'approved_by' => $approvedBy, 'approved_at' => $now, 'updated_at' => $now]);
-
-        return $this->db->table('budget_movements')
-            ->where('id', $movementId)->get()->getRowArray();
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 6. rejectMovement
-    // ═══════════════════════════════════════════════════════════════════════
-
-    public function rejectMovement(int $movementId, int $rejectedBy, string $reason = ''): array
-    {
-        $movement = $this->db->table('budget_movements')
-            ->where('id', $movementId)->get()->getRowArray();
-
-        if (!$movement) throw new RuntimeException('ไม่พบรายการเคลื่อนไหว');
-        if ($movement['status'] !== 'pending') throw new RuntimeException('รายการนี้ไม่ได้อยู่ในสถานะรอการอนุมัติ');
-
-        $now = date('Y-m-d H:i:s');
-        $this->db->table('budget_movements')
-            ->where('id', $movementId)
-            ->update(['status' => 'rejected', 'approved_by' => $rejectedBy, 'approved_at' => $now, 'note' => $reason, 'updated_at' => $now]);
-
-        return $this->db->table('budget_movements')
-            ->where('id', $movementId)->get()->getRowArray();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -520,10 +453,8 @@ class BudgetMovementService
             throw new RuntimeException('จำนวนเงินเกินงบคงเหลือ (คงเหลือ ' . number_format($remaining, 0) . ' บาท)');
         }
 
-        // 7. Check approval_required
-        $project = $this->db->table('projects')->select('approval_required')
-            ->where('id', $projectId)->get()->getRowArray();
-        $status = (!empty($project['approval_required'])) ? 'pending' : 'approved';
+        // 7. budget_movement อนุมัติทันทีเสมอ — ไม่มีขั้นตอนรออนุมัติงบแล้ว
+        $status = 'approved';
 
         // 8. Generate movement_no
         $movementNo = $this->generateMovementNo($projectId);

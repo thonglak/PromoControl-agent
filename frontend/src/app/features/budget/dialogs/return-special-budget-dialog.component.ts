@@ -21,7 +21,6 @@ export interface ReturnSpecialBudgetDialogData {
   allocated: number;
   used: number;
   remaining: number;
-  approval_required?: boolean;
 }
 
 @Component({
@@ -106,12 +105,6 @@ export interface ReturnSpecialBudgetDialogData {
           <div class="text-sm text-red-600 bg-red-50 p-3 rounded">{{ errorMsg() }}</div>
         }
 
-        <!-- Approval note -->
-        @if (data.approval_required) {
-          <div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded">
-            หมายเหตุ: รายการคืนงบจะต้องรอการอนุมัติก่อนมีผล
-          </div>
-        }
       </div>
     </mat-dialog-content>
 
@@ -183,10 +176,7 @@ export class ReturnSpecialBudgetDialogComponent {
     }).subscribe({
       next: (res) => {
         this.saving.set(false);
-        const msg = res.data.status === 'approved'
-          ? 'คืนงบสำเร็จ'
-          : 'ส่งคำขอคืนงบสำเร็จ รอการอนุมัติ';
-        this.snackBar.open(msg, 'ปิด', { duration: 3000 });
+        this.snackBar.open('คืนงบสำเร็จ', 'ปิด', { duration: 3000 });
         this.dialogRef.close(res.data);
       },
       error: (err) => {

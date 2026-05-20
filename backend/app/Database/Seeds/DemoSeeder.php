@@ -36,7 +36,6 @@ class DemoSeeder extends Seeder
             'company_name'       => 'บริษัท ทดสอบ ดีเวลลอปเมนท์ จำกัด',
             'location'           => 'ถนนรัชดาภิเษก เขตดินแดง กรุงเทพมหานคร',
             'project_type'       => 'condo',
-            'approval_required'  => true,
             'pool_budget_amount' => 1000000.00,
             'status'             => 'active',
             'start_date'         => '2024-01-01',

@@ -170,8 +170,6 @@ $routes->group('api', static function (RouteCollection $routes): void {
     });
     $routes->group('budget-movements', ['filter' => 'role:admin,manager'], static function (RouteCollection $routes): void {
         $routes->post('/',                    'BudgetMovementController::create');
-        $routes->post('(:num)/approve',       'BudgetMovementController::approve/$1');
-        $routes->post('(:num)/reject',        'BudgetMovementController::reject/$1');
         $routes->post('return-special',        'BudgetMovementController::returnSpecialBudget');
         $routes->post('transfer-special',      'BudgetMovementController::transferSpecialBudget');
         $routes->post('void-special',          'BudgetMovementController::voidSpecialBudget');

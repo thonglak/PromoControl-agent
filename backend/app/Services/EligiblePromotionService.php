@@ -30,7 +30,7 @@ class EligiblePromotionService
     {
         // โหลดข้อมูลยูนิต + project-level vars (สำหรับ expression formulas)
         $unit = $this->db->table('project_units pu')
-            ->select('pu.*, pr.project_type, pr.approval_required, pr.common_fee_rate, pr.electric_meter_fee, pr.water_meter_fee, pr.pool_budget_amount')
+            ->select('pu.*, pr.project_type, pr.common_fee_rate, pr.electric_meter_fee, pr.water_meter_fee, pr.pool_budget_amount')
             ->join('projects pr', 'pr.id = pu.project_id', 'left')
             ->where('pu.id', $unitId)
             ->get()->getRowArray();

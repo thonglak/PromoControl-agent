@@ -64,9 +64,7 @@ export class StatusChipComponent {
         SPECIAL_BUDGET_USE: { label: 'SPECIAL_BUDGET_USE', bgColor: Eb, textColor: E },
       },
       movement_status: {
-        pending:  { label: 'รอ',       bgColor: Wb, textColor: W },
         approved: { label: 'อนุมัติ',   bgColor: Sb, textColor: S },
-        rejected: { label: 'ปฏิเสธ',   bgColor: Eb, textColor: E },
         voided:   { label: 'ยกเลิก',   bgColor: Nb, textColor: G },
       },
       budget_source: {

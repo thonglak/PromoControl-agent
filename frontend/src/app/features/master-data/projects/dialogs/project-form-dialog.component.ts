@@ -210,13 +210,6 @@ export interface ProjectFormDialogData {
 
         <mat-divider />
 
-        <!-- Approval required -->
-        <div class="flex items-center gap-2">
-          <mat-checkbox formControlName="approval_required" color="primary">
-            ต้องอนุมัติการขายก่อนบันทึก
-          </mat-checkbox>
-        </div>
-
         <!-- Allow over budget -->
         <div class="flex items-center gap-2">
           <mat-checkbox formControlName="allow_over_budget" color="warn">
@@ -301,7 +294,6 @@ export class ProjectFormDialogComponent {
         ? new Date(this.data.project.legacy_dashboard_as_of_date)
         : null as Date | null,
     ],
-    approval_required:   [!!Number(this.data.project?.approval_required)],
     allow_over_budget:   [!!Number(this.data.project?.allow_over_budget)],
   });
 
@@ -338,7 +330,6 @@ export class ProjectFormDialogComponent {
           common_fee_rate:    val.common_fee_rate ?? 0,
           electric_meter_fee: val.electric_meter_fee ?? 0,
           water_meter_fee:    val.water_meter_fee ?? 0,
-          approval_required:  !!val.approval_required,
           allow_over_budget:  !!val.allow_over_budget,
           legacy_sold_units:             val.legacy_sold_units ?? 0,
           legacy_sold_net_price:         val.legacy_sold_net_price ?? 0,
@@ -356,7 +347,6 @@ export class ProjectFormDialogComponent {
           common_fee_rate:    val.common_fee_rate ?? 0,
           electric_meter_fee: val.electric_meter_fee ?? 0,
           water_meter_fee:    val.water_meter_fee ?? 0,
-          approval_required:  !!val.approval_required,
           allow_over_budget:  !!val.allow_over_budget,
           legacy_sold_units:             val.legacy_sold_units ?? 0,
           legacy_sold_net_price:         val.legacy_sold_net_price ?? 0,

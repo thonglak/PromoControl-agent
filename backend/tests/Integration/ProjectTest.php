@@ -31,7 +31,6 @@ final class ProjectTest extends BaseIntegrationTest
                            'code'              => $code,
                            'name'              => $name,
                            'project_type'      => 'house',
-                           'approval_required' => false,
                            'pool_budget_amount' => 1000000,
                        ]);
 
@@ -96,7 +95,6 @@ final class ProjectTest extends BaseIntegrationTest
                            'name'              => 'The Garden Residence',
                            'project_type'      => 'house',
                            'description'       => 'โครงการบ้านเดี่ยว',
-                           'approval_required' => true,
                            'pool_budget_amount' => 500000,
                        ]);
 

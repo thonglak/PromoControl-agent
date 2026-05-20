@@ -522,10 +522,6 @@ class SalesTransactionService
     private function createBudgetMovements(int $projectId, int $unitId, array $items, int $createdBy, ?int $transactionId = null, array $addOns = []): array
     {
         $movements = [];
-        $project = $this->db->table('projects')
-            ->select('approval_required')
-            ->where('id', $projectId)->get()->getRowArray();
-        $approvalRequired = !empty($project['approval_required']);
 
         foreach ($items as $item) {
             $source = $item['funding_source_type'];
@@ -539,7 +535,7 @@ class SalesTransactionService
             };
 
             $movementNo = $this->generateMovementNo($projectId);
-            $status = $approvalRequired ? 'pending' : 'approved';
+            $status = 'approved'; // อนุมัติทันทีเสมอ — ไม่มีขั้นตอนรออนุมัติงบแล้ว
             $now = date('Y-m-d H:i:s');
 
             $this->db->table('budget_movements')->insert([
@@ -567,7 +563,7 @@ class SalesTransactionService
         $addExpenseMode = $addOns['additional_expense_mode'] ?? 'add_to_net';
         if ($addExpenseMode === 'as_premium' && $addExpenseAmount > 0) {
             $movementNo = $this->generateMovementNo($projectId);
-            $status = $approvalRequired ? 'pending' : 'approved';
+            $status = 'approved'; // อนุมัติทันทีเสมอ — ไม่มีขั้นตอนรออนุมัติงบแล้ว
             $now = date('Y-m-d H:i:s');
 
             $this->db->table('budget_movements')->insert([
@@ -635,7 +631,7 @@ class SalesTransactionService
             };
 
             $movementNo = $this->generateMovementNo($projectId);
-            $status = $movement['status'] === 'approved' ? 'approved' : 'pending';
+            $status = 'approved'; // อนุมัติทันทีเสมอ — ไม่มีขั้นตอนรออนุมัติงบแล้ว
             $now = date('Y-m-d H:i:s');
 
             $this->db->table('budget_movements')->insert([

@@ -275,28 +275,6 @@ export class SpecialBudgetComponent implements OnInit {
     this.loadMovements();
   }
 
-  approve(id: number): void {
-    this.budgetSvc.approveMovement(id).subscribe({
-      next: () => {
-        this.snackBar.open('อนุมัติรายการสำเร็จ', 'ปิด', { duration: 3000 });
-        this.loadMovements();
-      },
-      error: () => this.snackBar.open('อนุมัติล้มเหลว', 'ปิด', { duration: 3000 }),
-    });
-  }
-
-  reject(id: number): void {
-    const reason = window.prompt('กรุณาระบุเหตุผลที่ปฏิเสธ:');
-    if (reason == null) return;
-    this.budgetSvc.rejectMovement(id, reason).subscribe({
-      next: () => {
-        this.snackBar.open('ปฏิเสธรายการสำเร็จ', 'ปิด', { duration: 3000 });
-        this.loadMovements();
-      },
-      error: () => this.snackBar.open('ปฏิเสธล้มเหลว', 'ปิด', { duration: 3000 }),
-    });
-  }
-
   // ── Tab 3: Load Summaries ──
   loadSummaries(): void {
     const pid = this.projectId();
@@ -431,9 +409,8 @@ export class SpecialBudgetComponent implements OnInit {
       budget_source_type: sourceType as any,
       note: note.trim(),
     }).subscribe({
-      next: (res) => {
-        const msg = res.data.status === 'approved' ? 'ยกเลิกงบสำเร็จ' : 'ส่งคำขอยกเลิกสำเร็จ รอการอนุมัติ';
-        this.snackBar.open(msg, 'ปิด', { duration: 3000 });
+      next: () => {
+        this.snackBar.open('ยกเลิกงบสำเร็จ', 'ปิด', { duration: 3000 });
         this.loadMovements();
         this.loadSummaries();
       },
@@ -444,8 +421,6 @@ export class SpecialBudgetComponent implements OnInit {
   }
 
   private doOpenReturnDialog(pid: number, unitId: number, unitCode: string, sourceType: string, allocated: number, used: number, remaining: number): void {
-    const approvalRequired = (this.projectSvc.selectedProject() as any)?.approval_required;
-
     const ref = this.dialog.open(ReturnSpecialBudgetDialogComponent, {
       data: {
         project_id: pid,
@@ -456,7 +431,6 @@ export class SpecialBudgetComponent implements OnInit {
         allocated,
         used,
         remaining,
-        approval_required: !!Number(approvalRequired),
       } as ReturnSpecialBudgetDialogData,
       width: '480px',
       maxHeight: '90vh',
@@ -532,15 +506,14 @@ export class SpecialBudgetComponent implements OnInit {
   }
 
   statusLabel(s: string): string {
-    const map: Record<string, string> = { approved: 'อนุมัติ', pending: 'รอการอนุมัติ', rejected: 'ปฏิเสธ' };
+    const map: Record<string, string> = { approved: 'อนุมัติ', voided: 'ยกเลิก' };
     return map[s] ?? s;
   }
 
   statusClass(s: string): string {
     const map: Record<string, string> = {
       approved: 'bg-green-50 text-green-700',
-      pending: 'bg-amber-50 text-amber-700',
-      rejected: 'bg-red-50 text-red-700',
+      voided:   'bg-slate-100 text-slate-500',
     };
     return map[s] ?? 'bg-slate-100 text-slate-600';
   }

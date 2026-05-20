@@ -6,8 +6,8 @@ import { map } from 'rxjs/operators';
 export interface BudgetMovement {
   id: number; movement_no: string; project_id: number; unit_id: number;
   movement_type: string; budget_source_type: string; amount: number;
-  status: 'pending' | 'approved' | 'rejected';
-  unit_code?: string; created_by_name?: string; approved_by_name?: string;
+  status: 'approved' | 'voided';
+  unit_code?: string; created_by_name?: string;
   note?: string; created_at: string;
 }
 
@@ -18,7 +18,7 @@ export interface UnitBudgetSummary {
   UNIT_STANDARD: SourceSummary; PROJECT_POOL: SourceSummary;
   MANAGEMENT_SPECIAL: SourceSummary;
   total_allocated: number; total_used: number; total_remaining: number;
-  recent_movements?: any[]; pending_count?: number;
+  recent_movements?: any[];
 }
 
 export interface PoolBalance {
@@ -115,14 +115,6 @@ export class BudgetService {
 
   createMovement(data: any): Observable<BudgetMovement> {
     return this.http.post<{ data: BudgetMovement }>('/api/budget-movements', data).pipe(map(r => r.data));
-  }
-
-  approveMovement(id: number): Observable<any> {
-    return this.http.post<any>(`/api/budget-movements/${id}/approve`, {});
-  }
-
-  rejectMovement(id: number, reason: string): Observable<any> {
-    return this.http.post<any>(`/api/budget-movements/${id}/reject`, { reason });
   }
 
   // ── Allocations ──

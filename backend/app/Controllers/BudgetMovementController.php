@@ -89,10 +89,6 @@ class BudgetMovementController extends BaseController
                 ->where('project_id', $pid)->where('unit_id', $unitId)
                 ->orderBy('created_at', 'DESC')->limit(5)->get()->getResultArray();
 
-            $summary['pending_count'] = (int) $this->db()->table('budget_movements')
-                ->where('project_id', $pid)->where('unit_id', $unitId)->where('status', 'pending')
-                ->countAllResults();
-
             return $this->response->setStatusCode(200)->setJSON(['data' => $summary]);
         } catch (RuntimeException $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
@@ -156,35 +152,6 @@ class BudgetMovementController extends BaseController
         try {
             $r = $this->svc->createMovement($body);
             return $this->response->setStatusCode(201)->setJSON(['message' => 'สร้างรายการเคลื่อนไหวสำเร็จ', 'data' => $r]);
-        } catch (RuntimeException $e) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // POST /api/budget-movements/:id/approve
-    // ═══════════════════════════════════════════════════════════════════════
-
-    public function approve(int $id): ResponseInterface
-    {
-        if (!$this->canWrite()) return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์']);
-        try {
-            return $this->response->setStatusCode(200)->setJSON(['message' => 'อนุมัติสำเร็จ', 'data' => $this->svc->approveMovement($id, $this->userId())]);
-        } catch (RuntimeException $e) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // POST /api/budget-movements/:id/reject
-    // ═══════════════════════════════════════════════════════════════════════
-
-    public function reject(int $id): ResponseInterface
-    {
-        if (!$this->canWrite()) return $this->response->setStatusCode(403)->setJSON(['error' => 'ไม่มีสิทธิ์']);
-        $body = $this->request->getJSON(true) ?? [];
-        try {
-            return $this->response->setStatusCode(200)->setJSON(['message' => 'ปฏิเสธสำเร็จ', 'data' => $this->svc->rejectMovement($id, $this->userId(), $body['reason'] ?? '')]);
         } catch (RuntimeException $e) {
             return $this->response->setStatusCode(400)->setJSON(['error' => $e->getMessage()]);
         }

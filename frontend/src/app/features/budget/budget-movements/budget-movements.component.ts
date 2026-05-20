@@ -8,7 +8,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -16,7 +15,6 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { BudgetService, BudgetMovement } from '../services/budget.service';
 import { ProjectService } from '../../../core/services/project.service';
-import { AuthService } from '../../../core/services/auth.service';
 import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { SectionCardComponent } from '../../../shared/components/section-card/section-card.component';
@@ -35,7 +33,7 @@ import { ThaiDatePipe } from '../../../shared/pipes/thai-date.pipe';
     CommonModule, ReactiveFormsModule,
     MatTableModule, MatSortModule, MatPaginatorModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatButtonModule, MatCheckboxModule,
+    MatButtonModule,
     MatDatepickerModule,
     MatTooltipModule, MatProgressSpinnerModule, MatSnackBarModule,
     SvgIconComponent,
@@ -45,7 +43,6 @@ import { ThaiDatePipe } from '../../../shared/pipes/thai-date.pipe';
 export class BudgetMovementsComponent implements OnInit {
   private readonly budgetSvc  = inject(BudgetService);
   private readonly projectSvc = inject(ProjectService);
-  private readonly authSvc    = inject(AuthService);
   private readonly fb         = inject(FormBuilder);
   private readonly snackBar   = inject(MatSnackBar);
 
@@ -54,41 +51,13 @@ export class BudgetMovementsComponent implements OnInit {
   readonly total       = signal(0);
   readonly page        = signal(1);
   readonly perPage     = signal(25);
-  readonly pendingCount = signal(0);
   readonly loading     = signal(false);
-  readonly selectedIds = signal<Set<number>>(new Set());
 
   // ── computed ──
   readonly projectId = computed(() => this.projectSvc.selectedProject()?.id ?? null);
 
-  readonly canApprove = computed(() => {
-    const role = this.authSvc.currentUser()?.role;
-    return role === 'admin' || role === 'manager';
-  });
-
-  readonly displayedColumns = computed(() => {
-    const cols = ['movement_no', 'created_at', 'unit_code', 'movement_type',
-                  'budget_source_type', 'amount', 'status', 'note', 'created_by_name', 'actions'];
-    return this.canApprove() ? ['select', ...cols] : cols;
-  });
-
-  readonly pendingInPage = computed(() =>
-    this.movements().filter(m => m.status === 'pending')
-  );
-
-  readonly allPendingSelected = computed(() => {
-    const pending = this.pendingInPage();
-    if (pending.length === 0) return false;
-    const ids = this.selectedIds();
-    return pending.every(m => ids.has(m.id));
-  });
-
-  readonly somePendingSelected = computed(() => {
-    const pending = this.pendingInPage();
-    const ids = this.selectedIds();
-    const someSelected = pending.some(m => ids.has(m.id));
-    return someSelected && !this.allPendingSelected();
-  });
+  readonly displayedColumns = ['movement_no', 'created_at', 'unit_code', 'movement_type',
+    'budget_source_type', 'amount', 'status', 'note', 'created_by_name'];
 
   // ── filter form ──
   readonly filterForm = this.fb.group({
@@ -126,9 +95,6 @@ export class BudgetMovementsComponent implements OnInit {
       next: res => {
         this.movements.set(res.data);
         this.total.set(res.total);
-        // นับ pending จากข้อมูลที่ได้ (ถ้า API ไม่ส่ง pending_count มา)
-        this.pendingCount.set(res.data.filter(m => m.status === 'pending').length);
-        this.selectedIds.set(new Set());
         this.loading.set(false);
       },
       error: () => {
@@ -155,61 +121,6 @@ export class BudgetMovementsComponent implements OnInit {
     this.loadData();
   }
 
-  // ── approve / reject ──
-  approve(id: number): void {
-    this.budgetSvc.approveMovement(id).subscribe({
-      next: () => {
-        this.snackBar.open('อนุมัติรายการสำเร็จ', 'ปิด', { duration: 3000 });
-        this.loadData();
-      },
-      error: () => this.snackBar.open('อนุมัติล้มเหลว', 'ปิด', { duration: 3000 }),
-    });
-  }
-
-  reject(id: number): void {
-    const reason = window.prompt('กรุณาระบุเหตุผลที่ปฏิเสธ:');
-    if (reason == null) return; // user cancelled
-    this.budgetSvc.rejectMovement(id, reason).subscribe({
-      next: () => {
-        this.snackBar.open('ปฏิเสธรายการสำเร็จ', 'ปิด', { duration: 3000 });
-        this.loadData();
-      },
-      error: () => this.snackBar.open('ปฏิเสธล้มเหลว', 'ปิด', { duration: 3000 }),
-    });
-  }
-
-  async bulkApprove(): Promise<void> {
-    const ids = Array.from(this.selectedIds());
-    for (const id of ids) {
-      try {
-        await this.budgetSvc.approveMovement(id).toPromise();
-      } catch {
-        this.snackBar.open(`อนุมัติรายการ #${id} ล้มเหลว`, 'ปิด', { duration: 3000 });
-      }
-    }
-    this.snackBar.open(`อนุมัติ ${ids.length} รายการสำเร็จ`, 'ปิด', { duration: 3000 });
-    this.loadData();
-  }
-
-  // ── selection ──
-  toggleSelect(id: number): void {
-    const s = new Set(this.selectedIds());
-    if (s.has(id)) { s.delete(id); } else { s.add(id); }
-    this.selectedIds.set(s);
-  }
-
-  toggleSelectAll(checked: boolean): void {
-    const s = new Set(this.selectedIds());
-    for (const m of this.pendingInPage()) {
-      if (checked) { s.add(m.id); } else { s.delete(m.id); }
-    }
-    this.selectedIds.set(s);
-  }
-
-  isSelected(id: number): boolean {
-    return this.selectedIds().has(id);
-  }
-
   // ── label / class helpers ──
   moveTypeLabel(type: string): string {
     const map: Record<string, string> = {
@@ -233,15 +144,14 @@ export class BudgetMovementsComponent implements OnInit {
   }
 
   statusLabel(s: string): string {
-    const map: Record<string, string> = { approved: 'อนุมัติ', pending: 'รอการอนุมัติ', rejected: 'ปฏิเสธ' };
+    const map: Record<string, string> = { approved: 'อนุมัติ', voided: 'ยกเลิก' };
     return map[s] ?? s;
   }
 
   statusClass(s: string): string {
     const map: Record<string, string> = {
       approved: 'bg-green-50 text-green-700',
-      pending: 'bg-amber-50 text-amber-700',
-      rejected: 'bg-red-50 text-red-700',
+      voided:   'bg-slate-100 text-slate-500',
     };
     return map[s] ?? 'bg-slate-100 text-slate-600';
   }
