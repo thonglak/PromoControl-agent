@@ -39,10 +39,9 @@ class BudgetMovementController extends BaseController
         $offset  = ($page - 1) * $perPage;
 
         $builder = $this->db()->table('budget_movements bm')
-            ->select('bm.*, pu.unit_code, cu.name AS created_by_name, au.name AS approved_by_name')
+            ->select('bm.*, pu.unit_code, cu.name AS created_by_name')
             ->join('project_units pu', 'pu.id = bm.unit_id', 'left')
             ->join('users cu', 'cu.id = bm.created_by', 'left')
-            ->join('users au', 'au.id = bm.approved_by', 'left')
             ->where('bm.project_id', $pid);
 
         if ($uid = (int) $this->request->getGet('unit_id'))              $builder->where('bm.unit_id', $uid);

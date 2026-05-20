@@ -55,24 +55,7 @@ class BudgetMovementService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 1. getBalance — derive จาก SUM(movements)
-    // ═══════════════════════════════════════════════════════════════════════
-
-    public function getBalance(int $projectId, int $unitId, string $sourceType): float
-    {
-        $row = $this->db->table('budget_movements')
-            ->selectSum('amount', 'total')
-            ->where('project_id', $projectId)
-            ->where('unit_id', $unitId)
-            ->where('budget_source_type', $sourceType)
-            ->where('status', 'approved')
-            ->get()->getRowArray();
-
-        return (float) ($row['total'] ?? 0);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 2. getPoolBalance
+    // 1. getPoolBalance
     // ═══════════════════════════════════════════════════════════════════════
 
     public function getPoolBalance(int $projectId): float
@@ -390,8 +373,8 @@ class BudgetMovementService
             'reference_type'     => $data['reference_type'] ?? null,
             'note'               => $data['note'] ?? null,
             'created_by'         => $data['created_by'] ?? null,
-            'approved_by'        => $status === 'approved' ? ($data['created_by'] ?? null) : null,
-            'approved_at'        => $status === 'approved' ? $now : null,
+            'approved_by'        => $data['created_by'] ?? null,
+            'approved_at'        => $now,
             'created_at'         => $now,
         ]);
     }
@@ -474,8 +457,8 @@ class BudgetMovementService
                 'status'             => $status,
                 'note'               => $note,
                 'created_by'         => $createdBy,
-                'approved_by'        => $status === 'approved' ? $createdBy : null,
-                'approved_at'        => $status === 'approved' ? $now : null,
+                'approved_by'        => $createdBy,
+                'approved_at'        => $now,
                 'created_at'         => $now,
             ]);
 

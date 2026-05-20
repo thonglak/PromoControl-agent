@@ -549,8 +549,8 @@ class SalesTransactionService
                 'reference_id' => $transactionId,
                 'reference_type' => 'sales_transaction',
                 'created_by' => $createdBy,
-                'approved_by' => $status === 'approved' ? $createdBy : null,
-                'approved_at' => $status === 'approved' ? $now : null,
+                'approved_by' => $createdBy,
+                'approved_at' => $now,
                 'created_at' => $now,
             ]);
 
@@ -578,8 +578,8 @@ class SalesTransactionService
                 'reference_type' => 'sales_transaction',
                 'note' => 'ค่าธรรมเนียมโอน — ของแถมเพิ่มเติม',
                 'created_by' => $createdBy,
-                'approved_by' => $status === 'approved' ? $createdBy : null,
-                'approved_at' => $status === 'approved' ? $now : null,
+                'approved_by' => $createdBy,
+                'approved_at' => $now,
                 'created_at' => $now,
             ]);
 
@@ -646,8 +646,8 @@ class SalesTransactionService
                 'reference_type' => 'sales_transaction_return',
                 'note' => 'คืนงบจากการแก้ไขรายการขาย',
                 'created_by' => $createdBy,
-                'approved_by' => $status === 'approved' ? $createdBy : null,
-                'approved_at' => $status === 'approved' ? $now : null,
+                'approved_by' => $createdBy,
+                'approved_at' => $now,
                 'created_at' => $now,
             ]);
         }
