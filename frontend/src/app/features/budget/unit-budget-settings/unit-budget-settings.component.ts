@@ -62,10 +62,18 @@ type DiffFilter = 'all' | 'changed' | 'increase' | 'decrease' | 'unchanged';
       } @else {
 
         <!-- ── Summary cards (เรียบง่าย) ── -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
           <div class="summary-card">
             <div class="summary-card__label">ยูนิตว่าง</div>
             <div class="summary-card__value">{{ rows().length | number }}</div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-card__label">ผลรวมงบที่คำนวณได้</div>
+            <div class="summary-card__value" style="color: var(--color-primary)">
+              {{ totalCalculatedBudget() | number }}
+            </div>
+            <div class="summary-card__hint">บาท · จาก {{ rows().length | number }} ยูนิต</div>
           </div>
 
           <div class="summary-card">
@@ -394,6 +402,11 @@ export class UnitBudgetSettingsComponent implements OnInit {
   );
 
   readonly selectedCount = computed(() => this.selectedIds().size);
+
+  /** ผลรวมงบที่คำนวณได้ของทุกยูนิต (ทั้งโครงการ ไม่ขึ้นกับตัวกรอง) */
+  readonly totalCalculatedBudget = computed(() =>
+    this.rows().reduce((s, r) => s + (Number(r.calculated_budget) || 0), 0)
+  );
 
   readonly selectedImpact = computed(() => {
     const ids = this.selectedIds();
