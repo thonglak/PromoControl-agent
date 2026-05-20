@@ -61,53 +61,78 @@ type DiffFilter = 'all' | 'changed' | 'increase' | 'decrease' | 'unchanged';
         </div>
       } @else {
 
-        <!-- ── Summary cards (เรียบง่าย) ── -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-          <div class="summary-card">
-            <div class="summary-card__label">ยูนิตว่าง</div>
-            <div class="summary-card__value">{{ rows().length | number }}</div>
-          </div>
+        <!-- ── Summary Bar ── -->
+        <div class="mb-4 bg-white rounded-lg border border-slate-200 overflow-hidden">
+          <div class="flex flex-wrap sm:flex-nowrap sm:divide-x sm:divide-slate-100">
 
-          <div class="summary-card">
-            <div class="summary-card__label">ผลรวมงบที่คำนวณได้</div>
-            <div class="summary-card__value" style="color: var(--color-primary)">
-              {{ totalCalculatedBudget() | number }}
+            <!-- ยูนิตว่าง -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ยูนิตว่าง</span>
+              <div class="flex items-baseline gap-1 mt-1.5">
+                <span class="text-sm font-semibold tabular-nums text-slate-800">{{ rows().length | number:'1.0-0' }}</span>
+                <span class="text-xs text-slate-400">ยูนิต</span>
+              </div>
             </div>
-            <div class="summary-card__hint">บาท · จาก {{ rows().length | number }} ยูนิต</div>
-          </div>
 
-          <div class="summary-card">
-            <div class="summary-card__label">เพิ่มขึ้น</div>
-            <div class="summary-card__value" style="color: var(--color-success)">{{ countIncrease() | number }}</div>
-            @if (netIncrease() > 0) {
-              <div class="summary-card__hint">+{{ netIncrease() | number }} บาท</div>
-            }
-          </div>
-
-          <div class="summary-card">
-            <div class="summary-card__label">ลดลง</div>
-            <div class="summary-card__value" style="color: var(--color-warning)">{{ countDecrease() | number }}</div>
-            @if (netDecrease() < 0) {
-              <div class="summary-card__hint">{{ netDecrease() | number }} บาท</div>
-            }
-          </div>
-
-          <div class="summary-card">
-            <div class="summary-card__label">ไม่เปลี่ยน</div>
-            <div class="summary-card__value">{{ countUnchanged() | number }}</div>
-          </div>
-
-          <div class="summary-card">
-            <div class="summary-card__label">ผลกระทบที่เลือก</div>
-            <div class="summary-card__value num"
-                 [style.color]="selectedImpact() > 0 ? 'var(--color-success)'
-                              : selectedImpact() < 0 ? 'var(--color-warning)'
-                              : 'var(--color-text-primary)'">
-              {{ selectedImpact() > 0 ? '+' : '' }}{{ selectedImpact() | number }}
+            <!-- ผลรวมงบที่คำนวณได้ -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-slate-100 sm:border-b-0">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ผลรวมงบที่คำนวณได้</span>
+              <div class="flex items-baseline gap-1 mt-1.5">
+                <span class="text-sm font-semibold tabular-nums text-blue-600">{{ totalCalculatedBudget() | number:'1.0-0' }}</span>
+                <span class="text-xs text-slate-400">บาท</span>
+              </div>
             </div>
-            <div class="summary-card__hint">
-              {{ selectedCount() > 0 ? 'จาก ' + selectedCount() + ' ยูนิต' : 'ยังไม่ได้เลือก' }}
+
+            <!-- เพิ่มขึ้น -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">เพิ่มขึ้น</span>
+              <div class="flex items-baseline gap-1 mt-1.5">
+                <span class="text-sm font-semibold tabular-nums text-green-600">{{ countIncrease() | number:'1.0-0' }}</span>
+                <span class="text-xs text-slate-400">ยูนิต</span>
+              </div>
+              @if (netIncrease() > 0) {
+                <span class="text-[11px] tabular-nums text-green-500 leading-none">+{{ netIncrease() | number:'1.0-0' }} บาท</span>
+              }
             </div>
+
+            <!-- ลดลง -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-slate-100 sm:border-b-0">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ลดลง</span>
+              <div class="flex items-baseline gap-1 mt-1.5">
+                <span class="text-sm font-semibold tabular-nums text-red-600">{{ countDecrease() | number:'1.0-0' }}</span>
+                <span class="text-xs text-slate-400">ยูนิต</span>
+              </div>
+              @if (netDecrease() < 0) {
+                <span class="text-[11px] tabular-nums text-red-400 leading-none">{{ netDecrease() | number:'1.0-0' }} บาท</span>
+              }
+            </div>
+
+            <!-- ไม่เปลี่ยน -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-r border-slate-100 sm:border-r-0">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ไม่เปลี่ยน</span>
+              <div class="flex items-baseline gap-1 mt-1.5">
+                <span class="text-sm font-semibold tabular-nums text-slate-800">{{ countUnchanged() | number:'1.0-0' }}</span>
+                <span class="text-xs text-slate-400">ยูนิต</span>
+              </div>
+            </div>
+
+            <!-- ผลกระทบที่เลือก -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">ผลกระทบที่เลือก</span>
+              <div class="flex items-baseline gap-1 mt-1.5">
+                <span class="text-sm font-semibold tabular-nums"
+                      [class.text-green-600]="selectedImpact() > 0"
+                      [class.text-red-600]="selectedImpact() < 0"
+                      [class.text-slate-800]="selectedImpact() === 0">
+                  {{ selectedImpact() > 0 ? '+' : '' }}{{ selectedImpact() | number:'1.0-0' }}
+                </span>
+                <span class="text-xs text-slate-400">บาท</span>
+              </div>
+              <span class="text-[11px] text-slate-400 leading-none">
+                {{ selectedCount() > 0 ? 'จาก ' + selectedCount() + ' ยูนิต' : 'ยังไม่ได้เลือก' }}
+              </span>
+            </div>
+
           </div>
         </div>
 
@@ -287,33 +312,6 @@ type DiffFilter = 'all' | 'changed' | 'increase' | 'decrease' | 'unchanged';
       text-align: right;
       font-variant-numeric: tabular-nums;
       font-family: var(--font-mono, ui-monospace, monospace);
-    }
-
-    /* Summary card — เรียบ ไม่มี icon, เน้นตัวเลขเป็นหลัก */
-    .summary-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: 10px;
-      padding: 14px 16px;
-    }
-    .summary-card__label {
-      font-size: 12px;
-      color: var(--color-text-secondary);
-      margin-bottom: 6px;
-      letter-spacing: 0.02em;
-    }
-    .summary-card__value {
-      font-size: 26px;
-      font-weight: 700;
-      line-height: 1.15;
-      color: var(--color-text-primary);
-      font-variant-numeric: tabular-nums;
-    }
-    .summary-card__hint {
-      font-size: 11px;
-      color: var(--color-text-secondary);
-      margin-top: 4px;
-      font-variant-numeric: tabular-nums;
     }
 
     /* Diff bar — visual indicator of magnitude relative to max diff in dataset */
