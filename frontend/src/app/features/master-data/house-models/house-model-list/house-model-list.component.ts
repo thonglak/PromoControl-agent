@@ -63,8 +63,8 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
   dataSource       = new MatTableDataSource<HouseModel>([]);
   loading          = signal(false);
 
-  // สรุปจำนวนยูนิตรวมของแบบบ้านที่แสดงอยู่
-  totalUnits       = signal(0);
+  totalUnits  = signal(0);
+  modelCount  = signal(0);
 
   isAdmin   = computed(() => this.auth.currentUser()?.role === 'admin');
   isManager = computed(() => this.auth.currentUser()?.role === 'manager');
@@ -110,6 +110,7 @@ export class HouseModelListComponent implements OnInit, AfterViewInit {
     this.api.getList(this.projectId, this.filterForm.value.search ?? '').subscribe({
       next: models => {
         this.dataSource.data = models;
+        this.modelCount.set(models.length);
         this.loading.set(false);
       },
       error: () => {

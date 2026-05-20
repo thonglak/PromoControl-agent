@@ -78,129 +78,102 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
         </div>
       </app-page-header>
 
-      <!-- Summary cards -->
+      <!-- Summary Bar -->
       @if (summary()) {
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <!-- งบยูนิต -->
-          <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs font-semibold text-slate-600 mb-2">งบยูนิต</p>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <p class="text-[11px] text-slate-400 mb-0.5">ใช้แล้ว</p>
-                <p class="text-base font-bold text-amber-600 tabular-nums">฿{{ summary()!.unit_budget_used | number:'1.0-0' }}</p>
-              </div>
-              <div>
-                <p class="text-[11px] text-slate-400 mb-0.5">คงเหลือ</p>
-                <p class="text-base font-bold tabular-nums"
-                   [class.text-primary-700]="summary()!.unit_budget_remaining >= 0"
-                   [class.text-loss]="summary()!.unit_budget_remaining < 0">
-                  ฿{{ summary()!.unit_budget_remaining | number:'1.0-0' }}
-                </p>
-              </div>
-            </div>
-            <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
-          </div>
+        <div class="mb-4 bg-white rounded-lg border border-slate-200 overflow-hidden">
+          <div class="flex flex-wrap sm:flex-nowrap sm:divide-x sm:divide-slate-100">
 
-          <!-- งบคงเหลือรวม (X) = ระบบเก่า + ระบบใหม่ (sum ยูนิต + Pool คงเหลือ) -->
-          <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-xs font-semibold text-slate-600">งบคงเหลือรวม (X)</p>
-              @if (canEdit()) {
-                <button mat-icon-button
-                        class="!w-6 !h-6 !text-slate-400 hover:!text-primary-500"
-                        matTooltip="กระทบยอดระบบเก่า"
-                        (click)="openLegacyDialog()">
-                  <app-icon name="cog" class="w-3.5 h-3.5" />
-                </button>
-              }
+            <!-- งบยูนิต -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบยูนิต</span>
+              <div class="flex items-end gap-4 mt-1.5">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[10px] text-slate-400">ใช้แล้ว</span>
+                  <span class="text-sm font-semibold tabular-nums text-amber-600">฿{{ summary()!.unit_budget_used | number:'1.0-0' }}</span>
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[10px] text-slate-400">คงเหลือ</span>
+                  <span class="text-sm font-semibold tabular-nums"
+                        [class.text-blue-600]="summary()!.unit_budget_remaining >= 0"
+                        [class.text-red-600]="summary()!.unit_budget_remaining < 0">
+                    ฿{{ summary()!.unit_budget_remaining | number:'1.0-0' }}
+                  </span>
+                </div>
+              </div>
             </div>
-            <p class="text-2xl font-bold tabular-nums"
-               [class.text-primary-700]="totalBudgetCombined() >= 0"
-               [class.text-loss]="totalBudgetCombined() < 0">
-              ฿{{ totalBudgetCombined() | number:'1.0-0' }}
-            </p>
-            @if (summary()!.legacy) {
-              <p class="text-[11px] text-slate-500 mt-2">
-                ระบบเก่า:
-                <span class="font-mono tabular-nums text-slate-700">
-                  ฿{{ summary()!.legacy!.total_budget_remaining | number:'1.0-0' }}
-                </span>
-                <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
-              </p>
-            } @else {
-              <div class="mt-2">
-                <p class="text-[11px] text-slate-400 italic">ยังไม่ระบุข้อมูลระบบเก่า</p>
+
+            <!-- งบคงเหลือรวม (X) -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-slate-100 sm:border-b-0">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบคงเหลือรวม (X)</span>
                 @if (canEdit()) {
-                  <button type="button"
-                          class="mt-1 text-[11px] text-primary-500 hover:text-primary-700 underline cursor-pointer"
-                          (click)="openLegacyDialog()">
-                    ตั้งค่า
+                  <button mat-icon-button class="!w-5 !h-5 -mt-0.5 !text-slate-400 hover:!text-primary-500"
+                          matTooltip="กระทบยอดระบบเก่า" (click)="openLegacyDialog()">
+                    <app-icon name="cog" class="w-3 h-3" />
                   </button>
                 }
               </div>
-            }
-          </div>
-
-          <!-- กำไร (Y) = ระบบเก่า + ระบบใหม่ (sum profit ทุก row ยกเว้นยกเลิก) -->
-          <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-xs font-semibold text-slate-600">กำไร (Y)</p>
-              @if (canEdit()) {
-                <button mat-icon-button
-                        class="!w-6 !h-6 !text-slate-400 hover:!text-primary-500"
-                        matTooltip="กระทบยอดระบบเก่า"
-                        (click)="openLegacyDialog()">
-                  <app-icon name="cog" class="w-3.5 h-3.5" />
-                </button>
+              <span class="text-sm font-semibold tabular-nums mt-1.5"
+                    [class.text-blue-600]="totalBudgetCombined() >= 0"
+                    [class.text-red-600]="totalBudgetCombined() < 0">
+                ฿{{ totalBudgetCombined() | number:'1.0-0' }}
+              </span>
+              @if (summary()!.legacy) {
+                <p class="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                  ระบบเก่า: <span class="font-mono tabular-nums text-slate-600">฿{{ summary()!.legacy!.total_budget_remaining | number:'1.0-0' }}</span>
+                </p>
+              } @else if (canEdit()) {
+                <button type="button" class="text-[10px] text-primary-500 hover:text-primary-700 underline cursor-pointer text-left mt-0.5"
+                        (click)="openLegacyDialog()">ตั้งค่าระบบเก่า</button>
               }
             </div>
-            <p class="text-2xl font-bold tabular-nums"
-               [class.text-profit]="totalProfitCombined() >= 0"
-               [class.text-loss]="totalProfitCombined() < 0">
-              ฿{{ totalProfitCombined() | number:'1.0-0' }}
-            </p>
-            @if (summary()!.legacy) {
-              <p class="text-[11px] text-slate-500 mt-2">
-                ระบบเก่า:
-                <span class="font-mono tabular-nums text-slate-700">
-                  ฿{{ summary()!.legacy!.total_profit | number:'1.0-0' }}
-                </span>
-                <span class="text-slate-400 ml-1">(ณ {{ summary()!.legacy!.as_of_date | thaiDate:'short' }})</span>
-              </p>
-            } @else {
-              <div class="mt-2">
-                <p class="text-[11px] text-slate-400 italic">ยังไม่ระบุข้อมูลระบบเก่า</p>
+
+            <!-- กำไร (Y) -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-r border-slate-100 sm:border-r-0">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">กำไร (Y)</span>
                 @if (canEdit()) {
-                  <button type="button"
-                          class="mt-1 text-[11px] text-primary-500 hover:text-primary-700 underline cursor-pointer"
-                          (click)="openLegacyDialog()">
-                    ตั้งค่า
+                  <button mat-icon-button class="!w-5 !h-5 -mt-0.5 !text-slate-400 hover:!text-primary-500"
+                          matTooltip="กระทบยอดระบบเก่า" (click)="openLegacyDialog()">
+                    <app-icon name="cog" class="w-3 h-3" />
                   </button>
                 }
               </div>
-            }
-          </div>
-
-          <!-- งบผู้บริหาร -->
-          <div class="bg-white rounded-lg border border-slate-200 p-4">
-            <p class="text-xs font-semibold text-slate-600 mb-2">งบผู้บริหาร</p>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <p class="text-[11px] text-slate-400 mb-0.5">ใช้แล้ว</p>
-                <p class="text-base font-bold text-amber-600 tabular-nums">฿{{ summary()!.management_budget_used | number:'1.0-0' }}</p>
-              </div>
-              <div>
-                <p class="text-[11px] text-slate-400 mb-0.5">คงเหลือ</p>
-                <p class="text-base font-bold tabular-nums"
-                   [class.text-primary-700]="summary()!.management_budget_remaining >= 0"
-                   [class.text-loss]="summary()!.management_budget_remaining < 0">
-                  ฿{{ summary()!.management_budget_remaining | number:'1.0-0' }}
+              <span class="text-sm font-semibold tabular-nums mt-1.5"
+                    [class.text-green-600]="totalProfitCombined() >= 0"
+                    [class.text-red-600]="totalProfitCombined() < 0">
+                ฿{{ totalProfitCombined() | number:'1.0-0' }}
+              </span>
+              @if (summary()!.legacy) {
+                <p class="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                  ระบบเก่า: <span class="font-mono tabular-nums text-slate-600">฿{{ summary()!.legacy!.total_profit | number:'1.0-0' }}</span>
                 </p>
+              } @else if (canEdit()) {
+                <button type="button" class="text-[10px] text-primary-500 hover:text-primary-700 underline cursor-pointer text-left mt-0.5"
+                        (click)="openLegacyDialog()">ตั้งค่าระบบเก่า</button>
+              }
+            </div>
+
+            <!-- งบผู้บริหาร -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5">
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบผู้บริหาร</span>
+              <div class="flex items-end gap-4 mt-1.5">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[10px] text-slate-400">ใช้แล้ว</span>
+                  <span class="text-sm font-semibold tabular-nums text-amber-600">฿{{ summary()!.management_budget_used | number:'1.0-0' }}</span>
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[10px] text-slate-400">คงเหลือ</span>
+                  <span class="text-sm font-semibold tabular-nums"
+                        [class.text-blue-600]="summary()!.management_budget_remaining >= 0"
+                        [class.text-red-600]="summary()!.management_budget_remaining < 0">
+                    ฿{{ summary()!.management_budget_remaining | number:'1.0-0' }}
+                  </span>
+                </div>
               </div>
             </div>
-            <p class="text-xs text-slate-400 mt-2">ทั้งโครงการ</p>
-          </div>
 
+          </div>
         </div>
       }
 

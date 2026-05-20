@@ -82,20 +82,33 @@ Remove any `signal` or state that was only used for the old expand/collapse togg
 summaryExpanded = signal(false);
 ```
 
+## Page Layout Order
+
+Always place the Summary Bar **above** the filter bar:
+
+```
+Header
+Summary Bar      ← อยู่บน filter bar เสมอ
+Filter bar
+Active filter chips
+Table
+```
+
 ## Execution Steps
 
 1. **Read** the target component's `.html` and `.ts` files
 2. **Identify** the current summary bar section (look for collapse/expand pattern, `summaryExpanded`, large number classes like `text-2xl`)
-3. **Count** the metrics to determine mobile layout (even count = clean 2-col; odd count = last item spans full width)
-4. **Map** each metric to the right color:
+3. **Check position** — if the summary bar is below the filter bar, move it above
+4. **Count** the metrics to determine mobile layout (even count = clean 2-col; odd count = last item spans full width)
+5. **Map** each metric to the right color:
    - Count/quantity → slate-800 + unit label
    - Revenue/price → slate-800
    - Cost/expense → red-600
    - Budget → blue-600
    - Profit → green-600
-5. **Replace** the summary bar HTML with the compact strip
-6. **Remove** `summaryExpanded` signal from TS (if present)
-7. **Verify** no template references to `summaryExpanded()` remain
+6. **Replace** the summary bar HTML with the compact strip
+7. **Remove** `summaryExpanded` signal from TS (if present)
+8. **Verify** no template references to `summaryExpanded()` remain
 
 ## What NOT to do
 - Do NOT use `text-2xl`, `text-xl`, or `text-lg` for metric values
@@ -103,3 +116,4 @@ summaryExpanded = signal(false);
 - Do NOT add `mat-card` — use plain `div` with border/bg
 - Do NOT use inline `style="..."` — Tailwind classes only
 - Do NOT change the `summary` signal shape or `computeSummary()` logic
+- Do NOT place the summary bar below the filter bar
