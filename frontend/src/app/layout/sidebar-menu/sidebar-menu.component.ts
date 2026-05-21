@@ -2,6 +2,7 @@ import {
   Component, Input, Output, EventEmitter, OnInit, OnDestroy,
   inject, signal, computed, effect,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -37,47 +38,18 @@ const MENU: MenuItem[] = [
     label: 'ข้อมูลหลัก', icon: 'squares-2x2',
     roles: ['admin', 'manager'],
     children: [
-      { label: 'โครงการ',       path: '/projects',         roles: ['admin', 'manager'] },
-      { label: 'แบบบ้าน',       path: '/house-models',     roles: ['admin', 'manager'] },
-      { label: 'ยูนิต',         path: '/units',            roles: ['admin', 'manager'] },
+      { label: 'โครงการ',        path: '/projects',        roles: ['admin', 'manager'] },
+      { label: 'แบบบ้าน',        path: '/house-models',    roles: ['admin', 'manager'] },
+      { label: 'ยูนิต',          path: '/units',           roles: ['admin', 'manager'] },
+      { label: 'Phase',          path: '/phases',          roles: ['admin', 'manager'] },
       { label: 'รายการโปรโมชั่น', path: '/promotion-items', roles: ['admin', 'manager'] },
-      { label: 'นำเข้าของแถม (Premium)', path: '/premium-import', roles: ['admin', 'manager'] },
-      { label: 'Phase',           path: '/phases',          roles: ['admin', 'manager'] },
     ],
   },
   {
     label: 'การขาย', icon: 'document-text',
     children: [
-      { label: 'บันทึกขาย',  path: '/sales',      roles: ['admin', 'manager', 'sales'], exact: true },
-      { label: 'รายการขาย',  path: '/sales/list' },
-    ],
-  },
-  {
-    label: 'สูตรคำนวณ', icon: 'calculator',
-    roles: ['admin', 'manager'],
-    children: [
-      { label: 'สูตรคำนวณ',       path: '/fee-formulas', exact: true },
-      { label: 'ทดสอบสูตร',       path: '/fee-formulas/tester' },
-    ],
-  },
-  {
-    label: 'ราคาต้นทุน', icon: 'arrow-up-tray',
-    roles: ['admin', 'manager'],
-    children: [
-      { label: 'Import ราคาต้นทุน', path: '/bottom-line/import' },
-      { label: 'ประวัติ Import',    path: '/bottom-line/history' },
-      { label: 'ตั้งค่า Mapping',   path: '/bottom-line/mapping' },
-    ],
-  },
-  {
-    label: 'ข้อมูลจาก API', icon: 'cloud-arrow-down',
-    roles: ['admin', 'manager'],
-    children: [
-      { label: 'ประวัติการดึง', path: '/sync-from-api',          roles: ['admin', 'manager'], exact: true },
-      { label: 'ตั้งค่า API',   path: '/sync-from-api/configs',  roles: ['admin', 'manager'] },
-      { label: 'ทดสอบ API',    path: '/sync-from-api/debug',    roles: ['admin', 'manager'] },
-      { label: 'จับคู่ Field',  path: '/sync-from-api/mappings', roles: ['admin', 'manager'] },
-      { label: 'Target Tables', path: '/sync-from-api/targets', roles: ['admin'] },
+      { label: 'บันทึกขาย', path: '/sales',      roles: ['admin', 'manager', 'sales'], exact: true },
+      { label: 'รายการขาย', path: '/sales/list' },
     ],
   },
   {
@@ -85,28 +57,69 @@ const MENU: MenuItem[] = [
     roles: ['admin', 'manager'],
     children: [
       { label: 'ตั้งค่างบประมาณยูนิต', path: '/budget/unit-settings' },
-      { label: 'รายการเคลื่อนไหว', path: '/budget/movements' },
-      { label: 'งบพิเศษ',        path: '/budget/special' },
+      { label: 'รายการเคลื่อนไหว',     path: '/budget/movements' },
+      { label: 'งบพิเศษ',             path: '/budget/special' },
     ],
   },
-  { label: 'รายงาน',     icon: 'chart-pie', path: '/reports', roles: ['admin', 'manager', 'finance', 'viewer'] },
   {
-    label: 'ตั้งค่า', icon: 'cog',
+    label: 'สูตรคำนวณ', icon: 'calculator',
     roles: ['admin', 'manager'],
     children: [
-      { label: 'ตั้งค่าระบบ', path: '/settings/system', roles: ['admin', 'manager'] },
-      { label: 'เลขที่เอกสาร', path: '/settings/number-series', roles: ['admin', 'manager'] },
-      { label: 'แหล่งข้อมูลของแถม', path: '/settings/value-sources', roles: ['admin'] },
-      { label: 'รูปแบบวันที่', path: '/settings/date-format' },
+      { label: 'สูตรคำนวณ', path: '/fee-formulas', exact: true },
+      { label: 'ทดสอบสูตร', path: '/fee-formulas/tester' },
     ],
   },
-  { label: 'จัดการผู้ใช้', icon: 'users',   path: '/users',    roles: ['admin'] },
   {
-    label: 'เครื่องมือ Dev', icon: 'wrench-screwdriver',
-    roles: ['admin'],
+    label: 'นำเข้าข้อมูล', icon: 'arrow-up-tray',
+    roles: ['admin', 'manager'],
     children: [
-      { label: 'ล้างข้อมูลขาย', path: '/dev/clear-transactions', roles: ['admin'] },
-      { label: 'Fix Error',     path: '/dev/fix-error',          roles: ['admin'] },
+      { label: 'นำเข้าของแถม (Premium)', path: '/premium-import', roles: ['admin', 'manager'] },
+      {
+        label: 'ราคาต้นทุน',
+        roles: ['admin', 'manager'],
+        children: [
+          { label: 'Import ราคาต้นทุน', path: '/bottom-line/import' },
+          { label: 'ประวัติ Import',    path: '/bottom-line/history' },
+          { label: 'ตั้งค่า Mapping',   path: '/bottom-line/mapping' },
+        ],
+      },
+      {
+        label: 'ข้อมูลจาก API',
+        roles: ['admin', 'manager'],
+        children: [
+          { label: 'ประวัติการดึง', path: '/sync-from-api',          roles: ['admin', 'manager'], exact: true },
+          { label: 'ตั้งค่า API',   path: '/sync-from-api/configs',  roles: ['admin', 'manager'] },
+          { label: 'ทดสอบ API',    path: '/sync-from-api/debug',    roles: ['admin', 'manager'] },
+          { label: 'จับคู่ Field',  path: '/sync-from-api/mappings', roles: ['admin', 'manager'] },
+          { label: 'Target Tables', path: '/sync-from-api/targets', roles: ['admin'] },
+        ],
+      },
+    ],
+  },
+  { label: 'รายงาน', icon: 'chart-pie', path: '/reports', roles: ['admin', 'manager', 'finance', 'viewer'] },
+  {
+    label: 'ระบบ', icon: 'cog',
+    roles: ['admin', 'manager'],
+    children: [
+      {
+        label: 'ตั้งค่า',
+        roles: ['admin', 'manager'],
+        children: [
+          { label: 'ตั้งค่าระบบ',       path: '/settings/system',        roles: ['admin', 'manager'] },
+          { label: 'เลขที่เอกสาร',      path: '/settings/number-series', roles: ['admin', 'manager'] },
+          { label: 'แหล่งข้อมูลของแถม', path: '/settings/value-sources', roles: ['admin'] },
+          { label: 'รูปแบบวันที่',      path: '/settings/date-format' },
+        ],
+      },
+      { label: 'จัดการผู้ใช้', path: '/users', roles: ['admin'] },
+      {
+        label: 'เครื่องมือ Dev',
+        roles: ['admin'],
+        children: [
+          { label: 'ล้างข้อมูลขาย', path: '/dev/clear-transactions', roles: ['admin'] },
+          { label: 'Fix Error',     path: '/dev/fix-error',          roles: ['admin'] },
+        ],
+      },
     ],
   },
 ];
@@ -117,7 +130,7 @@ const MENU: MenuItem[] = [
   selector: 'app-sidebar-menu',
   standalone: true,
   imports: [
-    FormsModule,
+    FormsModule, NgTemplateOutlet,
     RouterLink, RouterLinkActive,
     MatButtonModule, MatTooltipModule, MatMenuModule, MatDividerModule,
     MatDialogModule, MatSnackBarModule,
@@ -201,8 +214,13 @@ export class SidebarMenuComponent implements OnInit, OnDestroy {
     return this.expandedGroups().has(label);
   }
 
+  /** กลุ่มถือว่า active เมื่อมีลูก (ทุกชั้น) ตรงกับ URL ปัจจุบัน */
   isGroupActive(item: MenuItem): boolean {
-    return (item.children ?? []).some(c => c.path && this.router.url.startsWith(c.path));
+    return (item.children ?? []).some(c =>
+      c.children
+        ? this.isGroupActive(c)
+        : !!c.path && this.router.url.startsWith(c.path),
+    );
   }
 
   /** ตรวจว่า project ที่ส่งมาเป็นโครงการที่เลือกอยู่ (id type ระหว่าง PHP/TS ไม่ตรงกัน ใช้ String()) */
@@ -253,11 +271,28 @@ export class SidebarMenuComponent implements OnInit, OnDestroy {
       .filter(item => !item.children || item.children.length > 0);
   }
 
+  /** Expand ทุกกลุ่มที่เป็นบรรพบุรุษของ URL ปัจจุบัน (รองรับเมนูหลายชั้น) */
   private autoExpand(url: string): void {
-    MENU.forEach(item => {
-      if (item.children?.some(c => c.path && url.startsWith(c.path))) {
-        this.expandedGroups.update(s => new Set([...s, item.label]));
+    const toExpand: string[] = [];
+
+    const walk = (items: MenuItem[]): boolean => {
+      let active = false;
+      for (const item of items) {
+        if (item.children) {
+          if (walk(item.children)) {
+            toExpand.push(item.label);
+            active = true;
+          }
+        } else if (item.path && url.startsWith(item.path)) {
+          active = true;
+        }
       }
-    });
+      return active;
+    };
+
+    walk(MENU);
+    if (toExpand.length) {
+      this.expandedGroups.update(s => new Set([...s, ...toExpand]));
+    }
   }
 }

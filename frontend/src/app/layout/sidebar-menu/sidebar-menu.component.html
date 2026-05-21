@@ -135,38 +135,26 @@
 
   <!-- ── Menu items ─────────────────────────────────────────────────────── -->
   <div class="flex-1 overflow-y-auto overflow-x-hidden py-2 space-y-0.5">
+    <ng-container
+      *ngTemplateOutlet="menuNodes; context: { $implicit: filteredMenu(), depth: 0 }"
+    />
+  </div>
 
-    @for (item of filteredMenu(); track item.label) {
+  <!-- ── Recursive menu renderer (รองรับเมนูหลายชั้น) ────────────────────── -->
+  <ng-template #menuNodes let-items let-depth="depth">
+    @for (item of items; track item.label) {
 
       @if (!item.children) {
         <!-- ── Leaf item ─────────────────────────────────────────────── -->
-        <a
-          [routerLink]="item.path"
-          routerLinkActive
-          #rla="routerLinkActive"
-          [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
-          class="sidebar-menu-item flex items-center gap-3 mx-2 no-underline cursor-pointer"
-          [class.active]="rla.isActive"
-          [matTooltip]="collapsed ? item.label : ''"
-          matTooltipPosition="right"
-        >
-          @if (item.icon) {
-            <app-icon [name]="item.icon" class="menu-icon w-5 h-5 flex-shrink-0" />
-          }
-          @if (!collapsed) {
-            <span class="truncate">{{ item.label }}</span>
-          }
-        </a>
-
-      } @else {
-        <!-- ── Group item ─────────────────────────────────────────────── -->
-        <div>
-          <button
-            type="button"
-            (click)="toggleGroup(item.label)"
-            class="sidebar-menu-item w-full flex items-center mx-2 cursor-pointer"
-            [class.active]="isGroupActive(item)"
-            [style.width]="'calc(100% - 16px)'"
+        @if (depth === 0) {
+          <!-- ระดับบนสุด: มีไอคอน + tooltip ตอนย่อ -->
+          <a
+            [routerLink]="item.path"
+            routerLinkActive
+            #rla="routerLinkActive"
+            [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
+            class="sidebar-menu-item flex items-center gap-3 mx-2 no-underline cursor-pointer"
+            [class.active]="rla.isActive"
             [matTooltip]="collapsed ? item.label : ''"
             matTooltipPosition="right"
           >
@@ -174,38 +162,88 @@
               <app-icon [name]="item.icon" class="menu-icon w-5 h-5 flex-shrink-0" />
             }
             @if (!collapsed) {
-              <span class="flex-1 text-left truncate ml-3">{{ item.label }}</span>
+              <span class="truncate">{{ item.label }}</span>
+            }
+          </a>
+        } @else {
+          <!-- ระดับลูก: ลิงก์แบบ submenu -->
+          <a
+            [routerLink]="item.path"
+            routerLinkActive
+            #rla="routerLinkActive"
+            [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+            class="sidebar-submenu-item flex items-center px-3 py-2 text-sm transition-colors
+                   cursor-pointer no-underline"
+            [class.active]="rla.isActive"
+            style="border-radius: var(--radius-sm)"
+          >
+            {{ item.label }}
+          </a>
+        }
+
+      } @else {
+        <!-- ── Group item ─────────────────────────────────────────────── -->
+        @if (depth === 0) {
+          <!-- กลุ่มระดับบนสุด -->
+          <div>
+            <button
+              type="button"
+              (click)="toggleGroup(item.label)"
+              class="sidebar-menu-item w-full flex items-center mx-2 cursor-pointer"
+              [class.active]="isGroupActive(item)"
+              [style.width]="'calc(100% - 16px)'"
+              [matTooltip]="collapsed ? item.label : ''"
+              matTooltipPosition="right"
+            >
+              @if (item.icon) {
+                <app-icon [name]="item.icon" class="menu-icon w-5 h-5 flex-shrink-0" />
+              }
+              @if (!collapsed) {
+                <span class="flex-1 text-left truncate ml-3">{{ item.label }}</span>
+                <app-icon
+                  [name]="isExpanded(item.label) ? 'chevron-down' : 'chevron-right'"
+                  class="w-4 h-4 flex-shrink-0 text-white/40"
+                />
+              }
+            </button>
+
+            @if (!collapsed && isExpanded(item.label)) {
+              <div class="ml-8 mt-0.5 mb-1 space-y-0.5 border-l border-white/10 pl-2">
+                <ng-container
+                  *ngTemplateOutlet="menuNodes; context: { $implicit: item.children, depth: 1 }"
+                />
+              </div>
+            }
+          </div>
+        } @else {
+          <!-- กลุ่มย่อย (ชั้นลึก) -->
+          <div>
+            <button
+              type="button"
+              (click)="toggleGroup(item.label)"
+              class="sidebar-submenu-item w-full flex items-center px-3 py-2 text-sm cursor-pointer"
+              [class.active]="isGroupActive(item)"
+              style="border-radius: var(--radius-sm)"
+            >
+              <span class="flex-1 text-left truncate">{{ item.label }}</span>
               <app-icon
                 [name]="isExpanded(item.label) ? 'chevron-down' : 'chevron-right'"
                 class="w-4 h-4 flex-shrink-0 text-white/40"
               />
-            }
-          </button>
+            </button>
 
-          <!-- Submenu -->
-          @if (!collapsed && isExpanded(item.label)) {
-            <div class="ml-8 mt-0.5 mb-1 space-y-0.5 border-l border-white/10 pl-2">
-              @for (child of item.children; track child.path) {
-                <a
-                  [routerLink]="child.path"
-                  routerLinkActive
-                  #crla="routerLinkActive"
-                  [routerLinkActiveOptions]="{ exact: child.exact ?? false }"
-                  class="sidebar-submenu-item flex items-center px-3 py-2 text-sm transition-colors
-                         cursor-pointer no-underline"
-                  [class.active]="crla.isActive"
-                  style="border-radius: var(--radius-sm)"
-                >
-                  {{ child.label }}
-                </a>
-              }
-            </div>
-          }
-        </div>
+            @if (isExpanded(item.label)) {
+              <div class="ml-3 mt-0.5 mb-1 space-y-0.5 border-l border-white/10 pl-2">
+                <ng-container
+                  *ngTemplateOutlet="menuNodes; context: { $implicit: item.children, depth: depth + 1 }"
+                />
+              </div>
+            }
+          </div>
+        }
       }
     }
-
-  </div>
+  </ng-template>
 
   <!-- ── Collapse toggle (desktop) ──────────────────────────────────────── -->
   <div class="border-t border-white/10 flex-shrink-0 p-2 flex justify-center">

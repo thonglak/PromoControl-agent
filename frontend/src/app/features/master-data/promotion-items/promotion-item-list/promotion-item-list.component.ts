@@ -201,7 +201,7 @@ export class PromotionItemListComponent implements OnInit {
 
   openTableSettings(): void {
     this.dialog.open(TableSettingsDialogComponent, {
-      width: '400px', maxHeight: '90vh',
+      width: '400px', maxWidth: '95vw', maxHeight: '90vh',
       data: { columns: this.columnDefs(), tableId: TABLE_ID },
     }).afterClosed().subscribe(result => {
       if (!result) return;
@@ -212,7 +212,7 @@ export class PromotionItemListComponent implements OnInit {
 
   openCreate(): void {
     this.dialog.open(PromotionItemFormDialogComponent, {
-      width: '700px', maxHeight: '90vh', disableClose: true,
+      width: '700px', maxWidth: '95vw', maxHeight: '90vh', disableClose: true,
       data: { mode: 'create' },
     }).afterClosed().subscribe(r => { if (r) { this.snack.open('สร้างรายการสำเร็จ', 'ปิด', { duration: 3000 }); this.loadData(); } });
   }
@@ -310,7 +310,7 @@ export class PromotionItemListComponent implements OnInit {
 
   openEdit(item: PromotionItem): void {
     this.dialog.open(PromotionItemFormDialogComponent, {
-      width: '700px', maxHeight: '90vh', disableClose: true,
+      width: '700px', maxWidth: '95vw', maxHeight: '90vh', disableClose: true,
       data: { mode: 'edit', item },
     }).afterClosed().subscribe(r => { if (r) { this.snack.open('อัปเดตรายการสำเร็จ', 'ปิด', { duration: 3000 }); this.loadData(); } });
   }

@@ -74,6 +74,10 @@ export interface SalesTransaction {
   total_promo_burden: number;
   total_cost: number;
   profit: number;
+  /** งบคงเหลือรวมของยูนิต ณ รายการขายนี้ (API ส่งมาในรายการ list) */
+  total_budget_remaining?: number | null;
+  /** งบนอกสุทธิที่ใช้ไป (API ส่งมาในรายการ list) */
+  net_extra_budget_used?: number;
   sale_date: string;
   contract_price: number | null;
   /** ขอบวกเพิ่ม (virtual — แสดงคู่ขนานในราคาสุทธิยื่นกู้ ไม่กระทบงบ/กำไรจริง) */

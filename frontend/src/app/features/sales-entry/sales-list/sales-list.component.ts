@@ -62,17 +62,18 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     LegacyReconciliationDialogComponent,
   ],
   template: `
-    <div class="p-6" style="max-width: 1440px; margin: 0 auto;">
+    <div class="p-4 sm:p-6" style="max-width: 1440px; margin: 0 auto;">
 
       <!-- Page Header -->
       <app-page-header title="รายการขาย" subtitle="ดูและจัดการรายการขายทั้งหมด">
-        <div actions class="flex items-center gap-2">
+        <div actions class="flex flex-wrap items-center justify-end gap-2">
           <button mat-icon-button matTooltip="ตั้งค่าคอลัมน์" (click)="openTableSettings()" class="!text-slate-500 hover:!text-slate-700">
             <app-icon name="adjustments-horizontal" class="w-5 h-5" />
           </button>
           @if (canCreate()) {
-            <button mat-flat-button color="primary" (click)="goToCreate()" class="flex items-center gap-2">
-              <app-icon name="plus" class="w-4 h-4" /> บันทึกรายการขาย
+            <button mat-flat-button color="primary" (click)="goToCreate()" matTooltip="บันทึกรายการขาย">
+              <app-icon name="plus" class="w-4 h-4 sm:mr-1" />
+              <span class="hidden sm:inline">บันทึกรายการขาย</span>
             </button>
           }
         </div>
@@ -180,13 +181,13 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
       <!-- Filter bar -->
       <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
         <div class="flex flex-wrap gap-3 items-end">
-          <mat-form-field appearance="outline" class="flex-1 min-w-[200px]">
+          <mat-form-field appearance="outline" class="w-full sm:flex-1 sm:min-w-[260px]">
             <mat-label>ค้นหา</mat-label>
             <input matInput [formControl]="searchControl" placeholder="เลขที่ขาย / ยูนิต / ลูกค้า" (input)="loadData()" />
             <app-icon matSuffix name="magnifying-glass" class="w-4 h-4 text-slate-400 mr-2" />
           </mat-form-field>
 
-          <mat-form-field appearance="outline" class="w-40">
+          <mat-form-field appearance="outline" class="w-full sm:w-40">
             <mat-label>สถานะ</mat-label>
             <mat-select [value]="statusFilter()" (selectionChange)="statusFilter.set($event.value); loadData()">
               <mat-option value="">ทั้งหมด</mat-option>
@@ -225,7 +226,91 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
             <div class="absolute inset-0 bg-white/70 flex items-center justify-center z-10"><mat-spinner diameter="36" /></div>
           }
 
-          <div class="overflow-x-auto">
+          <!-- Mobile: card list -->
+          <div class="md:hidden divide-y divide-slate-100">
+            @for (row of transactions(); track row.id) {
+              <div class="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                   [class.opacity-60]="row.status === 'cancelled'"
+                   (click)="goToDetail(row.id)">
+                <!-- identity row -->
+                <div class="flex items-start gap-2">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-mono font-semibold text-slate-800">{{ row.sale_no || '—' }}</span>
+                      <app-status-chip type="transaction_status" [value]="row.status" />
+                      @if (row.transfer_date) {
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">โอนแล้ว</span>
+                      } @else if (row.status === 'active') {
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">ยังไม่โอน</span>
+                      }
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">
+                      ยูนิต {{ row.unit_code }} · {{ row.sale_date | thaiDate }}
+                    </p>
+                  </div>
+                  <button mat-icon-button matTooltip="ดูรายละเอียด" class="!text-slate-500 hover:!text-blue-600 -mt-1 -mr-2"
+                    (click)="goToDetail(row.id); $event.stopPropagation()">
+                    <app-icon name="eye" class="w-4 h-4" />
+                  </button>
+                  @if (canEdit()) {
+                    <button mat-icon-button matTooltip="แก้ไข" class="!text-slate-500 hover:!text-blue-600 -mt-1 -mr-2"
+                      (click)="goToEdit(row.id); $event.stopPropagation()">
+                      <app-icon name="pencil-square" class="w-4 h-4" />
+                    </button>
+                  }
+                  @if (row.status === 'active') {
+                    <button mat-icon-button matTooltip="ยกเลิกขาย" class="!text-slate-400 hover:!text-red-600 -mt-1 -mr-2"
+                      (click)="openCancelDialog(row); $event.stopPropagation()">
+                      <app-icon name="x-circle" class="w-4 h-4" />
+                    </button>
+                  }
+                </div>
+
+                <!-- detail pairs -->
+                <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  <div class="min-w-0">
+                    <p class="text-xs text-slate-400 mb-0.5">ราคาหน้าสัญญา</p>
+                    <p class="text-xs tabular-nums text-slate-700 truncate">
+                      {{ row.contract_price != null ? '฿' + (row.contract_price | number:'1.0-0') : '—' }}
+                    </p>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs text-slate-400 mb-0.5">ราคาสุทธิ</p>
+                    <p class="text-xs tabular-nums text-slate-700 truncate">฿{{ row.net_price | number:'1.0-0' }}</p>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs text-slate-400 mb-0.5">กำไร</p>
+                    <p class="text-xs tabular-nums font-medium truncate"
+                       [class.text-profit]="row.profit >= 0"
+                       [class.text-loss]="row.profit < 0">฿{{ row.profit | number:'1.0-0' }}</p>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs text-slate-400 mb-0.5">งบคงเหลือรวม</p>
+                    <p class="text-xs tabular-nums text-slate-700 truncate">
+                      {{ row.total_budget_remaining != null ? '฿' + (row.total_budget_remaining | number:'1.0-0') : '—' }}
+                    </p>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs text-slate-400 mb-0.5">งบนอกสุทธิที่ใช้</p>
+                    <p class="text-xs tabular-nums truncate"
+                       [class.text-amber-600]="(row.net_extra_budget_used ?? 0) > 0"
+                       [class.text-slate-400]="!row.net_extra_budget_used">
+                      {{ (row.net_extra_budget_used ?? 0) > 0 ? '฿' + (row.net_extra_budget_used | number:'1.0-0') : '—' }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            }
+            @if (!transactions().length && !loading()) {
+              <div class="text-center py-12 text-slate-400">
+                <app-icon name="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p>ไม่พบรายการขาย</p>
+              </div>
+            }
+          </div>
+
+          <!-- Desktop: table -->
+          <div class="overflow-x-auto hidden md:block">
             <table mat-table [dataSource]="transactions()" matSort
               (matSortChange)="onSort($event)" class="w-full min-w-[900px]">
 
@@ -539,7 +624,7 @@ export class SalesListComponent implements OnInit {
   openTableSettings(): void {
     const ref = this.dialog.open(TableSettingsDialogComponent, {
       data: { columns: this.columnDefs(), tableId: TABLE_ID },
-      width: '400px', maxHeight: '90vh',
+      width: '400px', maxWidth: '95vw', maxHeight: '90vh',
     });
     ref.afterClosed().subscribe(result => {
       if (!result) return;
@@ -569,6 +654,7 @@ export class SalesListComponent implements OnInit {
         isAdmin: this.auth.currentUser()?.role === 'admin',
       },
       width: '500px',
+      maxWidth: '95vw',
       maxHeight: '90vh',
     });
     ref.afterClosed().subscribe(result => {
@@ -588,6 +674,8 @@ export class SalesListComponent implements OnInit {
         sale_date: row.sale_date,
       },
       width: '520px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
     });
     ref.afterClosed().subscribe(result => {
       if (result?.success) {
