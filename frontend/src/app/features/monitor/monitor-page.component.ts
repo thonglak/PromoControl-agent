@@ -186,10 +186,11 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
   private manifestPrevHref: string | null = null;     // null = ไม่เคยมี element → ลบทิ้งตอน destroy
   private appleIcon: HTMLLinkElement | null = null;
   private appleIconPrevHref: string | null = null;
-  private themeColorMeta: HTMLMetaElement | null = null;
-  private appleCapableMeta: HTMLMetaElement | null = null;
-  private appleStatusBarMeta: HTMLMetaElement | null = null;
+  // apple-mobile-web-app-title มีอยู่แล้วใน index.html ค่า "PromoControl" (ของแอปหลัก)
+  // ต้องสลับ content ตอนเข้า monitor ไม่งั้น iOS เพิ่มบนหน้าจอโฮมเป็นชื่อผิด
   private appleTitleMeta: HTMLMetaElement | null = null;
+  private appleTitlePrevContent: string | null = null;
+  private docTitlePrev: string | null = null;
 
   ngOnInit(): void {
     this.injectPwaHeadTags();
@@ -217,11 +218,12 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
       else this.appleIcon.remove();
     }
 
-    this.themeColorMeta?.remove();
-    this.appleCapableMeta?.remove();
-    this.appleStatusBarMeta?.remove();
-    this.appleTitleMeta?.remove();
-
+    // restore apple title meta + document.title
+    if (this.appleTitleMeta) {
+      if (this.appleTitlePrevContent !== null) this.appleTitleMeta.content = this.appleTitlePrevContent;
+      else this.appleTitleMeta.remove();
+    }
+    if (this.docTitlePrev !== null) document.title = this.docTitlePrev;
   }
 
   private injectPwaHeadTags(): void {
@@ -262,25 +264,27 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
       head.appendChild(this.appleIcon);
     }
 
-    this.themeColorMeta = document.createElement('meta');
-    this.themeColorMeta.name = 'theme-color';
-    this.themeColorMeta.content = '#0F4C81';
-    head.appendChild(this.themeColorMeta);
+    // theme-color / apple-mobile-web-app-capable / status-bar-style
+    // ค่าตรงกับ index.html อยู่แล้ว ไม่ต้อง inject ซ้ำ (ป้องกัน meta tag duplicate)
 
-    this.appleCapableMeta = document.createElement('meta');
-    this.appleCapableMeta.name = 'apple-mobile-web-app-capable';
-    this.appleCapableMeta.content = 'yes';
-    head.appendChild(this.appleCapableMeta);
+    // apple-mobile-web-app-title: index.html ตั้ง "PromoControl" — สลับเป็นชื่อ monitor
+    // (iOS Safari ใช้ค่านี้เป็นชื่อบนหน้าจอโฮม ตอนกด Add to Home Screen)
+    const existingTitle = head.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+    if (existingTitle) {
+      this.appleTitleMeta = existingTitle;
+      this.appleTitlePrevContent = existingTitle.content;
+      existingTitle.content = 'PromoControl Monitor';
+    } else {
+      this.appleTitleMeta = document.createElement('meta');
+      this.appleTitleMeta.name = 'apple-mobile-web-app-title';
+      this.appleTitleMeta.content = 'PromoControl Monitor';
+      this.appleTitlePrevContent = null;
+      head.appendChild(this.appleTitleMeta);
+    }
 
-    this.appleStatusBarMeta = document.createElement('meta');
-    this.appleStatusBarMeta.name = 'apple-mobile-web-app-status-bar-style';
-    this.appleStatusBarMeta.content = 'default';
-    head.appendChild(this.appleStatusBarMeta);
-
-    this.appleTitleMeta = document.createElement('meta');
-    this.appleTitleMeta.name = 'apple-mobile-web-app-title';
-    this.appleTitleMeta.content = 'Monitor';
-    head.appendChild(this.appleTitleMeta);
+    // document.title — เผื่อ iOS เก่าๆ ที่ fallback ใช้ <title> ตอน Add to Home Screen
+    this.docTitlePrev = document.title;
+    document.title = 'PromoControl Monitor';
   }
 
   private registerServiceWorker(): void {
