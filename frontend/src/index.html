@@ -17,6 +17,29 @@
   <meta name="apple-mobile-web-app-title" content="PromoControl">
   <link rel="apple-touch-icon" href="/monitor/apple-touch-icon.png">
 
+  <!--
+    ตั้งชื่อ PWA ตาม path ก่อน Angular บูต — สำคัญสำหรับ iOS Safari Add to Home Screen
+    เพราะ Safari อ่าน apple-mobile-web-app-title + <title> ตอน parse HTML
+    ถ้ารอ ngOnInit ของ component ผู้ใช้กด Share เร็วจะได้ชื่อผิด
+    Script นี้ต้องอยู่ "หลัง" PWA meta block เพื่อให้ querySelector หาเจอ
+  -->
+  <script>
+    (function () {
+      if (location.pathname.indexOf('/monitor') === 0) {
+        var newTitle = 'PromoControl Monitor';
+        document.title = newTitle;
+        var m = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (m) m.content = newTitle;
+        var a = document.querySelector('meta[name="application-name"]');
+        if (a) a.content = newTitle;
+        // เปลี่ยน manifest จากแอปหลักไปเป็นของ monitor ตั้งแต่ HTML parse
+        // กัน Chrome/Safari ใช้ scope=/ แทน scope=/monitor/ ตอน install
+        var lk = document.querySelector('link[rel="manifest"]');
+        if (lk) lk.href = '/monitor/manifest.webmanifest';
+      }
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
