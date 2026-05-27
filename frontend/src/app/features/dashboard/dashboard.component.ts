@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
@@ -9,6 +9,15 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { DashboardApiService, Phase, DashboardData, DiscountResult } from './dashboard-api.service';
+
+const VALUE_BASIS_STORAGE_KEY = 'dashboard_value_basis';
+function restoreValueBasis(): 'selling' | 'cost' {
+  try {
+    return localStorage.getItem(VALUE_BASIS_STORAGE_KEY) === 'cost' ? 'cost' : 'selling';
+  } catch {
+    return 'selling';
+  }
+}
 import { ProjectService } from '../../core/services/project.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SectionCardComponent } from '../../shared/components/section-card/section-card.component';
@@ -39,12 +48,17 @@ export class DashboardComponent {
     effect(() => {
       const id = this.project.selectedProject()?.id;
       if (!id) return;
-      // reset state ของ project เดิมก่อน fetch ใหม่ — กัน flash ค่าเก่า
-      this.selectedPhaseId.set(null);
-      this.discountInput.set(0);
-      this.discountResult.set(null);
-      this.loadPhases();
-      this.loadDashboard();
+      // ครอบ untracked เพื่อกัน effect re-fire เมื่อ valueBasis/selectedPhaseId เปลี่ยน
+      // (loadDashboard อ่าน signal เหล่านี้ — ถ้าไม่ untracked effect จะ track โดยไม่ตั้งใจ)
+      untracked(() => {
+        this.selectedPhaseId.set(null);
+        this.discountInput.set(0);
+        this.discountResult.set(null);
+        // valueBasis คง user preference ข้ามโครงการ — restore จาก localStorage
+        this.valueBasis.set(restoreValueBasis());
+        this.loadPhases();
+        this.loadDashboard();
+      });
     });
   }
 
@@ -53,6 +67,8 @@ export class DashboardComponent {
   error = signal<string | null>(null);
   phases = signal<Phase[]>([]);
   selectedPhaseId = signal<number | null>(null);
+  /** ฐานคำนวณ stock_value: selling = base_price, cost = unit_cost — persist ใน localStorage */
+  valueBasis = signal<'selling' | 'cost'>(restoreValueBasis());
   dashboardData = signal<DashboardData | null>(null);
   discountInput = signal<number>(0);
   discountResult = signal<DiscountResult | null>(null);
@@ -165,7 +181,7 @@ export class DashboardComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.api.getDashboard(this.projectId, this.selectedPhaseId()).subscribe({
+    this.api.getDashboard(this.projectId, this.selectedPhaseId(), this.valueBasis()).subscribe({
       next: data => {
         this.dashboardData.set(data);
         this.loading.set(false);
@@ -188,6 +204,15 @@ export class DashboardComponent {
     this.loadDashboard();
   }
 
+  onValueBasisChange(basis: 'selling' | 'cost'): void {
+    if (basis === this.valueBasis()) return;
+    this.valueBasis.set(basis);
+    try { localStorage.setItem(VALUE_BASIS_STORAGE_KEY, basis); } catch { /* ignore */ }
+    this.discountInput.set(0);
+    this.discountResult.set(null);
+    this.loadDashboard();
+  }
+
   onCalculateDiscount(): void {
     this.doCalculateDiscount(this.discountInput());
   }
@@ -203,7 +228,7 @@ export class DashboardComponent {
 
   private doCalculateDiscount(discount: number): void {
     this.calculatingDiscount.set(true);
-    this.api.calculateDiscount(this.projectId, discount, this.selectedPhaseId()).subscribe({
+    this.api.calculateDiscount(this.projectId, discount, this.selectedPhaseId(), this.valueBasis()).subscribe({
       next: data => {
         this.discountResult.set(data);
         this.calculatingDiscount.set(false);

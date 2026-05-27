@@ -67,20 +67,35 @@ export class DashboardApiService {
       .pipe(map(r => r.data));
   }
 
-  getDashboard(projectId: number, phaseId?: number | null): Observable<DashboardData> {
+  getDashboard(
+    projectId: number,
+    phaseId?: number | null,
+    valueBasis: 'selling' | 'cost' = 'selling',
+  ): Observable<DashboardData> {
     let params = new HttpParams().set('project_id', projectId);
     if (phaseId != null) {
       params = params.set('phase', phaseId);
+    }
+    if (valueBasis === 'cost') {
+      params = params.set('value_basis', 'cost');
     }
     return this.http
       .get<{ data: DashboardData }>('/api/dashboard', { params })
       .pipe(map(r => r.data));
   }
 
-  calculateDiscount(projectId: number, discount: number, phaseId?: number | null): Observable<DiscountResult> {
+  calculateDiscount(
+    projectId: number,
+    discount: number,
+    phaseId?: number | null,
+    valueBasis: 'selling' | 'cost' = 'selling',
+  ): Observable<DiscountResult> {
     const body: Record<string, unknown> = { project_id: projectId, discount };
     if (phaseId != null) {
       body['phase'] = phaseId;
+    }
+    if (valueBasis === 'cost') {
+      body['value_basis'] = 'cost';
     }
     return this.http
       .post<{ data: DiscountResult }>('/api/dashboard/calculate-discount', body)

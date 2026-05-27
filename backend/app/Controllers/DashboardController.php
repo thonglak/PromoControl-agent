@@ -27,8 +27,9 @@ class DashboardController extends BaseController
     }
 
     /**
-     * GET /api/dashboard?project_id=&phase=
+     * GET /api/dashboard?project_id=&phase=&value_basis=
      * ข้อมูลหลักของ Dashboard (ยอดขาย, stock คงเหลือ)
+     * value_basis: selling (default) | cost — เลือกฐาน stock_value
      */
     public function summary(): ResponseInterface
     {
@@ -45,7 +46,9 @@ class DashboardController extends BaseController
         $phaseParam = $this->request->getGet('phase');
         $phaseId = $phaseParam !== null && $phaseParam !== '' ? (int) $phaseParam : null;
 
-        $data           = $this->svc->getSalesDashboard($projectId, $phaseId);
+        $valueBasis = $this->request->getGet('value_basis') === 'cost' ? 'cost' : 'selling';
+
+        $data           = $this->svc->getSalesDashboard($projectId, $phaseId, $valueBasis);
         $data['legacy'] = $this->svc->getLegacyData($projectId);
 
         return $this->response->setJSON(['data' => $data]);
@@ -54,6 +57,7 @@ class DashboardController extends BaseController
     /**
      * POST /api/dashboard/calculate-discount
      * คำนวณส่วนลดประมาณการสำหรับยูนิตที่ยังไม่ขาย
+     * body: { project_id, discount, phase?, value_basis? ('selling' | 'cost') }
      */
     public function calculateDiscount(): ResponseInterface
     {
@@ -63,6 +67,7 @@ class DashboardController extends BaseController
         $discount  = (float) ($body['discount'] ?? 0);
         $phaseParam = $body['phase'] ?? null;
         $phaseId   = $phaseParam !== null && $phaseParam !== '' ? (int) $phaseParam : null;
+        $valueBasis = ($body['value_basis'] ?? null) === 'cost' ? 'cost' : 'selling';
 
         if (!$projectId) {
             return $this->response->setStatusCode(400)->setJSON(['error' => 'กรุณาระบุ project_id']);
@@ -76,7 +81,7 @@ class DashboardController extends BaseController
             return $this->response->setStatusCode(400)->setJSON(['error' => 'ส่วนลดต้องมีค่ามากกว่าหรือเท่ากับ 0']);
         }
 
-        $data           = $this->svc->calculateDiscount($projectId, $phaseId, $discount);
+        $data           = $this->svc->calculateDiscount($projectId, $phaseId, $discount, $valueBasis);
         $data['legacy'] = $this->svc->getLegacyData($projectId);
 
         return $this->response->setJSON(['data' => $data]);

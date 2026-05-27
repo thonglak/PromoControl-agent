@@ -85,8 +85,10 @@ class DashboardService
 
     /**
      * getSalesDashboard — ข้อมูลหลักของ Dashboard (Section 1-2)
+     * $valueBasis: 'selling' (default) = stock_value จาก base_price
+     *              'cost'              = stock_value จาก unit_cost (มุมต้นทุน)
      */
-    public function getSalesDashboard(int $projectId, ?int $phaseId = null): array
+    public function getSalesDashboard(int $projectId, ?int $phaseId = null, string $valueBasis = 'selling'): array
     {
         // === จำนวนยูนิตแยกตามกลุ่ม ===
         // sold_units / total_units / approved_project_value → exclude legacy_source
@@ -101,8 +103,11 @@ class DashboardService
         // sales_transactions ไม่มี legacy entries (sync caldiscount จะ skip ยูนิตที่มี active tx)
         $soldNetPrice = $this->sumSalesNetPrice($projectId, $phaseId);
 
-        // === มูลค่า stock ที่เหลือ (SUM base_price ของ unit ที่ยังไม่ขาย) ===
-        $stockValue = $this->sumBasePrice($projectId, $phaseId, ['available', 'reserved']);
+        // === มูลค่า stock ที่เหลือ ===
+        // selling → SUM(base_price); cost → SUM(unit_cost) เพื่อสะท้อนต้นทุนแทนราคาขาย
+        $stockValue = $valueBasis === 'cost'
+            ? $this->sumUnitCost($projectId, $phaseId, ['available', 'reserved'])
+            : $this->sumBasePrice($projectId, $phaseId, ['available', 'reserved']);
 
         // === มูลค่าโครงการที่อนุมัติ ===
         // ถ้า user กรอกใน projects.approved_project_value > 0 → ใช้ override + ไม่บวก legacy ที่ frontend
@@ -140,10 +145,11 @@ class DashboardService
 
     /**
      * calculateDiscount — คำนวณส่วนลดประมาณการสำหรับยูนิตที่ยังไม่ขาย
+     * $valueBasis ส่งต่อให้ getSalesDashboard เพื่อสลับฐาน stock_value
      */
-    public function calculateDiscount(int $projectId, ?int $phaseId, float $discount): array
+    public function calculateDiscount(int $projectId, ?int $phaseId, float $discount, string $valueBasis = 'selling'): array
     {
-        $dashboard = $this->getSalesDashboard($projectId, $phaseId);
+        $dashboard = $this->getSalesDashboard($projectId, $phaseId, $valueBasis);
 
         $remainingUnits       = $dashboard['remaining_units'];
         $stockValue           = $dashboard['stock_value'];

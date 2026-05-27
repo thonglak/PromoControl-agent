@@ -1,8 +1,8 @@
 # API Specification
 
 ## Dashboard (Sales-Focused)
-GET  /api/dashboard?project_id=&phase=          (ข้อมูลหลัก: ยอดขาย, stock, มูลค่าอนุมัติ — phase เป็น optional filter)
-POST /api/dashboard/calculate-discount           (คำนวณส่วนลดประมาณการ body: { project_id, discount, phase? })
+GET  /api/dashboard?project_id=&phase=&value_basis=   (ข้อมูลหลัก — phase: optional filter; value_basis: 'selling' default | 'cost')
+POST /api/dashboard/calculate-discount           (คำนวณส่วนลดประมาณการ body: { project_id, discount, phase?, value_basis? })
 ## Phases (เฟสโครงการ)
 GET    /api/phases?project_id=                    (รายการ phase ของโครงการ พร้อม unit_count)
 POST   /api/phases                                (สร้าง phase ใหม่ body: { project_id, name, sort_order? })
@@ -41,14 +41,24 @@ GET /api/dashboard response:
 → มีผลต่อเนื่อง: `avg_price_sold = sold_net_price / sold_units` และ `project_net_sales = sold_net_price + net_after_discount` (Section 4) ใช้ค่านี้เช่นกัน
 หมายเหตุ: `legacy.sold_net_price` ยังคงเป็นค่าที่ user กรอกใน `projects.legacy_sold_net_price` ตามเดิม (ระบบเก่าไม่มี breakdown ของแถม)
 
+**`value_basis` (ฐาน stock_value)**
+- `selling` (default) → `stock_value = SUM(base_price)` ของ unit สถานะ available/reserved
+- `cost`              → `stock_value = SUM(unit_cost)` ของ unit เดียวกัน (มุมต้นทุน)
+ค่าที่ derive ต่อ (`net_after_discount`, `project_net_sales`, `value_achieved`, `value_difference`, `difference_percent`, `avg_price_remaining`, `avg_price_project`) เปลี่ยนตาม stock_value โดยอัตโนมัติ
+ฝั่ง `sold_net_price` คงเดิม (มาจาก sales_transactions) ไม่ขึ้นกับ `value_basis`
+ฝั่ง `approved_project_value` คงเดิม (user override หรือ `SUM(unit_cost)`) ไม่ขึ้นกับ `value_basis`
+`legacy.*` คงเดิม (ค่า user input) ไม่ขึ้นกับ `value_basis`
+
 POST /api/dashboard/calculate-discount request:
 ```json
 {
   "project_id": 1,
   "discount": 50000,
-  "phase": null
+  "phase": null,
+  "value_basis": "selling"
 }
 ```
+หมายเหตุ: `value_basis` optional — default = `"selling"`. ค่าที่ยอมรับ: `"selling"` | `"cost"` (อื่น = ตีเป็น `"selling"`)
 
 POST /api/dashboard/calculate-discount response:
 ```json

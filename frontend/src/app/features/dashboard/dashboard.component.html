@@ -3,21 +3,51 @@
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <!-- HEADER: Title + Phase Dropdown                                        -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <div class="flex items-center justify-between">
+  <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h1 class="text-page-title text-primary-900 m-0">Dashboard</h1>
       <p class="text-caption text-gray-500 mt-1">{{ projectName() }}</p>
     </div>
 
-    <mat-form-field appearance="outline" class="w-48" subscriptSizing="dynamic">
-      <mat-label>Phase</mat-label>
-      <mat-select [value]="selectedPhaseId()" (selectionChange)="onPhaseChange($event.value)">
-        <mat-option [value]="null">- All -</mat-option>
-        @for (phase of phases(); track phase.id) {
-          <mat-option [value]="phase.id">{{ phase.name }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
+    <div class="flex items-center gap-3">
+      <!-- ฐานคำนวณมูลค่าขายสุทธิทั้งโครงการ: ราคาขาย (base_price) | ต้นทุน (unit_cost) -->
+      <div class="inline-flex rounded-md border border-gray-300 overflow-hidden" role="group" aria-label="ฐานคำนวณมูลค่า">
+        <button type="button"
+                class="px-4 py-2 text-sm font-medium transition-colors"
+                [class.bg-primary-700]="valueBasis() === 'selling'"
+                [class.text-white]="valueBasis() === 'selling'"
+                [class.bg-white]="valueBasis() !== 'selling'"
+                [class.text-gray-700]="valueBasis() !== 'selling'"
+                [class.hover:bg-gray-50]="valueBasis() !== 'selling'"
+                matTooltip="คำนวณ stock เหลือจาก base_price (ราคาขาย)"
+                matTooltipPosition="above"
+                (click)="onValueBasisChange('selling')">
+          ราคาขาย
+        </button>
+        <button type="button"
+                class="px-4 py-2 text-sm font-medium border-l border-gray-300 transition-colors"
+                [class.bg-primary-700]="valueBasis() === 'cost'"
+                [class.text-white]="valueBasis() === 'cost'"
+                [class.bg-white]="valueBasis() !== 'cost'"
+                [class.text-gray-700]="valueBasis() !== 'cost'"
+                [class.hover:bg-gray-50]="valueBasis() !== 'cost'"
+                matTooltip="คำนวณ stock เหลือจาก unit_cost (ต้นทุน)"
+                matTooltipPosition="above"
+                (click)="onValueBasisChange('cost')">
+          ต้นทุน
+        </button>
+      </div>
+
+      <mat-form-field appearance="outline" class="w-48" subscriptSizing="dynamic">
+        <mat-label>Phase</mat-label>
+        <mat-select [value]="selectedPhaseId()" (selectionChange)="onPhaseChange($event.value)">
+          <mat-option [value]="null">- All -</mat-option>
+          @for (phase of phases(); track phase.id) {
+            <mat-option [value]="phase.id">{{ phase.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
   </div>
 
   <!-- Phase + Legacy warning -->
