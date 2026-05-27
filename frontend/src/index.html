@@ -2,43 +2,47 @@
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <title>PromoControl</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
 
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#0F4C81">
-  <meta name="application-name" content="PromoControl">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="PromoControl">
-  <link rel="apple-touch-icon" href="/monitor/apple-touch-icon.png">
-
   <!--
-    ตั้งชื่อ PWA ตาม path ก่อน Angular บูต — สำคัญสำหรับ iOS Safari Add to Home Screen
-    เพราะ Safari อ่าน apple-mobile-web-app-title + <title> ตอน parse HTML
-    ถ้ารอ ngOnInit ของ component ผู้ใช้กด Share เร็วจะได้ชื่อผิด
-    Script นี้ต้องอยู่ "หลัง" PWA meta block เพื่อให้ querySelector หาเจอ
+    PWA bootstrap — inject manifest/title/apple-meta ก่อน browser preload
+    เหตุผล: browser เริ่ม fetch <link rel=manifest> ทันทีที่เจอ tag → ถ้ามี static link
+    แล้วเพิ่งมาแก้ href ด้วย script ใต้นั้น iOS อาจใช้ manifest ตัวที่ fetch ไปแล้ว
+    Script นี้จึงต้อง inject ทั้ง 4 ตัว (manifest/title/apple-title/application-name)
+    เป็นคนแรก ห้ามมี static tag เหล่านี้ใน HTML ก่อนหน้า
   -->
   <script>
     (function () {
-      if (location.pathname.indexOf('/monitor') === 0) {
-        var newTitle = 'PromoControl Monitor';
-        document.title = newTitle;
-        var m = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-        if (m) m.content = newTitle;
-        var a = document.querySelector('meta[name="application-name"]');
-        if (a) a.content = newTitle;
-        // เปลี่ยน manifest จากแอปหลักไปเป็นของ monitor ตั้งแต่ HTML parse
-        // กัน Chrome/Safari ใช้ scope=/ แทน scope=/monitor/ ตอน install
-        var lk = document.querySelector('link[rel="manifest"]');
-        if (lk) lk.href = '/monitor/manifest.webmanifest';
+      var isMonitor = location.pathname.indexOf('/monitor') === 0;
+      var title = isMonitor ? 'PromoControl Monitor' : 'PromoControl';
+      var manifestHref = isMonitor ? '/monitor/manifest.webmanifest' : '/manifest.webmanifest';
+
+      document.title = title;
+
+      function meta(name, content) {
+        var m = document.createElement('meta');
+        m.name = name;
+        m.content = content;
+        document.head.appendChild(m);
       }
+      meta('apple-mobile-web-app-title', title);
+      meta('application-name', title);
+
+      var lk = document.createElement('link');
+      lk.rel = 'manifest';
+      lk.href = manifestHref;
+      document.head.appendChild(lk);
     })();
   </script>
+
+  <!-- PWA static tags (ค่าเหมือนกันทุก path) -->
+  <meta name="theme-color" content="#0F4C81">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="/monitor/apple-touch-icon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
