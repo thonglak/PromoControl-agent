@@ -344,10 +344,13 @@ class UnitSyncService
     //   due_trans  (date)    → วันที่กำหนดโอน — ใช้เป็น sale_date (fallback)
     //
     // Logic mapping → ระบบใหม่:
-    //   is_trans=1            → status='transferred', transfer_date=date_trans, sale_date=due_trans
-    //   is_sold=1 & is_trans=0 → status='transferred', transfer_date=null,       sale_date=due_trans
-    //                            (ตามนโยบาย: ยูนิตที่ขายแล้วใน Caldiscount นับเป็นโอนแล้วในระบบนี้)
-    //   ทั้งคู่ = 0            → ข้าม (no_change — ไม่ override sales_transaction ระบบใหม่)
+    //   is_trans=1                          → status='transferred', transfer_date=date_trans, sale_date=due_trans
+    //   is_sold=1 & is_trans=0              → status='transferred', transfer_date=null,        sale_date=due_trans
+    //                                          (ตามนโยบาย: ยูนิตที่ขายแล้วใน Caldiscount นับเป็นโอนแล้วในระบบนี้)
+    //   มี discount_records.dir_status='sold' (แม้ profile.is_sold=0 & is_trans=0)
+    //                                       → status='transferred', transfer_date=null,        sale_date=dir_sale_date
+    //                                          (แก้ data inconsistency ของ Caldiscount — flag profile ไม่ตรงกับ dr)
+    //   ไม่มีข้อมูลจาก 2 แหล่ง               → ข้าม (no_change — ไม่ override sales_transaction ระบบใหม่)
     //
     // Side-effect (apply): สร้าง sales_transactions row label "ระบบเก่า" ให้ทุก unit ที่ถูก sync
     //   - sale_no = "LEGACY-{unit_code}", status='legacy', legacy_ref=dir_code
@@ -392,6 +395,9 @@ class UnitSyncService
             if ($norm !== null) $calNormMap[$norm][] = $r;
         }
 
+        // ดึง discount_records — แหล่งที่ 2 สำหรับสถานะ "ขายแล้ว" (กัน data inconsistency ของ Caldiscount)
+        $drMap = $this->fetchSoldDiscountRecordsMap($projectCode);
+
         // เช็ค active sales_transaction (สำหรับ conflict detection)
         $unitIds = array_map(static fn($u) => (int) $u['id'], $units);
         $txMap = [];
@@ -417,15 +423,16 @@ class UnitSyncService
             $code = (string) $u['unit_code'];
             $unitId = (int) $u['id'];
 
-            // หา cal match
+            // หา match จาก 2 แหล่ง: np_products_profile (is_sold/is_trans) + discount_records (dir_status='sold')
             $matched = $calExactMap[$code] ?? null;
             if (!$matched) {
                 $norm = $this->normalizeCode($code);
                 $candidates = $norm !== null ? ($calNormMap[$norm] ?? []) : [];
                 if (count($candidates) === 1) $matched = $candidates[0];
             }
+            $dr = $this->lookupDiscountRecord($drMap, $code);
 
-            if (!$matched) {
+            if (!$matched && !$dr) {
                 $rows[] = [
                     'unit_id'              => $unitId,
                     'unit_code'            => $code,
@@ -444,11 +451,13 @@ class UnitSyncService
             }
 
             // คำนวณ status ใหม่จาก flags
-            $isTrans = (int) ($matched['is_trans'] ?? 0) === 1;
-            $isSold  = (int) ($matched['is_sold']  ?? 0) === 1;
+            $matched = $matched ?? [];
+            $isTrans   = (int) ($matched['is_trans'] ?? 0) === 1;
+            $isSold    = (int) ($matched['is_sold']  ?? 0) === 1;
+            $hasDrSold = $dr !== null;
 
-            if (!$isTrans && !$isSold) {
-                // Caldiscount ไม่ได้บอกว่าขาย/โอน — ไม่ sync
+            if (!$isTrans && !$isSold && !$hasDrSold) {
+                // ไม่มีข้อมูลขาย/โอน จากทั้ง np_products_profile และ discount_records
                 $rows[] = [
                     'unit_id'              => $unitId,
                     'unit_code'            => $code,
@@ -466,10 +475,10 @@ class UnitSyncService
                 continue;
             }
 
-            // is_sold หรือ is_trans = 1 → บันทึกเป็น transferred ทั้งคู่
+            // is_sold/is_trans/มี dr.sold → บันทึกเป็น transferred ทั้งหมด
             $newStatus       = 'transferred';
             $newTransferDate = $isTrans ? ($matched['date_trans'] ?? null) : null;
-            $newSaleDate     = $matched['due_trans'] ?? null;
+            $newSaleDate     = ($dr['dir_sale_date'] ?? null) ?: ($matched['due_trans'] ?? null);
 
             // เช็ค conflict กับ sales_transaction ใหม่
             $conflictSaleNo = $txMap[$unitId] ?? null;
@@ -618,21 +627,25 @@ class UnitSyncService
             $code = (string) $u['unit_code'];
             $unitId = (int) $u['id'];
 
+            // หา match จาก 2 แหล่ง: np_products_profile + discount_records
             $matched = $calExactMap[$code] ?? null;
             if (!$matched) {
                 $norm = $this->normalizeCode($code);
                 $candidates = $norm !== null ? ($calNormMap[$norm] ?? []) : [];
                 if (count($candidates) === 1) $matched = $candidates[0];
             }
+            $dr = $this->lookupDiscountRecord($drMap, $code);
 
-            if (!$matched) {
+            if (!$matched && !$dr) {
                 $skipped[] = ['ref' => $code, 'reason' => 'ไม่พบใน caldiscount'];
                 continue;
             }
 
-            $isTrans = (int) ($matched['is_trans'] ?? 0) === 1;
-            $isSold  = (int) ($matched['is_sold']  ?? 0) === 1;
-            if (!$isTrans && !$isSold) {
+            $matched   = $matched ?? [];
+            $isTrans   = (int) ($matched['is_trans'] ?? 0) === 1;
+            $isSold    = (int) ($matched['is_sold']  ?? 0) === 1;
+            $hasDrSold = $dr !== null;
+            if (!$isTrans && !$isSold && !$hasDrSold) {
                 $skipped[] = ['ref' => $code, 'reason' => 'caldiscount ไม่ได้ระบุว่าขาย/โอน'];
                 continue;
             }
@@ -644,7 +657,7 @@ class UnitSyncService
 
             $set = [
                 'status'        => 'transferred',
-                'sale_date'     => $matched['due_trans']  ?? null,
+                'sale_date'     => ($dr['dir_sale_date'] ?? null) ?: ($matched['due_trans'] ?? null),
                 'transfer_date' => $isTrans ? ($matched['date_trans'] ?? null) : null,
                 'legacy_source' => 'caldiscount',
                 'updated_at'    => $now,
@@ -663,7 +676,7 @@ class UnitSyncService
                         (float) ($u['base_price'] ?? 0),
                         (float) ($u['unit_cost'] ?? 0),
                         $matched,
-                        $this->lookupDiscountRecord($drMap, $code),
+                        $dr,
                         $isTrans,
                         $now
                     );
