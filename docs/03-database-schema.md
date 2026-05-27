@@ -164,6 +164,14 @@ unit_cost
 net_price
 total_cost
 profit
+status (ENUM: draft, confirmed, active, cancelled, legacy)
+legacy_ref (VARCHAR 20, nullable — เก็บ caldiscount.discount_records.dir_code ถ้า status='legacy')
+
+-- หมายเหตุ status='legacy':
+-- รายการขายที่ sync จากระบบเก่า (Caldiscount) — ระบบเก่ากระทบยอดงบไปแล้ว
+-- ทุก budget query กรองด้วย status='active' จึงตัด legacy ออกอัตโนมัติ
+-- read-only: ห้ามแก้ไข/ยกเลิก/โอนผ่านระบบนี้
+-- sale_no format: LEGACY-{unit_code}
 
 ## sales_transaction_items
 id

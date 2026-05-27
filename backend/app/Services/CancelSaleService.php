@@ -53,6 +53,9 @@ class CancelSaleService
             }
 
             // 2. ตรวจ status
+            if ($transaction['status'] === 'legacy') {
+                throw new RuntimeException('รายการขายระบบเก่า (Caldiscount) ยกเลิกไม่ได้');
+            }
             if ($transaction['status'] !== 'active') {
                 throw new RuntimeException('รายการนี้ถูกยกเลิกแล้ว');
             }

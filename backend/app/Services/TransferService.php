@@ -43,6 +43,9 @@ class TransferService
             }
 
             // 2. ตรวจ transaction status
+            if ($transaction['status'] === 'legacy') {
+                throw new RuntimeException('รายการขายระบบเก่า (Caldiscount) โอนกรรมสิทธิ์ผ่านระบบนี้ไม่ได้');
+            }
             if ($transaction['status'] !== 'active') {
                 throw new RuntimeException('ไม่สามารถโอนกรรมสิทธิ์ได้ — รายการถูกยกเลิกแล้ว');
             }

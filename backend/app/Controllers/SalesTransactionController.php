@@ -126,6 +126,13 @@ class SalesTransactionController extends BaseController
         // cache budget summary ต่อ unit (หลาย transaction อาจชี้ unit เดียวกัน)
         $summaryCache = [];
         foreach ($data as &$row) {
+            // legacy: ระบบเก่ากระทบยอดงบไปแล้ว — ไม่นับงบคงเหลือ/งบนอก/กำไร ในระบบนี้
+            if (($row['status'] ?? null) === 'legacy') {
+                $row['total_budget_remaining'] = null;
+                $row['net_extra_budget_used']  = null;
+                continue;
+            }
+
             $rowPid = (int) $row['project_id'];
             $rowUid = (int) $row['unit_id'];
             $cacheKey = "{$rowPid}_{$rowUid}";
@@ -165,13 +172,14 @@ class SalesTransactionController extends BaseController
         // คำนวณแบบ unit-level (allocated − used − returned) ทำให้ RETURN กลับ Pool ไม่สะท้อนยอดเหลือ
         $poolRemaining = $this->budgetSvc->getPoolBalance($pid);
 
-        // ═══ sum คอลัมน์ "งบคงเหลือรวม" — ทุก row ที่ตรง filter ยกเว้นรายการยกเลิก (ไม่ paginate, ไม่ dedupe) ═══
+        // ═══ sum คอลัมน์ "งบคงเหลือรวม" — ทุก row ที่ตรง filter ยกเว้นยกเลิก/ระบบเก่า (ไม่ paginate, ไม่ dedupe) ═══
         // group by unit_id แล้ว fetch unit summary 1 ครั้งต่อยูนิต × tx_count → sum
+        // ระบบเก่า (legacy) กระทบยอดงบไปแล้ว — ไม่นับเข้าผลรวมงบคงเหลือฝั่งระบบนี้
         $aggBuilder = $this->db()->table('sales_transactions st')
             ->select('st.unit_id, COUNT(*) as tx_count')
             ->join('project_units pu', 'pu.id = st.unit_id', 'left');
         $this->applyIndexFilters($aggBuilder, $pid, false);
-        $aggBuilder->where('st.status !=', 'cancelled');  // ตัดรายการยกเลิกออก แม้ user filter จะรวมไว้
+        $aggBuilder->whereNotIn('st.status', ['cancelled', 'legacy']);
         $unitTxCounts = $aggBuilder->groupBy('st.unit_id')->get()->getResultArray();
 
         $totalColumnSum = 0;
@@ -191,12 +199,13 @@ class SalesTransactionController extends BaseController
             }
         }
 
-        // ═══ sum กำไร — ทุก row ที่ตรง filter ยกเว้นรายการยกเลิก ═══
+        // ═══ sum กำไร — ทุก row ที่ตรง filter ยกเว้นรายการยกเลิก/ระบบเก่า ═══
+        // ระบบเก่า (legacy) กระทบยอดงบไปแล้ว → ไม่นับเข้ายอดรวมกำไรของระบบนี้
         $profitBuilder = $this->db()->table('sales_transactions st')
             ->selectSum('st.profit', 'total_profit')
             ->join('project_units pu', 'pu.id = st.unit_id', 'left');
         $this->applyIndexFilters($profitBuilder, $pid, false);
-        $profitBuilder->where('st.status !=', 'cancelled');
+        $profitBuilder->whereNotIn('st.status', ['cancelled', 'legacy']);
         $totalProfit = (float) ($profitBuilder->get()->getRowArray()['total_profit'] ?? 0);
 
         // งบผู้บริหารที่คืนแล้ว — project-wide (รวมที่คืนจากการยกเลิกขายและคืนแบบ manual)

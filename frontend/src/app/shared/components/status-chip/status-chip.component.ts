@@ -53,6 +53,7 @@ export class StatusChipComponent {
       transaction_status: {
         active:    { label: 'ปกติ',    bgColor: Sb, textColor: S },
         cancelled: { label: 'ยกเลิก',  bgColor: Eb, textColor: E },
+        legacy:    { label: 'ระบบเก่า', bgColor: Nb, textColor: G },
       },
       movement_type: {
         ALLOCATE:           { label: 'ALLOCATE',           bgColor: Ib, textColor: I },

@@ -193,6 +193,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               <mat-option value="">ทั้งหมด</mat-option>
               <mat-option value="active">ปกติ</mat-option>
               <mat-option value="cancelled">ยกเลิก</mat-option>
+              <mat-option value="legacy">ระบบเก่า</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
@@ -209,7 +210,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
           }
           @if (statusFilter()) {
             <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-medium">
-              สถานะ: {{ statusFilter() === 'active' ? 'ปกติ' : 'ยกเลิก' }}
+              สถานะ: {{ statusLabel(statusFilter()) }}
             </span>
           }
           <button type="button" (click)="resetFilters()"
@@ -252,7 +253,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
                     (click)="goToDetail(row.id); $event.stopPropagation()">
                     <app-icon name="eye" class="w-4 h-4" />
                   </button>
-                  @if (canEdit()) {
+                  @if (canEdit() && row.status !== 'legacy') {
                     <button mat-icon-button matTooltip="แก้ไข" class="!text-slate-500 hover:!text-blue-600 -mt-1 -mr-2"
                       (click)="goToEdit(row.id); $event.stopPropagation()">
                       <app-icon name="pencil-square" class="w-4 h-4" />
@@ -280,9 +281,13 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
                   </div>
                   <div class="min-w-0">
                     <p class="text-xs text-slate-400 mb-0.5">กำไร</p>
-                    <p class="text-xs tabular-nums font-medium truncate"
-                       [class.text-profit]="row.profit >= 0"
-                       [class.text-loss]="row.profit < 0">฿{{ row.profit | number:'1.0-0' }}</p>
+                    @if (row.status === 'legacy') {
+                      <p class="text-xs text-slate-400">—</p>
+                    } @else {
+                      <p class="text-xs tabular-nums font-medium truncate"
+                         [class.text-profit]="row.profit >= 0"
+                         [class.text-loss]="row.profit < 0">฿{{ row.profit | number:'1.0-0' }}</p>
+                    }
                   </div>
                   <div class="min-w-0">
                     <p class="text-xs text-slate-400 mb-0.5">งบคงเหลือรวม</p>
@@ -354,9 +359,13 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               <ng-container matColumnDef="profit">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">กำไร</th>
                 <td mat-cell *matCellDef="let row" class="!text-right !text-sm tabular-nums !font-medium"
-                  [class.text-profit]="row.profit >= 0"
-                  [class.text-loss]="row.profit < 0">
-                  ฿{{ row.profit | number:'1.0-0' }}
+                  [class.text-profit]="row.status !== 'legacy' && row.profit >= 0"
+                  [class.text-loss]="row.status !== 'legacy' && row.profit < 0">
+                  @if (row.status === 'legacy') {
+                    <span class="text-slate-400 font-normal">—</span>
+                  } @else {
+                    ฿{{ row.profit | number:'1.0-0' }}
+                  }
                 </td>
               </ng-container>
 
@@ -417,7 +426,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
                       (click)="goToDetail(row.id); $event.stopPropagation()">
                       <app-icon name="eye" class="w-4 h-4" />
                     </button>
-                    @if (canEdit()) {
+                    @if (canEdit() && row.status !== 'legacy') {
                       <button mat-icon-button matTooltip="แก้ไข" class="!text-slate-500 hover:!text-blue-600"
                         (click)="goToEdit(row.id); $event.stopPropagation()">
                         <app-icon name="pencil-square" class="w-4 h-4" />
@@ -615,8 +624,8 @@ export class SalesListComponent implements OnInit {
   statusLabel(status: string): string {
     switch (status) {
       case 'active': return 'ปกติ';
-      
       case 'cancelled': return 'ยกเลิก';
+      case 'legacy': return 'ระบบเก่า';
       default: return status;
     }
   }

@@ -24,6 +24,62 @@ class UnitSyncService
         $this->cal = \Config\Database::connect('db');
     }
 
+    /**
+     * ดึง discount_records ของโครงการที่สถานะ 'sold' (latest ต่อ pd_uniq)
+     * Return: [pd_uniq => [dir_code, dir_price_sold, dir_price_contract, dir_sale_date, dir_cash_discount]]
+     * ถ้ามีหลาย sold record ต่อ unit → เลือกแถวที่ dir_sale_date ล่าสุด (รองด้วย dir_created_at)
+     */
+    private function fetchSoldDiscountRecordsMap(string $projectCode): array
+    {
+        $rows = $this->cal->table('discount_records')
+            ->select('dir_code, dir_pd_uniq, dir_price_sold, dir_price_contract, dir_sale_date, dir_cash_discount')
+            ->where('dir_pj_code', $projectCode)
+            ->where('dir_status', 'sold')
+            ->where('dir_deleted_at', null)
+            ->orderBy('dir_sale_date', 'DESC')
+            ->orderBy('dir_created_at', 'DESC')
+            ->get()->getResultArray();
+
+        $exact = [];
+        $norm  = [];
+        foreach ($rows as $r) {
+            $uniq = (string) $r['dir_pd_uniq'];
+            // เก็บแถวแรก (ล่าสุด) ต่อ uniq
+            if (!isset($exact[$uniq])) $exact[$uniq] = $r;
+            $n = $this->normalizeCode($uniq);
+            if ($n !== null && !isset($norm[$n])) $norm[$n] = $r;
+        }
+        return ['exact' => $exact, 'norm' => $norm];
+    }
+
+    /** หา discount_record ที่ match กับ unit_code (exact ก่อน, fallback normalized) */
+    private function lookupDiscountRecord(array $drMap, string $unitCode): ?array
+    {
+        $row = $drMap['exact'][$unitCode] ?? null;
+        if ($row !== null) return $row;
+        $n = $this->normalizeCode($unitCode);
+        return ($n !== null && isset($drMap['norm'][$n])) ? $drMap['norm'][$n] : null;
+    }
+
+    /**
+     * เช็คว่า unit นี้มี legacy sales_transaction อยู่แล้วหรือยัง (อย่างน้อย 1 row status='legacy')
+     * Return: [unit_id => true/false]
+     */
+    private function fetchLegacySaleExistsMap(array $unitIds): array
+    {
+        $map = array_fill_keys($unitIds, false);
+        if (empty($unitIds)) return $map;
+        $rows = $this->db->table('sales_transactions')
+            ->select('unit_id')
+            ->whereIn('unit_id', $unitIds)
+            ->where('status', 'legacy')
+            ->get()->getResultArray();
+        foreach ($rows as $r) {
+            $map[(int) $r['unit_id']] = true;
+        }
+        return $map;
+    }
+
     /** Normalize unit_code → key สำหรับ fuzzy match (uppercase, no separators, no leading zeros) */
     private function normalizeCode(string $code): ?string
     {
@@ -289,8 +345,16 @@ class UnitSyncService
     //
     // Logic mapping → ระบบใหม่:
     //   is_trans=1            → status='transferred', transfer_date=date_trans, sale_date=due_trans
-    //   is_sold=1 & is_trans=0 → status='sold',       sale_date=due_trans
+    //   is_sold=1 & is_trans=0 → status='transferred', transfer_date=null,       sale_date=due_trans
+    //                            (ตามนโยบาย: ยูนิตที่ขายแล้วใน Caldiscount นับเป็นโอนแล้วในระบบนี้)
     //   ทั้งคู่ = 0            → ข้าม (no_change — ไม่ override sales_transaction ระบบใหม่)
+    //
+    // Side-effect (apply): สร้าง sales_transactions row label "ระบบเก่า" ให้ทุก unit ที่ถูก sync
+    //   - sale_no = "LEGACY-{unit_code}", status='legacy', legacy_ref=dir_code
+    //   - net_price/contract_price/sale_date ← caldiscount.discount_records (dir_status='sold' ล่าสุด)
+    //   - ถ้าไม่มี discount_records → fallback: net_price=base_price, sale_date=due_trans
+    //   - idempotent: ถ้ามี legacy row ของ unit นี้แล้ว → skip
+    //   - status='legacy' ถูกตัดออกจากทุก budget query (ทุก query กรอง status='active')
     //
     // Conflict: ถ้า unit มี active sales_transaction ในระบบใหม่ → mark conflict
     //   skip apply กัน data inconsistency
@@ -342,6 +406,9 @@ class UnitSyncService
                 $txMap[(int) $t['unit_id']] = (string) $t['sale_no'];
             }
         }
+
+        // เช็คว่ามี legacy sales_transaction ของ unit นี้อยู่แล้วหรือยัง
+        $legacySaleMap = $this->fetchLegacySaleExistsMap($unitIds);
 
         $rows = [];
         $countUpdate = 0; $countNoChange = 0; $countConflict = 0; $countNotFound = 0;
@@ -399,7 +466,8 @@ class UnitSyncService
                 continue;
             }
 
-            $newStatus       = $isTrans ? 'transferred' : 'sold';
+            // is_sold หรือ is_trans = 1 → บันทึกเป็น transferred ทั้งคู่
+            $newStatus       = 'transferred';
             $newTransferDate = $isTrans ? ($matched['date_trans'] ?? null) : null;
             $newSaleDate     = $matched['due_trans'] ?? null;
 
@@ -423,13 +491,14 @@ class UnitSyncService
                 continue;
             }
 
-            // เทียบกับ current — ถ้าเหมือนเดิมและ flag = caldiscount อยู่แล้ว → no_change
-            $sameStatus = $u['status'] === $newStatus;
-            $sameSale   = (string) $u['sale_date']     === (string) $newSaleDate;
-            $sameTrans  = (string) $u['transfer_date'] === (string) $newTransferDate;
+            // เทียบกับ current — ถ้าเหมือนเดิม + flag caldiscount + มี legacy sale อยู่แล้ว → no_change
+            $sameStatus     = $u['status'] === $newStatus;
+            $sameSale       = (string) $u['sale_date']     === (string) $newSaleDate;
+            $sameTrans      = (string) $u['transfer_date'] === (string) $newTransferDate;
             $alreadyFlagged = $u['legacy_source'] === 'caldiscount';
+            $hasLegacySale  = $legacySaleMap[$unitId] ?? false;
 
-            if ($sameStatus && $sameSale && $sameTrans && $alreadyFlagged) {
+            if ($sameStatus && $sameSale && $sameTrans && $alreadyFlagged && $hasLegacySale) {
                 $rows[] = [
                     'unit_id'              => $unitId,
                     'unit_code'            => $code,
@@ -447,6 +516,11 @@ class UnitSyncService
                 continue;
             }
 
+            $note = null;
+            if ($sameStatus && $sameSale && $sameTrans && $alreadyFlagged && !$hasLegacySale) {
+                $note = 'จะสร้างรายการขายระบบเก่าเพิ่ม';
+            }
+
             $rows[] = [
                 'unit_id'              => $unitId,
                 'unit_code'            => $code,
@@ -458,7 +532,7 @@ class UnitSyncService
                 'new_transfer_date'    => $newTransferDate,
                 'status'               => 'will_update',
                 'conflict_sale_no'     => null,
-                'note'                 => null,
+                'note'                 => $note,
             ];
             $countUpdate++;
         }
@@ -494,7 +568,7 @@ class UnitSyncService
         }
 
         $units = $this->db->table('project_units')
-            ->select('id, unit_code')
+            ->select('id, unit_code, base_price, unit_cost')
             ->where('project_id', $projectId)
             ->whereIn('id', $unitIds)
             ->get()->getResultArray();
@@ -517,6 +591,9 @@ class UnitSyncService
             if ($norm !== null) $calNormMap[$norm][] = $r;
         }
 
+        // ดึง discount_records (ราคาขายจริง) สำหรับโครงการนี้
+        $drMap = $this->fetchSoldDiscountRecordsMap($projectCode);
+
         $thisUnitIds = array_map(static fn($u) => (int) $u['id'], $units);
         $tx = $this->db->table('sales_transactions')
             ->select('unit_id, sale_no')
@@ -528,6 +605,9 @@ class UnitSyncService
         foreach ($tx as $t) {
             $txMap[(int) $t['unit_id']] = (string) $t['sale_no'];
         }
+
+        // เช็ค legacy sales_transaction ที่มีอยู่แล้ว (idempotent)
+        $legacySaleMap = $this->fetchLegacySaleExistsMap($thisUnitIds);
 
         $updated = 0;
         $skipped = [];
@@ -563,7 +643,7 @@ class UnitSyncService
             }
 
             $set = [
-                'status'        => $isTrans ? 'transferred' : 'sold',
+                'status'        => 'transferred',
                 'sale_date'     => $matched['due_trans']  ?? null,
                 'transfer_date' => $isTrans ? ($matched['date_trans'] ?? null) : null,
                 'legacy_source' => 'caldiscount',
@@ -573,6 +653,21 @@ class UnitSyncService
             try {
                 $this->db->table('project_units')->where('id', $unitId)->update($set);
                 $updated++;
+
+                // สร้าง legacy sales_transaction (skip ถ้ามีอยู่แล้ว)
+                if (!($legacySaleMap[$unitId] ?? false)) {
+                    $this->insertLegacySalesTransaction(
+                        $projectId,
+                        $unitId,
+                        $code,
+                        (float) ($u['base_price'] ?? 0),
+                        (float) ($u['unit_cost'] ?? 0),
+                        $matched,
+                        $this->lookupDiscountRecord($drMap, $code),
+                        $isTrans,
+                        $now
+                    );
+                }
             } catch (\Throwable $e) {
                 $errors[] = ['ref' => $code, 'reason' => $e->getMessage()];
             }
@@ -583,5 +678,67 @@ class UnitSyncService
             'skipped' => $skipped,
             'errors'  => $errors,
         ];
+    }
+
+    /**
+     * สร้าง legacy sales_transaction สำหรับ unit ที่ถูก sync จาก Caldiscount
+     *
+     * ค่าราคา/วันที่ ใช้จาก discount_records ถ้ามี, ไม่งั้น fallback จาก project_units + np_products_profile
+     * ห้ามเรียกซ้ำกับ unit เดียวกัน (caller ต้องเช็ค legacy exists ก่อน)
+     *
+     * @param array $matched      np_products_profile row (is_sold, is_trans, due_trans, date_trans)
+     * @param array|null $dr      discount_records sold row (อาจไม่มี — ใช้ fallback)
+     */
+    private function insertLegacySalesTransaction(
+        int $projectId,
+        int $unitId,
+        string $unitCode,
+        float $basePrice,
+        float $unitCost,
+        array $matched,
+        ?array $dr,
+        bool $isTrans,
+        string $now
+    ): void {
+        $netPrice = $dr !== null && $dr['dir_price_sold'] !== null
+            ? (float) $dr['dir_price_sold']
+            : $basePrice;
+
+        $contractPrice = $dr !== null && $dr['dir_price_contract'] !== null
+            ? (float) $dr['dir_price_contract']
+            : null;
+
+        $saleDate = ($dr['dir_sale_date'] ?? null)
+            ?: ($matched['due_trans'] ?? null)
+            ?: date('Y-m-d');
+
+        $transferDate = $isTrans ? ($matched['date_trans'] ?? null) : null;
+
+        $row = [
+            'sale_no'                   => 'LEGACY-' . $unitCode,
+            'project_id'                => $projectId,
+            'unit_id'                   => $unitId,
+            'base_price'                => $basePrice,
+            'unit_cost'                 => $unitCost,
+            'net_price'                 => $netPrice,
+            'total_cost'                => $unitCost,
+            'profit'                    => $netPrice - $unitCost,
+            'total_discount'            => 0,
+            'total_promo_cost'          => 0,
+            'total_expense_support'     => 0,
+            'total_promo_burden'        => 0,
+            'sale_date'                 => $saleDate,
+            'contract_price'            => $contractPrice,
+            'loan_markup_amount'        => 0,
+            'additional_expense_amount' => 0,
+            'additional_expense_mode'   => 'add_to_net',
+            'status'                    => 'legacy',
+            'legacy_ref'                => $dr['dir_code'] ?? null,
+            'transfer_date'             => $transferDate,
+            'created_at'                => $now,
+            'updated_at'                => $now,
+        ];
+
+        $this->db->table('sales_transactions')->insert($row);
     }
 }

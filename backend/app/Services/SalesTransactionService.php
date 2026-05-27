@@ -99,6 +99,10 @@ class SalesTransactionService
             throw new RuntimeException('ไม่พบรายการขาย');
         }
 
+        if (($transaction['status'] ?? null) === 'legacy') {
+            throw new RuntimeException('รายการขายระบบเก่า (Caldiscount) แก้ไขไม่ได้');
+        }
+
         $projectId = (int) ($data['project_id'] ?? $transaction['project_id']);
         $unitId = (int) ($data['unit_id'] ?? $transaction['unit_id']);
         $saleDate = $data['sale_date'] ?? $transaction['sale_date'];

@@ -109,11 +109,13 @@ export class DashboardComponent {
     return (result.legacy?.total_discount_amount ?? 0) + result.total_discount_amount;
   });
 
-  /** มูลค่าโครงการที่ทำได้รวม (ระบบเก่า + ระบบใหม่) — ดึงจาก discountResult */
+  /** มูลค่าโครงการที่ทำได้รวม = มูลค่าขายสุทธิที่ขายได้ (รวม legacy) + มูลค่าขายสุทธิหลังหักส่วนลด
+   *  หมายเหตุ: หลัง migration stock เหลือทั้งหมดอยู่ในระบบใหม่ → net_after_discount ครอบคลุมทุก stock
+   *  ส่วนระบบเก่าใช้ legacy.sold_net_price (ที่ขายไปแล้ว) ไม่ใช่ legacy.value_achieved */
   combinedValueAchieved = computed(() => {
     const result = this.discountResult();
     if (!result) return 0;
-    return (result.legacy?.value_achieved ?? 0) + result.value_achieved;
+    return result.sold_net_price + (result.legacy?.sold_net_price ?? 0) + result.net_after_discount;
   });
 
   // ── Section 4 (สรุปการขาย ทั้งโครงการ) combined ─────────────────────────

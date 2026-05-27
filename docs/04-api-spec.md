@@ -40,6 +40,7 @@ GET /api/dashboard response:
 = ผลรวม "สุทธิหลังหักของแถม" (เทียบเท่าคอลัมน์ `net_after_promo` ในรายงาน Sales)
 → มีผลต่อเนื่อง: `avg_price_sold = sold_net_price / sold_units` และ `project_net_sales = sold_net_price + net_after_discount` (Section 4) ใช้ค่านี้เช่นกัน
 หมายเหตุ: `legacy.sold_net_price` ยังคงเป็นค่าที่ user กรอกใน `projects.legacy_sold_net_price` ตามเดิม (ระบบเก่าไม่มี breakdown ของแถม)
+**สำคัญ**: `sales_transactions.status='legacy'` (รายการจาก Caldiscount sync) **ไม่ถูกนับ** ใน budget query/formula ใดๆ — ระบบเก่ากระทบยอดงบไปแล้ว filter `status='active'` ตัด legacy ออกอัตโนมัติ
 
 **`value_basis` (ฐาน stock_value)**
 - `selling` (default) → `stock_value = SUM(base_price)` ของ unit สถานะ available/reserved
@@ -240,8 +241,15 @@ GET  /api/units/sync-caldiscount-sold/preview?project_id=  # preview sync สถ
                                                             #   summary: { total, will_update, no_change, conflict, not_found }
                                                             #   conflict = ยูนิตมี active sales_transaction ในระบบใหม่อยู่แล้ว → ข้าม
 POST /api/units/sync-caldiscount-sold/apply              # apply { project_id, unit_ids[] }
-                                                            #   set status (sold/transferred) + sale_date + transfer_date + legacy_source='caldiscount'
+                                                            #   นโยบาย: is_sold=1 หรือ is_trans=1 → บันทึกเป็น status='transferred' ทั้งคู่
+                                                            #   set status='transferred' + sale_date=due_trans + transfer_date=date_trans (null ถ้า is_trans=0) + legacy_source='caldiscount'
                                                             #   skip rows ที่ conflict (re-check ก่อน update กัน race)
+                                                            #   Side-effect: สร้าง sales_transactions row label "ระบบเก่า" ให้ทุก unit ที่ถูก sync
+                                                            #     - sale_no = "LEGACY-{unit_code}", status='legacy', legacy_ref = caldiscount.discount_records.dir_code
+                                                            #     - net_price/contract_price/sale_date ← discount_records (dir_status='sold' ล่าสุด) — fallback: base_price + due_trans
+                                                            #     - idempotent: ถ้ามี legacy row ของ unit นี้แล้ว → skip
+                                                            #     - status='legacy' ถูกตัดจากทุก budget query (กรอง status='active' อยู่แล้ว)
+                                                            #     - read-only: update/cancel/transfer → 422 "รายการขายระบบเก่าแก้ไข/ยกเลิก/โอนไม่ได้"
 
 ## Unit Types (ประเภทยูนิต — กำหนดเองต่อโครงการ)
 GET    /api/unit-types?project_id=     (รายการประเภทยูนิตของโครงการ)

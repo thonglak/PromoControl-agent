@@ -90,7 +90,7 @@ import { CancelSaleDialogComponent } from '../cancel-sale-dialog/cancel-sale-dia
               @if (tx().status === 'active' && tx().unit_status !== 'transferred') {
                 <button mat-stroked-button color="warn" (click)="openCancelDialog()">ยกเลิกขาย</button>
               }
-              @if (canEdit()) {
+              @if (canEdit() && tx().status !== 'legacy') {
                 <button mat-flat-button color="primary" (click)="goToEdit()">
                   <app-icon name="pencil" class="w-4 h-4 mr-1" /> แก้ไข
                 </button>

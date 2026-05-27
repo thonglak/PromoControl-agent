@@ -164,7 +164,8 @@ type StatusFilter = 'all' | 'will_update' | 'no_change' | 'conflict' | 'not_foun
         </div>
 
         <p class="text-xs text-slate-500 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span>📌 <code class="font-mono">is_trans=1</code> → โอนแล้ว · <code class="font-mono">is_sold=1</code> → ขายแล้ว</span>
+          <span>📌 <code class="font-mono">is_trans=1</code> หรือ <code class="font-mono">is_sold=1</code> → บันทึกเป็น <span class="text-emerald-700 font-medium">โอนแล้ว</span> ทั้งคู่</span>
+          <span>· จะสร้าง <span class="text-slate-700 font-medium">รายการขายระบบเก่า</span> (sale_no = <code class="font-mono">LEGACY-{{ '{' }}unit_code{{ '}' }}</code>) อัตโนมัติ — read-only ไม่นับเข้างบ</span>
           <span>· ยูนิตที่มีรายการขายในระบบใหม่จะถูก <span class="text-rose-700 font-medium">ข้าม</span> อัตโนมัติ</span>
           @if (preview()?.project_code) { <span>· รหัสโครงการ <code class="font-mono">{{ preview()?.project_code }}</code></span> }
         </p>

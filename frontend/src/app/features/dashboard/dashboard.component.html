@@ -232,17 +232,9 @@
             <!-- มูลค่าส่วนลดรวม -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าส่วนลดรวมหลังที่ยังไม่ขาย</span>
-              <div class="text-right">
-                <span class="text-body-lg font-semibold tabular-nums text-discount-color block">
-                  {{ hasLegacy() ? formatNumber(combinedTotalDiscountAmount()) : formatNumber(discountResult()!.total_discount_amount) }}
-                </span>
-                @if (hasLegacy()) {
-                  <span class="text-xs text-gray-500 font-mono tabular-nums">
-                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy!.total_discount_amount) }}
-                    (ณ {{ discountResult()!.legacy!.as_of_date | thaiDate:'medium' }})
-                  </span>
-                }
-              </div>
+              <span class="text-body-lg font-semibold tabular-nums text-discount-color">
+                {{ hasLegacy() ? formatNumber(combinedTotalDiscountAmount()) : formatNumber(discountResult()!.total_discount_amount) }}
+              </span>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -282,16 +274,9 @@
             <!-- จำนวนยูนิตทั้งโครงการ -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">จำนวนยูนิตทั้งโครงการ</span>
-              <div class="text-right">
-                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
-                  {{ hasLegacyUnits() ? formatInteger(combinedTotalUnits()) : formatInteger(discountResult()!.total_units) }}
-                </span>
-                @if (hasLegacyUnits()) {
-                  <span class="text-xs text-gray-500 font-mono tabular-nums">
-                    ระบบเก่า: {{ formatInteger(discountResult()!.legacy_unit_count) }} ยูนิต
-                  </span>
-                }
-              </div>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ hasLegacyUnits() ? formatInteger(combinedTotalUnits()) : formatInteger(discountResult()!.total_units) }}
+              </span>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -299,16 +284,9 @@
             <!-- มูลค่าขายสุทธิทั้งโครงการ -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าขายสุทธิทั้งโครงการ</span>
-              <div class="text-right">
-                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
-                  {{ hasLegacy() ? formatNumber(combinedProjectNetSales()) : formatNumber(discountResult()!.project_net_sales) }}
-                </span>
-                @if (hasLegacy()) {
-                  <span class="text-xs text-gray-500 font-mono tabular-nums">
-                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy!.sold_net_price) }}
-                  </span>
-                }
-              </div>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ hasLegacy() ? formatNumber(combinedProjectNetSales()) : formatNumber(discountResult()!.project_net_sales) }}
+              </span>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -327,16 +305,9 @@
             <!-- มูลค่าโครงการที่อนุมัติ -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าโครงการที่อนุมัติ</span>
-              <div class="text-right">
-                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
-                  {{ hasLegacyUnits() ? formatNumber(combinedApprovedProjectValue()) : formatNumber(discountResult()!.approved_project_value) }}
-                </span>
-                @if (hasLegacyUnits()) {
-                  <span class="text-xs text-gray-500 font-mono tabular-nums">
-                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy_unit_cost_sum) }}
-                  </span>
-                }
-              </div>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ hasLegacyUnits() ? formatNumber(combinedApprovedProjectValue()) : formatNumber(discountResult()!.approved_project_value) }}
+              </span>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
@@ -348,20 +319,12 @@
                 <app-icon
                   name="information-circle"
                   class="w-4 h-4 text-gray-400 cursor-help"
-                  matTooltip="มูลค่าขายสุทธิทั้งโครงการ = ยอดขายจริง + ประมาณการหลังหักส่วนลด"
+                  matTooltip="มูลค่าขายสุทธิที่ขายได้ + มูลค่าขายสุทธิหลังหักส่วนลด"
                   matTooltipPosition="above" />
               </span>
-              <div class="text-right">
-                <span class="text-body-lg font-semibold tabular-nums text-primary-900 block">
-                  {{ hasLegacy() ? formatNumber(combinedValueAchieved()) : formatNumber(discountResult()!.value_achieved) }}
-                </span>
-                @if (hasLegacy()) {
-                  <span class="text-xs text-gray-500 font-mono tabular-nums">
-                    ระบบเก่า: ฿{{ formatNumber(discountResult()!.legacy!.value_achieved) }}
-                    (ณ {{ discountResult()!.legacy!.as_of_date | thaiDate:'medium' }})
-                  </span>
-                }
-              </div>
+              <span class="text-body-lg font-semibold tabular-nums text-primary-900">
+                {{ hasLegacy() ? formatNumber(combinedValueAchieved()) : formatNumber(discountResult()!.value_achieved) }}
+              </span>
             </div>
 
             <div class="border-b border-gray-100 mx-2"></div>
