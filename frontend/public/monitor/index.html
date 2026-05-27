@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0F4C81">
+  <link rel="manifest" href="/monitor/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/monitor/apple-touch-icon.png">
+  <style>
+    body { margin:0; font-family: 'Noto Sans Thai', system-ui, sans-serif; background:#F8FAFC; color:#475569; }
+    .wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .card { background:#fff; border:1px solid #E2E8F0; border-radius:.75rem; padding:1.5rem 1.25rem; text-align:center; max-width: 24rem; }
+    .card h1 { font-size: 1rem; font-weight: 600; color:#334155; margin:0 0 .5rem; }
+    .card p { font-size: .75rem; color:#94A3B8; margin:0; line-height:1.5; }
+  </style>
+  <script>
+    // entry point ของ PWA monitor — อ่าน token ล่าสุดจาก localStorage
+    // (บันทึกไว้ตอน MonitorPageComponent โหลดข้อมูลสำเร็จ)
+    // ถ้าเจอ → redirect ทันทีก่อน render — เลี่ยงโหลด Angular bundle เปล่าๆ
+    (function () {
+      try {
+        var t = localStorage.getItem('monitor_last_token');
+        if (t) {
+          location.replace('/monitor/' + encodeURIComponent(t));
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>ไม่พบลิงค์ Monitor ที่บันทึกไว้</h1>
+      <p>
+        เปิดลิงค์ที่ได้รับจากผู้ดูแลระบบอีกครั้ง<br>
+        เพื่อให้แอปจดจำลิงค์นี้
+      </p>
+    </div>
+  </div>
+</body>
+</html>

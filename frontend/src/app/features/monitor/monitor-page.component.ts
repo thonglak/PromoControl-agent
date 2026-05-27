@@ -119,12 +119,17 @@ interface MonitorData {
             }
           </div>
 
-          <!-- Refresh -->
-          <div class="mt-6 flex justify-center">
+          <!-- Refresh + Install -->
+          <div class="mt-6 flex flex-wrap justify-center gap-2">
             <button mat-stroked-button (click)="load()" [disabled]="refreshing()">
               @if (refreshing()) { <mat-spinner diameter="16" class="!inline-block mr-2" /> }
               รีเฟรชข้อมูล
             </button>
+            @if (!isInstalled() && (canInstall() || isIOS())) {
+              <button mat-flat-button color="primary" (click)="installApp()">
+                ติดตั้งแอป
+              </button>
+            }
           </div>
 
           <p class="text-[10px] text-slate-400 mt-6 text-center leading-tight">
@@ -133,6 +138,28 @@ interface MonitorData {
         }
 
       </div>
+
+      <!-- iOS install instructions sheet -->
+      @if (showIOSHint()) {
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 pb-6 sm:pb-0"
+             (click)="closeIOSHint()">
+          <div class="bg-white rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 shadow-xl"
+               (click)="$event.stopPropagation()">
+            <h2 class="text-base font-semibold text-slate-800 m-0">ติดตั้งแอปบน iOS</h2>
+            <ol class="text-sm text-slate-600 mt-3 pl-5 leading-relaxed list-decimal">
+              <li>กดปุ่ม <span class="font-semibold">Share</span> (สี่เหลี่ยมมีลูกศรขึ้น) ด้านล่างของ Safari</li>
+              <li>เลื่อนหาเมนู <span class="font-semibold">Add to Home Screen</span></li>
+              <li>กด <span class="font-semibold">Add</span> มุมขวาบน</li>
+            </ol>
+            <p class="text-xs text-slate-400 mt-3 m-0">
+              หมายเหตุ: ต้องเปิดผ่าน Safari เท่านั้น (ไม่ใช่ Chrome iOS)
+            </p>
+            <div class="mt-4 flex justify-end">
+              <button mat-stroked-button (click)="closeIOSHint()">ปิด</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
 })
@@ -147,10 +174,16 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
   readonly data = signal<MonitorData | null>(null);
   readonly token = signal<string>('');
 
+  // PWA install state
+  readonly canInstall = signal(false);
+  readonly isInstalled = signal(false);
+  readonly isIOS = signal(false);
+  readonly showIOSHint = signal(false);
+  private deferredPrompt: any = null;
+
   // refs สำหรับ cleanup
   private manifestLink: HTMLLinkElement | null = null;
   private manifestPrevHref: string | null = null;     // null = ไม่เคยมี element → ลบทิ้งตอน destroy
-  private manifestBlobUrl: string | null = null;      // blob URL ที่สร้าง (revoke ตอน destroy)
   private appleIcon: HTMLLinkElement | null = null;
   private appleIconPrevHref: string | null = null;
   private themeColorMeta: HTMLMetaElement | null = null;
@@ -162,6 +195,7 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     this.injectPwaHeadTags();
     this.registerServiceWorker();
     this.bindAutoLoad();
+    this.bindInstallPrompt();
     this.load();
   }
 
@@ -169,6 +203,8 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('focus', this.onFocus);
     window.removeEventListener('pageshow', this.onPageShow);
+    window.removeEventListener('beforeinstallprompt', this.onBeforeInstall);
+    window.removeEventListener('appinstalled', this.onAppInstalled);
 
     // Manifest/Apple icon: ถ้าเคยมีอยู่แล้ว (root index.html) restore href เดิม
     // ถ้าเราเป็นคนสร้างขึ้นมาเอง (prev=null) ก็ลบทิ้ง
@@ -186,26 +222,19 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     this.appleStatusBarMeta?.remove();
     this.appleTitleMeta?.remove();
 
-    if (this.manifestBlobUrl) {
-      URL.revokeObjectURL(this.manifestBlobUrl);
-      this.manifestBlobUrl = null;
-    }
   }
 
   private injectPwaHeadTags(): void {
     const head = document.head;
 
-    // สร้าง manifest แบบ dynamic เพื่อให้ start_url = URL เต็มของ token ตอนติดตั้ง
-    // เหตุผล: production nginx ไม่ serve /monitor/ (trailing slash, ไม่มี token) เป็น
-    //         index.html → ขึ้น 403 ก่อน Angular boot. ถ้า start_url เป็น /monitor/<token>
-    //         (path จริงที่ nginx fallback เข้า index.html ได้) ปัญหาหายไป
-    const token = this.route.snapshot.paramMap.get('token') ?? '';
-    const manifestUrl = token
-      ? this.buildBlobManifestUrl(token)
-      : '/monitor/manifest.webmanifest';
+    // ใช้ static manifest (/monitor/manifest.webmanifest) เพื่อให้ browser install criteria
+    // ผ่านได้แน่นอน — Chrome บางเวอร์ชันไม่ install จาก blob: URL
+    // start_url=. ใน manifest จะ resolve เป็น /monitor/ → nginx serve /monitor/index.html
+    // (static file ทำ JS redirect ไป /monitor/<token> โดยอ่าน localStorage)
+    const manifestUrl = '/monitor/manifest.webmanifest';
 
     // Manifest: ถ้ามี root manifest อยู่แล้ว ให้สลับ href แทนการ append ใหม่
-    // — กัน browser เห็น 2 manifest แล้วเลือก scope ผิด (เคยทำให้ติดตั้งแล้วเปิดมาเข้าแอปหลัก)
+    // — กัน browser เห็น 2 manifest แล้วเลือก scope ผิด
     const existingManifest = head.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     if (existingManifest) {
       this.manifestLink = existingManifest;
@@ -254,35 +283,6 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     head.appendChild(this.appleTitleMeta);
   }
 
-  /**
-   * สร้าง manifest แบบ runtime ที่ start_url = full URL ของ token นี้
-   * คืนค่า blob: URL ใช้กับ <link rel="manifest"> ได้ตรงๆ
-   */
-  private buildBlobManifestUrl(token: string): string {
-    const manifest = {
-      name: 'PromoControl Monitor',
-      short_name: 'Monitor',
-      description: 'ดู KPI โครงการแบบเรียลไทม์ผ่านลิงค์สาธารณะ',
-      scope: '/monitor/',
-      // start_url = path เต็มที่ nginx serve เป็น index.html ได้
-      // (หลีกเลี่ยง /monitor/ trailing slash ที่ production อาจ 403)
-      start_url: `/monitor/${token}`,
-      display: 'standalone',
-      orientation: 'portrait',
-      background_color: '#F8FAFC',
-      theme_color: '#0F4C81',
-      lang: 'th',
-      icons: [
-        { src: '/monitor/icon.svg',     sizes: 'any',     type: 'image/svg+xml', purpose: 'any' },
-        { src: '/monitor/icon-192.png', sizes: '192x192', type: 'image/png',     purpose: 'any maskable' },
-        { src: '/monitor/icon-512.png', sizes: '512x512', type: 'image/png',     purpose: 'any maskable' },
-      ],
-    };
-    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-    this.manifestBlobUrl = URL.createObjectURL(blob);
-    return this.manifestBlobUrl;
-  }
-
   private registerServiceWorker(): void {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('/monitor/sw.js', { scope: '/monitor/' }).catch(() => {
@@ -295,6 +295,51 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     window.addEventListener('focus', this.onFocus);
     window.addEventListener('pageshow', this.onPageShow);
   }
+
+  private bindInstallPrompt(): void {
+    // ตรวจว่าเปิดในโหมด standalone (ติดตั้งแล้ว) — ทั้ง Android และ iOS
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+      || (navigator as any).standalone === true;
+    if (standalone) {
+      this.isInstalled.set(true);
+      return;
+    }
+
+    // iOS Safari: ไม่มี beforeinstallprompt — ต้องสอน user กด Share → Add to Home Screen
+    const ua = navigator.userAgent;
+    const iosLike = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+    this.isIOS.set(iosLike);
+
+    window.addEventListener('beforeinstallprompt', this.onBeforeInstall);
+    window.addEventListener('appinstalled', this.onAppInstalled);
+  }
+
+  private onBeforeInstall = (e: Event): void => {
+    e.preventDefault();
+    this.deferredPrompt = e;
+    this.canInstall.set(true);
+  };
+
+  private onAppInstalled = (): void => {
+    this.deferredPrompt = null;
+    this.canInstall.set(false);
+    this.isInstalled.set(true);
+  };
+
+  async installApp(): Promise<void> {
+    // iOS: เปิด instruction sheet
+    if (this.isIOS()) {
+      this.showIOSHint.set(true);
+      return;
+    }
+    if (!this.deferredPrompt) return;
+    await this.deferredPrompt.prompt();
+    try { await this.deferredPrompt.userChoice; } catch {}
+    this.deferredPrompt = null;
+    this.canInstall.set(false);
+  }
+
+  closeIOSHint(): void { this.showIOSHint.set(false); }
 
   private onVisibility = (): void => {
     if (document.visibilityState === 'visible') this.load();
