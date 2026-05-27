@@ -36,6 +36,12 @@ export const routes: Routes = [
 
   // Public monitor — link-based access (no auth required)
   {
+    // PWA start_url (`.` ใน manifest) resolve เป็น /monitor/ ไม่มี token
+    // component อ่าน last token จาก localStorage แล้ว redirect — ป้องกัน fallback เด้ง login
+    path: 'monitor',
+    loadComponent: () => import('./features/monitor/monitor-redirect.component').then(m => m.MonitorRedirectComponent),
+  },
+  {
     path: 'monitor/:token',
     loadComponent: () => import('./features/monitor/monitor-page.component').then(m => m.MonitorPageComponent),
   },

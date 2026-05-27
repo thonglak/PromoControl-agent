@@ -244,6 +244,8 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
 
     this.http.get<MonitorData>(`/api/public/monitor/${token}`).subscribe({
       next: res => {
+        // จดจำ token ล่าสุดสำหรับกรณี PWA เปิดที่ /monitor/ (start_url ไม่มี token)
+        try { localStorage.setItem('monitor_last_token', token); } catch {}
         this.data.set(res);
         this.error.set(null);
         this.loading.set(false);
