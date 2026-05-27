@@ -55,6 +55,14 @@ $routes->group('api', static function (RouteCollection $routes): void {
         $routes->delete('(:num)/legacy-reconciliation', 'ProjectLegacyReconciliationController::delete/$1');
     });
 
+    // Monitor Links (ลิงค์สาธารณะดู KPI หลายโครงการ — admin only)
+    $routes->group('monitor-links', ['filter' => 'role:admin'], static function (RouteCollection $routes): void {
+        $routes->get   ('/',         'MonitorLinkController::index');
+        $routes->post  ('/',         'MonitorLinkController::create');
+        $routes->put   ('(:num)',    'MonitorLinkController::update/$1');
+        $routes->delete('(:num)',    'MonitorLinkController::delete/$1');
+    });
+
     $routes->group('house-models', static function (RouteCollection $routes): void {
         $routes->get('/',        'HouseModelController::index');
         $routes->get('(:num)',   'HouseModelController::show/$1');
@@ -332,4 +340,14 @@ $routes->group('api', static function (RouteCollection $routes): void {
     // (phases route อยู่ใน PhaseController group ด้านบน)
 
 
+});
+
+// ─────────────────────────────────────────────────────────────
+// Public endpoints (no auth) — ยกเว้นจาก JwtAuthFilter ผ่าน pattern api/public/*
+// ─────────────────────────────────────────────────────────────
+$routes->group('api/public', static function (RouteCollection $routes): void {
+    // Public monitor link — ดู KPI ของโครงการผ่าน token
+    $routes->get('monitor/(:segment)', 'PublicMonitorController::show/$1');
+    // Dashboard รายโครงการผ่าน token
+    $routes->get('monitor/(:segment)/dashboard/(:num)', 'PublicMonitorController::dashboard/$1/$2');
 });

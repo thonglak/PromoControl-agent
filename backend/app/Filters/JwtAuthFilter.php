@@ -53,6 +53,11 @@ class JwtAuthFilter implements FilterInterface
             }
         }
 
+        // Public endpoints (api/public/*) — สำหรับ link-based access ไม่ต้อง JWT
+        if (str_starts_with($currentUri, 'api/public/')) {
+            return;
+        }
+
         // ── ขั้นตอน 1: ตรวจ Authorization header ──────────────────────────
         $authHeader = $request->getHeaderLine('Authorization');
         if (empty($authHeader) || ! str_starts_with($authHeader, 'Bearer ')) {

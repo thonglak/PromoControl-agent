@@ -34,6 +34,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/sso-callback/sso-callback.component').then(m => m.SsoCallbackComponent),
   },
 
+  // Public monitor — link-based access (no auth required)
+  {
+    path: 'monitor/:token',
+    loadComponent: () => import('./features/monitor/monitor-page.component').then(m => m.MonitorPageComponent),
+  },
+
   {
     path: '',
     canActivate: [authGuard],

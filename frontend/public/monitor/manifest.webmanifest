@@ -1,0 +1,17 @@
+{
+  "name": "PromoControl Monitor",
+  "short_name": "Monitor",
+  "description": "ดู KPI โครงการแบบเรียลไทม์ผ่านลิงค์สาธารณะ",
+  "scope": "/monitor/",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F4C81",
+  "lang": "th",
+  "icons": [
+    { "src": "/monitor/icon.svg",        "sizes": "any",     "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/monitor/icon-192.png",    "sizes": "192x192", "type": "image/png",     "purpose": "any maskable" },
+    { "src": "/monitor/icon-512.png",    "sizes": "512x512", "type": "image/png",     "purpose": "any maskable" }
+  ]
+}
