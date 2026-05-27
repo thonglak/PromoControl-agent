@@ -31,9 +31,16 @@ export class MonitorRedirectComponent implements OnInit {
   private readonly router = inject(Router);
 
   ngOnInit(): void {
-    const token = localStorage.getItem('monitor_last_token');
+    // ลำดับ: cookie ก่อน (iOS PWA แชร์ cookie กับ Safari เสมอ) แล้วค่อย localStorage
+    const token = this.readCookie('monitor_last_token')
+      ?? localStorage.getItem('monitor_last_token');
     if (token) {
       this.router.navigateByUrl(`/monitor/${token}`, { replaceUrl: true });
     }
+  }
+
+  private readCookie(name: string): string | null {
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
   }
 }

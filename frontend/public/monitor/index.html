@@ -18,12 +18,19 @@
     .card p { font-size: .75rem; color:#94A3B8; margin:0; line-height:1.5; }
   </style>
   <script>
-    // entry point ของ PWA monitor — อ่าน token ล่าสุดจาก localStorage
-    // (บันทึกไว้ตอน MonitorPageComponent โหลดข้อมูลสำเร็จ)
-    // ถ้าเจอ → redirect ทันทีก่อน render — เลี่ยงโหลด Angular bundle เปล่าๆ
+    // entry point ของ PWA monitor — อ่าน token ล่าสุด redirect ทันทีก่อน render
+    // ใช้ทั้ง cookie + localStorage เพราะ iOS PWA standalone mode บางเวอร์ชัน
+    // ไม่แชร์ localStorage กับ Safari ปกติ (แต่แชร์ cookie เสมอ)
     (function () {
+      function readCookie(name) {
+        var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return m ? decodeURIComponent(m[1]) : null;
+      }
       try {
-        var t = localStorage.getItem('monitor_last_token');
+        var t = readCookie('monitor_last_token');
+        if (!t) {
+          try { t = localStorage.getItem('monitor_last_token'); } catch (_) {}
+        }
         if (t) {
           location.replace('/monitor/' + encodeURIComponent(t));
         }
