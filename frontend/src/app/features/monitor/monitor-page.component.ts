@@ -149,7 +149,9 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
 
   // refs สำหรับ cleanup
   private manifestLink: HTMLLinkElement | null = null;
+  private manifestPrevHref: string | null = null;     // null = ไม่เคยมี element → ลบทิ้งตอน destroy
   private appleIcon: HTMLLinkElement | null = null;
+  private appleIconPrevHref: string | null = null;
   private themeColorMeta: HTMLMetaElement | null = null;
   private appleCapableMeta: HTMLMetaElement | null = null;
   private appleStatusBarMeta: HTMLMetaElement | null = null;
@@ -166,9 +168,18 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('focus', this.onFocus);
     window.removeEventListener('pageshow', this.onPageShow);
-    // ลบ head tags ที่ inject เพื่อไม่ให้คงค้างใน app
-    this.manifestLink?.remove();
-    this.appleIcon?.remove();
+
+    // Manifest/Apple icon: ถ้าเคยมีอยู่แล้ว (root index.html) restore href เดิม
+    // ถ้าเราเป็นคนสร้างขึ้นมาเอง (prev=null) ก็ลบทิ้ง
+    if (this.manifestLink) {
+      if (this.manifestPrevHref !== null) this.manifestLink.href = this.manifestPrevHref;
+      else this.manifestLink.remove();
+    }
+    if (this.appleIcon) {
+      if (this.appleIconPrevHref !== null) this.appleIcon.href = this.appleIconPrevHref;
+      else this.appleIcon.remove();
+    }
+
     this.themeColorMeta?.remove();
     this.appleCapableMeta?.remove();
     this.appleStatusBarMeta?.remove();
@@ -178,15 +189,34 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
   private injectPwaHeadTags(): void {
     const head = document.head;
 
-    this.manifestLink = document.createElement('link');
-    this.manifestLink.rel = 'manifest';
-    this.manifestLink.href = '/monitor/manifest.webmanifest';
-    head.appendChild(this.manifestLink);
+    // Manifest: ถ้ามี root manifest อยู่แล้ว ให้สลับ href แทนการ append ใหม่
+    // — กัน browser เห็น 2 manifest แล้วเลือก scope ผิด (เคยทำให้ติดตั้งแล้วเปิดมาเข้าแอปหลัก)
+    const existingManifest = head.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    if (existingManifest) {
+      this.manifestLink = existingManifest;
+      this.manifestPrevHref = existingManifest.href;
+      existingManifest.href = '/monitor/manifest.webmanifest';
+    } else {
+      this.manifestLink = document.createElement('link');
+      this.manifestLink.rel = 'manifest';
+      this.manifestLink.href = '/monitor/manifest.webmanifest';
+      this.manifestPrevHref = null;
+      head.appendChild(this.manifestLink);
+    }
 
-    this.appleIcon = document.createElement('link');
-    this.appleIcon.rel = 'apple-touch-icon';
-    this.appleIcon.href = '/monitor/apple-touch-icon.png';
-    head.appendChild(this.appleIcon);
+    // Apple touch icon: เช่นกัน — สลับ href ของตัวเดิม
+    const existingAppleIcon = head.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    if (existingAppleIcon) {
+      this.appleIcon = existingAppleIcon;
+      this.appleIconPrevHref = existingAppleIcon.href;
+      existingAppleIcon.href = '/monitor/apple-touch-icon.png';
+    } else {
+      this.appleIcon = document.createElement('link');
+      this.appleIcon.rel = 'apple-touch-icon';
+      this.appleIcon.href = '/monitor/apple-touch-icon.png';
+      this.appleIconPrevHref = null;
+      head.appendChild(this.appleIcon);
+    }
 
     this.themeColorMeta = document.createElement('meta');
     this.themeColorMeta.name = 'theme-color';
