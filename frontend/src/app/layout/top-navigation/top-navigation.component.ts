@@ -9,6 +9,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AuthService } from '../../core/services/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { FontSizeService } from '../../core/services/font-size.service';
+import { InstallPromptService } from '../../core/services/install-prompt.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SvgIconComponent } from '../../shared/components/svg-icon/svg-icon.component';
 import { ChangePasswordDialogComponent } from './change-password-dialog.component';
@@ -55,6 +56,7 @@ export class TopNavigationComponent {
   private readonly dialog = inject(MatDialog);
   readonly theme          = inject(ThemeService);
   readonly fontSize       = inject(FontSizeService);
+  readonly install        = inject(InstallPromptService);
 
   readonly currentUser = this.auth.currentUser;
 
@@ -102,5 +104,10 @@ export class TopNavigationComponent {
       next: () => {},
       error: () => this.auth.clearSession(),
     });
+  }
+
+  /** เปิด install prompt ของ browser */
+  installApp(): void {
+    this.install.prompt();
   }
 }

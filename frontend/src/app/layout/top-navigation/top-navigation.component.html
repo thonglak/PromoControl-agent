@@ -75,6 +75,22 @@
     </button>
   </div>
 
+  <!-- ── Install PWA (แสดงเฉพาะเมื่อ browser พร้อมและยังไม่ติดตั้ง) ─────────── -->
+  @if (install.canInstall() && !install.installed()) {
+    <button
+      type="button"
+      (click)="installApp()"
+      matTooltip="ติดตั้งแอปบนอุปกรณ์นี้"
+      matTooltipPosition="below"
+      class="w-8 h-8 flex items-center justify-center mr-1 flex-shrink-0 transition-colors
+             border-0 bg-transparent cursor-pointer"
+      style="border-radius: var(--radius-md); color: var(--color-primary)"
+      onmouseover="this.style.backgroundColor='var(--color-gray-100)'"
+      onmouseout="this.style.backgroundColor='transparent'">
+      <app-icon name="arrow-down-tray" class="w-5 h-5" />
+    </button>
+  }
+
   <!-- ── Theme toggle ─────────────────────────────────────────────────── -->
   <button
     type="button"
