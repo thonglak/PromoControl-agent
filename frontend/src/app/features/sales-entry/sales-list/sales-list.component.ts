@@ -84,23 +84,17 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
         <div class="mb-4 bg-white rounded-lg border border-slate-200 overflow-hidden">
           <div class="flex flex-wrap sm:flex-nowrap sm:divide-x sm:divide-slate-100">
 
-            <!-- งบยูนิต -->
+            <!-- จำนวนขายแล้วรวม (รวมระบบเก่า) -->
             <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
-              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบยูนิต</span>
-              <div class="flex items-end gap-4 mt-1.5">
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-[10px] text-slate-400">ใช้แล้ว</span>
-                  <span class="text-sm font-semibold tabular-nums text-amber-600">฿{{ summary()!.unit_budget_used | number:'1.0-0' }}</span>
-                </div>
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-[10px] text-slate-400">คงเหลือ</span>
-                  <span class="text-sm font-semibold tabular-nums"
-                        [class.text-blue-600]="summary()!.unit_budget_remaining >= 0"
-                        [class.text-red-600]="summary()!.unit_budget_remaining < 0">
-                    ฿{{ summary()!.unit_budget_remaining | number:'1.0-0' }}
-                  </span>
-                </div>
-              </div>
+              <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">จำนวนขายแล้วรวม</span>
+              <span class="text-sm font-semibold tabular-nums text-slate-800 mt-1.5">
+                {{ summary()!.sold_count_total | number }} <span class="text-[11px] font-normal text-slate-400">ยูนิต</span>
+              </span>
+              <p class="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                ระบบใหม่: <span class="font-mono tabular-nums text-slate-600">{{ summary()!.sold_count_active | number }}</span>
+                ·
+                ระบบเก่า: <span class="font-mono tabular-nums text-slate-600">{{ summary()!.sold_count_legacy | number }}</span>
+              </p>
             </div>
 
             <!-- งบคงเหลือรวม (X) -->
@@ -500,6 +494,9 @@ export class SalesListComponent implements OnInit {
     management_budget_returned: number;
     total_budget_remaining_all_units: number;
     total_profit: number;
+    sold_count_active: number;
+    sold_count_legacy: number;
+    sold_count_total: number;
     legacy: {
       total_budget_remaining: number;
       total_profit: number;

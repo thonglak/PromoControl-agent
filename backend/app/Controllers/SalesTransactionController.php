@@ -208,6 +208,18 @@ class SalesTransactionController extends BaseController
         $profitBuilder->whereNotIn('st.status', ['cancelled', 'legacy']);
         $totalProfit = (float) ($profitBuilder->get()->getRowArray()['total_profit'] ?? 0);
 
+        // ═══ นับยอดขาย — แยกระบบใหม่ (active) / ระบบเก่า (legacy sync จาก Caldiscount) ═══
+        $countBuilder2 = $this->db()->table('sales_transactions st')
+            ->select("
+                COUNT(CASE WHEN st.status = 'active' THEN 1 END) AS active_count,
+                COUNT(CASE WHEN st.status = 'legacy' THEN 1 END) AS legacy_count
+            ", false)
+            ->join('project_units pu', 'pu.id = st.unit_id', 'left');
+        $this->applyIndexFilters($countBuilder2, $pid, false);
+        $countRow = $countBuilder2->get()->getRowArray() ?? ['active_count' => 0, 'legacy_count' => 0];
+        $soldActiveCount = (int) ($countRow['active_count'] ?? 0);
+        $soldLegacyCount = (int) ($countRow['legacy_count'] ?? 0);
+
         // งบผู้บริหารที่คืนแล้ว — project-wide (รวมที่คืนจากการยกเลิกขายและคืนแบบ manual)
         $mgmtReturnedRow = $this->db()->table('budget_movements')
             ->selectSum('amount', 'total')
@@ -251,6 +263,10 @@ class SalesTransactionController extends BaseController
                 'total_budget_remaining_all_units' => round((float) $totalColumnSum, 2),
                 // กำไรรวม — ทุก row ตรง filter ยกเว้นรายการยกเลิก
                 'total_profit' => round($totalProfit, 2),
+                // จำนวนขายแล้วรวม — แยกระบบใหม่ (active) + ระบบเก่า (legacy sync)
+                'sold_count_active' => $soldActiveCount,
+                'sold_count_legacy' => $soldLegacyCount,
+                'sold_count_total'  => $soldActiveCount + $soldLegacyCount,
                 // ข้อมูลกระทบยอดระบบเก่า — null ถ้ายังไม่ได้ตั้งค่า
                 'legacy' => $legacySummary,
             ],
