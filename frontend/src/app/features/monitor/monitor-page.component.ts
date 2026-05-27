@@ -150,6 +150,7 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
   // refs สำหรับ cleanup
   private manifestLink: HTMLLinkElement | null = null;
   private manifestPrevHref: string | null = null;     // null = ไม่เคยมี element → ลบทิ้งตอน destroy
+  private manifestBlobUrl: string | null = null;      // blob URL ที่สร้าง (revoke ตอน destroy)
   private appleIcon: HTMLLinkElement | null = null;
   private appleIconPrevHref: string | null = null;
   private themeColorMeta: HTMLMetaElement | null = null;
@@ -184,10 +185,24 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     this.appleCapableMeta?.remove();
     this.appleStatusBarMeta?.remove();
     this.appleTitleMeta?.remove();
+
+    if (this.manifestBlobUrl) {
+      URL.revokeObjectURL(this.manifestBlobUrl);
+      this.manifestBlobUrl = null;
+    }
   }
 
   private injectPwaHeadTags(): void {
     const head = document.head;
+
+    // สร้าง manifest แบบ dynamic เพื่อให้ start_url = URL เต็มของ token ตอนติดตั้ง
+    // เหตุผล: production nginx ไม่ serve /monitor/ (trailing slash, ไม่มี token) เป็น
+    //         index.html → ขึ้น 403 ก่อน Angular boot. ถ้า start_url เป็น /monitor/<token>
+    //         (path จริงที่ nginx fallback เข้า index.html ได้) ปัญหาหายไป
+    const token = this.route.snapshot.paramMap.get('token') ?? '';
+    const manifestUrl = token
+      ? this.buildBlobManifestUrl(token)
+      : '/monitor/manifest.webmanifest';
 
     // Manifest: ถ้ามี root manifest อยู่แล้ว ให้สลับ href แทนการ append ใหม่
     // — กัน browser เห็น 2 manifest แล้วเลือก scope ผิด (เคยทำให้ติดตั้งแล้วเปิดมาเข้าแอปหลัก)
@@ -195,11 +210,11 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     if (existingManifest) {
       this.manifestLink = existingManifest;
       this.manifestPrevHref = existingManifest.href;
-      existingManifest.href = '/monitor/manifest.webmanifest';
+      existingManifest.href = manifestUrl;
     } else {
       this.manifestLink = document.createElement('link');
       this.manifestLink.rel = 'manifest';
-      this.manifestLink.href = '/monitor/manifest.webmanifest';
+      this.manifestLink.href = manifestUrl;
       this.manifestPrevHref = null;
       head.appendChild(this.manifestLink);
     }
@@ -237,6 +252,35 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     this.appleTitleMeta.name = 'apple-mobile-web-app-title';
     this.appleTitleMeta.content = 'Monitor';
     head.appendChild(this.appleTitleMeta);
+  }
+
+  /**
+   * สร้าง manifest แบบ runtime ที่ start_url = full URL ของ token นี้
+   * คืนค่า blob: URL ใช้กับ <link rel="manifest"> ได้ตรงๆ
+   */
+  private buildBlobManifestUrl(token: string): string {
+    const manifest = {
+      name: 'PromoControl Monitor',
+      short_name: 'Monitor',
+      description: 'ดู KPI โครงการแบบเรียลไทม์ผ่านลิงค์สาธารณะ',
+      scope: '/monitor/',
+      // start_url = path เต็มที่ nginx serve เป็น index.html ได้
+      // (หลีกเลี่ยง /monitor/ trailing slash ที่ production อาจ 403)
+      start_url: `/monitor/${token}`,
+      display: 'standalone',
+      orientation: 'portrait',
+      background_color: '#F8FAFC',
+      theme_color: '#0F4C81',
+      lang: 'th',
+      icons: [
+        { src: '/monitor/icon.svg',     sizes: 'any',     type: 'image/svg+xml', purpose: 'any' },
+        { src: '/monitor/icon-192.png', sizes: '192x192', type: 'image/png',     purpose: 'any maskable' },
+        { src: '/monitor/icon-512.png', sizes: '512x512', type: 'image/png',     purpose: 'any maskable' },
+      ],
+    };
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    this.manifestBlobUrl = URL.createObjectURL(blob);
+    return this.manifestBlobUrl;
   }
 
   private registerServiceWorker(): void {
