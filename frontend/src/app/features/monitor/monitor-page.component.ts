@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ProjectDashboardDialogComponent, ProjectDashboardDialogData } from './project-dashboard-dialog.component';
+import { environment } from '../../../environments/environment';
 
 interface ProjectKpi {
   project: { id?: number; code: string; name: string };
@@ -26,7 +27,8 @@ interface MonitorData {
   standalone: true,
   imports: [CommonModule, MatButtonModule, MatProgressSpinnerModule],
   template: `
-    <div class="h-screen overflow-y-auto bg-slate-50 px-4 py-6 sm:py-10">
+    <div class="h-screen overflow-y-auto bg-slate-50 px-4 pt-6 pb-32 sm:pt-10 sm:pb-16"
+         style="padding-bottom: max(8rem, env(safe-area-inset-bottom, 0) + 8rem);">
       <div class="mx-auto" style="max-width: 480px;">
 
         @if (loading()) {
@@ -135,6 +137,11 @@ interface MonitorData {
           <p class="text-[10px] text-slate-400 mt-6 text-center leading-tight">
             หน้านี้เข้าถึงผ่านลิงค์สาธารณะ — ห้ามแชร์ลิงค์ออกนอกผู้ที่ได้รับอนุญาต
           </p>
+
+          <!-- version footer + พื้นที่ว่างกัน address bar บัง -->
+          <p class="text-[10px] text-slate-300 mt-3 text-center font-mono tabular-nums">
+            v{{ version }}
+          </p>
         }
 
       </div>
@@ -173,6 +180,7 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
   readonly error = signal<string | null>(null);
   readonly data = signal<MonitorData | null>(null);
   readonly token = signal<string>('');
+  readonly version = environment.version;
 
   // PWA install state
   readonly canInstall = signal(false);
