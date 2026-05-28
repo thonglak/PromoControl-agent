@@ -66,7 +66,7 @@ class PublicMonitorController extends ResourceController
                 'name' => $link['name'],
             ],
             'projects'   => $projects,
-            'fetched_at' => date('Y-m-d H:i:s'),
+            'fetched_at' => (new \DateTime('now', new \DateTimeZone('Asia/Bangkok')))->format('Y-m-d H:i:s'),
         ]);
     }
 

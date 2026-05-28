@@ -373,7 +373,11 @@ export class MonitorPageComponent implements OnInit, OnDestroy {
     const first = this.data() === null;
     if (first) this.loading.set(true); else this.refreshing.set(true);
 
-    this.http.get<MonitorData>(`/api/public/monitor/${token}`).subscribe({
+    // cache-buster กัน HTTP cache คืน response เก่า — ต้องการ data สดทุกครั้ง
+    const url = `/api/public/monitor/${token}?_t=${Date.now()}`;
+    this.http.get<MonitorData>(url, {
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+    }).subscribe({
       next: res => {
         // จดจำ token ล่าสุดสำหรับกรณี PWA เปิดที่ /monitor/ (start_url ไม่มี token)
         // เซ็ตทั้ง cookie + localStorage:
