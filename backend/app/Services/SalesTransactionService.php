@@ -319,7 +319,8 @@ class SalesTransactionService
         $houseModels = $this->db->table('promotion_item_house_models')
             ->where('promotion_item_id', $promotionItem['id'])
             ->get()->getResultArray();
-        $houseModelIds = array_column($houseModels, 'house_model_id');
+        // MySQLi คืน id เป็น string — cast เป็น int ก่อน strict compare ไม่งั้น in_array(int,[string]) จะ false ตลอด
+        $houseModelIds = array_map('intval', array_column($houseModels, 'house_model_id'));
 
         if (!empty($houseModelIds)) {
             $unit = $this->db->table('project_units')
@@ -327,7 +328,7 @@ class SalesTransactionService
                 ->where('id', $unitId)
                 ->get()->getRowArray();
 
-            if (!empty($unit['house_model_id']) && !in_array($unit['house_model_id'], $houseModelIds, true)) {
+            if (!empty($unit['house_model_id']) && !in_array((int) $unit['house_model_id'], $houseModelIds, true)) {
                 return false;
             }
         }
@@ -347,7 +348,7 @@ class SalesTransactionService
         $eligibleUnits = $this->db->table('promotion_item_units')
             ->where('promotion_item_id', $promotionItem['id'])
             ->get()->getResultArray();
-        $eligibleUnitIds = array_column($eligibleUnits, 'unit_id');
+        $eligibleUnitIds = array_map('intval', array_column($eligibleUnits, 'unit_id'));
 
         if (!empty($eligibleUnitIds)) {
             if (!in_array($unitId, $eligibleUnitIds, true)) {
