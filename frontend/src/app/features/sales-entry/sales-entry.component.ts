@@ -848,11 +848,8 @@ export class SalesEntryComponent implements OnInit {
             this.saleDate.set(tx.sale_date);
           }
 
-          // pre-fill ราคาหน้าสัญญา (edit mode) — markAsDirty เพื่อบล็อก auto-sync ทับค่าเดิม
-          if (tx.contract_price != null) {
-            unitInfo.contractPriceControl.setValue(Number(tx.contract_price));
-            unitInfo.contractPriceControl.markAsDirty();
-          }
+          // ราคาหน้าสัญญา (edit mode) — ไม่ pre-fill: ล็อกตามสูตร = ราคาสุทธิยื่นกู้ เสมอ
+          // (autoFillContractEffect คำนวณใหม่จาก net/markup/ค่าธรรมเนียมโอน ที่ pre-fill ด้านล่าง)
 
           // pre-fill ส่วนเสริม (ขอบวกเพิ่ม + ค่าใช้จ่ายบวกเพิ่ม + โหมด)
           if (tx.loan_markup_amount != null) {

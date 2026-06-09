@@ -76,39 +76,15 @@ function toISODateStr(d: any): string {
           <mat-datepicker #picker></mat-datepicker>
         </mat-form-field>
 
-        <!-- ราคาหน้าสัญญา (auto-fill จากราคาแนะนำ — แก้ไขได้) -->
-        <mat-form-field appearance="outline" class="w-full">
+        <!-- ราคาหน้าสัญญา — คำนวณอัตโนมัติ = ราคาสุทธิยื่นกู้ (disabled + พื้นเทา สื่อว่าแก้เองไม่ได้) -->
+        <mat-form-field appearance="outline" class="w-full input-locked">
           <mat-label>ราคาหน้าสัญญา</mat-label>
           <input matInput currencyMask
             [formControl]="contractPriceControl"
             placeholder="0">
           <span matTextPrefix>฿&nbsp;</span>
-          @if (contractPriceControl.touched && contractPriceControl.hasError('required')) {
-            <mat-error>กรุณาระบุราคาหน้าสัญญา</mat-error>
-          }
-          @if (contractPriceControl.touched && contractPriceControl.hasError('min')) {
-            <mat-error>ราคาหน้าสัญญาต้องมากกว่า 0</mat-error>
-          }
         </mat-form-field>
       </div>
-
-      <!-- ปุ่ม "ใช้ราคาแนะนำ" — แสดงใต้ grid แยกบรรทัด ไม่ดัน input อื่น -->
-      @if (showApplyRecommendedButton()) {
-        <div class="mt-1.5 flex justify-end">
-          <button type="button"
-            class="suggestion-chip inline-flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer transition-colors hover:opacity-80"
-            style="background-color: var(--color-primary-100);
-                   color: var(--color-primary-700);
-                   border: 1px dashed var(--color-primary-500);
-                   border-radius: var(--radius-sm);
-                   font-weight: 600;"
-            (click)="applyRecommendedContractPrice()">
-            <app-icon name="arrow-path" class="w-3 h-3" />
-            <span>คำนวณอัตโนมัติ</span>
-            <span class="tabular-nums font-bold">฿{{ recommendedContractPrice() | number:'1.0-0' }}</span>
-          </button>
-        </div>
-      }
 
       <!-- Zone B + C: readonly info (โผล่เมื่อเลือกยูนิตแล้ว) -->
       @if (selectedUnit(); as unit) {
@@ -293,8 +269,10 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   /** Text input control for the autocomplete field — value is display string, not unit ID */
   unitSearchControl = this.fb.control<string>('');
   saleDateControl = this.fb.control<Date>(new Date(), { nonNullable: true });
-  /** ราคาหน้าสัญญา — บังคับกรอก ต้อง > 0 */
-  contractPriceControl = this.fb.control<number | null>(null, [Validators.required, Validators.min(0.01)]);
+  /** ราคาหน้าสัญญา — ล็อกตามสูตร (= ราคาสุทธิยื่นกู้) disabled เพื่อสื่อว่าแก้เองไม่ได้
+   *  ค่าเติมอัตโนมัติผ่าน autoFillContractEffect (setValue ทำงานบน disabled control ได้)
+   *  validators คงไว้เป็น metadata แต่ disabled control ไม่ถูก validate — isValid() เช็คค่าตรงแทน */
+  contractPriceControl = this.fb.control<number | null>({ value: null, disabled: true }, [Validators.required, Validators.min(0.01)]);
   /** ขอบวกเพิ่ม — virtual markup เพื่อยื่นกู้ (ไม่กระทบงบ/กำไรจริง) */
   loanMarkupControl = this.fb.control<number>(0, { nonNullable: true });
   /** ค่าใช้จ่ายบวกเพิ่ม — ค่าธรรมเนียมโอน */
@@ -314,23 +292,13 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   readonly allowSoldUnit = signal(false);
   /** ข้อความที่ผู้ใช้พิมพ์เพื่อค้นหายูนิต */
   readonly unitSearchText = signal<string>('');
-  /** true เมื่อ user แก้ ราคาหน้าสัญญา เอง — บล็อก auto-fill จากราคาแนะนำ */
-  readonly userOverrodeContract = signal<boolean>(false);
-  /** ค่าปัจจุบันของ contractPriceControl เป็น signal (sync จาก valueChanges + auto-fill) */
+  /** ค่าปัจจุบันของ contractPriceControl เป็น signal (sync จาก auto-lock effect) */
   private contractValueSignal = signal<number | null>(null);
 
   /** true เมื่อ user แก้ ค่าธรรมเนียมโอน เอง — บล็อก auto-fill */
   readonly userOverrodeAdditionalExpense = signal<boolean>(false);
   /** ค่าปัจจุบันของ additionalExpenseControl เป็น signal */
   private additionalExpenseValueSignal = signal<number>(0);
-
-  /** แสดงปุ่ม "ใช้ราคาแนะนำ" เมื่อ: user เคยแก้เอง + recommended > 0 + ค่าใน ช่อง ≠ recommended */
-  readonly showApplyRecommendedButton = computed(() => {
-    const rec = this.recommendedContractPrice();
-    if (rec <= 0) return false;
-    if (!this.userOverrodeContract()) return false;
-    return Number(this.contractValueSignal() ?? 0) !== rec;
-  });
 
   /** แสดงปุ่ม "ใช้ค่าเริ่มต้น" สำหรับค่าธรรมเนียมโอน */
   readonly showApplyRecommendedAdditionalExpenseButton = computed(() => {
@@ -376,16 +344,7 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
       })
     );
 
-    // เมื่อเปลี่ยนราคาหน้าสัญญา (user แก้เอง — auto-fill ใช้ emitEvent:false ไม่ผ่านที่นี่)
-    // → flag override + emit ให้ parent recalc expression formulas ที่อ้าง contract_price
-    this.subs.push(
-      this.contractPriceControl.valueChanges.subscribe(price => {
-        const num = price == null ? null : Number(price);
-        this.contractValueSignal.set(num);
-        this.userOverrodeContract.set(true);
-        this.contractPriceChanged.emit(price);
-      })
-    );
+    // ราคาหน้าสัญญา = ราคาสุทธิยื่นกู้ (auto-lock ผ่าน autoFillContractEffect) — แก้ไขเองไม่ได้ จึงไม่ subscribe valueChanges
 
     // ส่วนเสริม — emit สู่ parent
     this.subs.push(
@@ -433,29 +392,18 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     this.subs.forEach(s => s.unsubscribe());
   }
 
-  /** Auto-fill contract_price จาก recommended เมื่อ user ยังไม่ได้แก้เอง
-   *  ใช้ emitEvent:false → ไม่ trigger contractPriceChanged → ไม่ trigger eligible reload (กัน loop) */
+  /** Auto-lock contract_price = ราคาสุทธิยื่นกู้ (recommended) เสมอ — แสดงอย่างเดียว แก้ไขเองไม่ได้
+   *  emit contractPriceChanged เมื่อค่าเปลี่ยน เพื่อให้ parent recalc สูตรที่อ้าง contract_price
+   *  (setValue ใช้ emitEvent:false กัน loop จาก valueChanges; แจ้ง parent ผ่าน emit โดยตรงแทน) */
   private autoFillContractEffect = effect(() => {
     const rec = this.recommendedContractPrice();
-    if (this.userOverrodeContract()) return;
     if (rec <= 0) return;
-    if (this.contractPriceControl.disabled) return;
     const current = Number(this.contractValueSignal() ?? 0);
     if (current === rec) return;
     this.contractPriceControl.setValue(rec, { emitEvent: false });
     this.contractValueSignal.set(rec);
-  });
-
-  /** ปุ่ม "ใช้ราคาแนะนำ" — รีเซ็ต override + sync ค่าใหม่ + emit (ให้ parent recalc ถ้ามีสูตรอ้าง contract_price) */
-  applyRecommendedContractPrice(): void {
-    const rec = this.recommendedContractPrice();
-    if (rec <= 0) return;
-    this.contractPriceControl.setValue(rec, { emitEvent: false });
-    this.contractValueSignal.set(rec);
-    this.userOverrodeContract.set(false);
-    this.contractPriceControl.markAsPristine();
     this.contractPriceChanged.emit(rec);
-  }
+  });
 
   /** Auto-fill ค่าธรรมเนียมโอน จาก recommendedAdditionalExpense เมื่อ user ยังไม่ได้แก้
    *  ใช้ emitEvent:false → ไม่ flip override flag, ไม่ trigger additionalExpenseChanged
@@ -498,9 +446,7 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
     this.unitSearchText.set('');
     const unit = this.units().find(u => String(u.id) === String(unitId)) ?? null;
     this.selectedUnit.set(unit);
-    // เปลี่ยนยูนิต → reset override ของ contract_price + additional_expense
-    // (ของยูนิตใหม่ไม่ใช่ข้อมูลที่ user เคยแก้)
-    this.userOverrodeContract.set(false);
+    // เปลี่ยนยูนิต → contract_price ล็อกตามสูตรอัตโนมัติ (effect); reset override ของค่าธรรมเนียมโอน
     this.contractPriceControl.markAsPristine();
     this.userOverrodeAdditionalExpense.set(false);
     this.additionalExpenseControl.markAsPristine();
@@ -585,12 +531,10 @@ export class UnitInfoSectionComponent implements OnInit, OnDestroy {
   }
 
   isValid(): boolean {
-    // mark touched เพื่อแสดง error
-    this.contractPriceControl.markAsTouched();
-    this.contractPriceControl.updateValueAndValidity();
-
     const hasUnit = !!this.selectedUnit();
-    const contractValid = this.contractPriceControl.valid;
+    // contractPriceControl ถูก disable (ล็อกตามสูตร) → .valid เป็น false เสมอ
+    // จึงเช็คค่าตรง ๆ: ราคาหน้าสัญญา = ราคาสุทธิยื่นกู้ ต้อง > 0
+    const contractValid = Number(this.contractPriceControl.value) > 0;
 
     // mode=as_unit_expense + มี amount → ต้องเลือก linkedItem
     const mode = this.additionalExpenseModeControl.value;

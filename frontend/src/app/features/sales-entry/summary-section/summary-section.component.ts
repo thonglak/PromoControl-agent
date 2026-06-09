@@ -47,10 +47,10 @@ export interface BudgetSummary {
           <span class="tabular-nums text-xl">{{ netPrice() | number:'1.0-0' }}</span>
         </div>
 
-        <!-- 3.1 ราคาสุทธิ (เพื่อยื่นกู้) — แสดงเมื่อมีขอบวกเพิ่ม หรือค่าธรรมเนียมโอนโหมด add_to_net -->
+        <!-- 3.1 ราคาหน้าสัญญา (เพื่อยื่นกู้) — แสดงเมื่อมีขอบวกเพิ่ม หรือค่าธรรมเนียมโอนโหมด add_to_net -->
         @if (loanMarkupAmount() > 0 || (additionalExpenseAmount() > 0 && additionalExpenseMode() === 'add_to_net')) {
           <div class="flex justify-between py-1 px-3 text-xs" style="color: var(--color-text-secondary)">
-            <span>ราคาสุทธิ (เพื่อยื่นกู้)</span>
+            <span>ราคาหน้าสัญญา (เพื่อยื่นกู้)</span>
             <span class="tabular-nums font-medium">{{ netPriceForLoan() | number:'1.0-0' }}</span>
           </div>
           <div class="px-3 text-xs" style="color: var(--color-text-secondary)">

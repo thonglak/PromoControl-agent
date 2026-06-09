@@ -274,6 +274,15 @@ app-icon svg {
   line-height: 1.5;
 }
 
+// ── Locked input (disabled + คำนวณอัตโนมัติ) — พื้นเทาให้รู้ว่าแก้ไม่ได้ ──
+.input-locked .mat-mdc-text-field-wrapper {
+  background-color: var(--color-gray-100) !important;
+}
+.input-locked .mat-mdc-text-field-wrapper,
+.input-locked input {
+  cursor: not-allowed;
+}
+
 // ── Option list (ใน select/autocomplete) ──
 .mat-mdc-option {
   background-color: var(--color-surface, #FFFFFF);
