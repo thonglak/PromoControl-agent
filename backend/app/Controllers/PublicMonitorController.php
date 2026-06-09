@@ -108,6 +108,47 @@ class PublicMonitorController extends ResourceController
             ->get()->getRowArray();
         $totalProfitNewSystem = round((float) ($profitRow['total'] ?? 0), 2);
 
+        // ─── งบนอกสุทธิที่ใช้ (Y) — ผลรวม per-row Y = max(งบอื่นที่ใช้ − งบยูนิตคงเหลือ, 0) ───
+        // สูตรเดียวกับ SalesTransactionController (reuse $summaryCache ต่อยูนิตด้านบน)
+        $netExtraRows = $this->db()->table('sales_transactions st')
+            ->select('st.id, st.unit_id, st.additional_expense_mode, st.additional_expense_amount')
+            ->where('st.project_id', $pid)
+            ->whereNotIn('st.status', ['cancelled', 'legacy'])
+            ->get()->getResultArray();
+
+        $netExtraTxIds = array_column($netExtraRows, 'id');
+        $otherUsedMap = [];
+        if (!empty($netExtraTxIds)) {
+            $otherRows = $this->db()->table('sales_transaction_items')
+                ->select('sales_transaction_id, SUM(used_value) as other_total')
+                ->where('funding_source_type !=', 'UNIT_STANDARD')
+                ->whereIn('sales_transaction_id', $netExtraTxIds)
+                ->groupBy('sales_transaction_id')
+                ->get()->getResultArray();
+            foreach ($otherRows as $or) {
+                $otherUsedMap[(int) $or['sales_transaction_id']] = (float) $or['other_total'];
+            }
+        }
+
+        $totalNetExtraNewSystem = 0;
+        foreach ($netExtraRows as $r) {
+            $uid = (int) $r['unit_id'];
+            if ($uid <= 0) continue;
+            try {
+                if (!isset($summaryCache[$uid])) {
+                    $summaryCache[$uid] = $this->budgetSvc->getUnitBudgetSummary($pid, $uid);
+                }
+                $unitRemaining = (float) ($summaryCache[$uid]['UNIT_STANDARD']['remaining'] ?? 0);
+                $otherUsed     = $otherUsedMap[(int) $r['id']] ?? 0;
+                if (($r['additional_expense_mode'] ?? null) === 'as_premium') {
+                    $otherUsed += (float) ($r['additional_expense_amount'] ?? 0);
+                }
+                $netExtra = $otherUsed - $unitRemaining;
+                if ($netExtra > 0) $totalNetExtraNewSystem += $netExtra;
+            } catch (\Throwable $e) {}
+        }
+        $totalNetExtraNewSystem = round($totalNetExtraNewSystem, 2);
+
         $countRow = $this->db()->table('sales_transactions')
             ->select("
                 COUNT(CASE WHEN status='active' THEN 1 END) AS active_count,
@@ -133,6 +174,12 @@ class PublicMonitorController extends ResourceController
             'profit' => [
                 'total'      => round($totalProfitNewSystem + $legacyProfit, 2),
                 'new_system' => $totalProfitNewSystem,
+                'legacy'     => $legacyProfit,
+            ],
+            // งบนอกสุทธิที่ใช้ (Y) — legacy ใช้ legacy_total_profit (repurpose เป็น Y ระบบเก่า)
+            'net_extra_budget_used' => [
+                'total'      => round($totalNetExtraNewSystem + $legacyProfit, 2),
+                'new_system' => $totalNetExtraNewSystem,
                 'legacy'     => $legacyProfit,
             ],
             'sold_count' => [

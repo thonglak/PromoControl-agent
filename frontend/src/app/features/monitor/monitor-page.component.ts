@@ -12,6 +12,7 @@ interface ProjectKpi {
   project: { id?: number; code: string; name: string };
   budget_remaining: { total: number; new_system: number; legacy: number };
   profit: { total: number; new_system: number; legacy: number };
+  net_extra_budget_used: { total: number; new_system: number; legacy: number };
   sold_count: { total: number; active: number; legacy: number };
   legacy_as_of: string | null;
 }
@@ -89,17 +90,18 @@ interface MonitorData {
                     </p>
                   </div>
 
-                  <!-- กำไร (Y) -->
+                  <!-- งบนอกสุทธิที่ใช้ (Y) -->
                   <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-slate-100 sm:border-b-0">
-                    <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">กำไร (Y)</span>
+                    <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบนอกสุทธิที่ใช้ (Y)</span>
                     <span class="text-sm font-semibold tabular-nums mt-1.5"
-                          [class.text-green-600]="p.profit.total >= 0"
-                          [class.text-red-600]="p.profit.total < 0">
-                      ฿{{ p.profit.total | number:'1.0-0' }}
+                          [class.text-amber-600]="p.net_extra_budget_used.total > 0"
+                          [class.text-slate-400]="p.net_extra_budget_used.total === 0"
+                          [class.text-red-600]="p.net_extra_budget_used.total < 0">
+                      ฿{{ p.net_extra_budget_used.total | number:'1.0-0' }}
                     </span>
                     <p class="text-[10px] text-slate-400 mt-0.5 leading-tight">
-                      ใหม่ <span class="font-mono tabular-nums text-slate-600">฿{{ p.profit.new_system | number:'1.0-0' }}</span><br>
-                      เก่า <span class="font-mono tabular-nums text-slate-600">฿{{ p.profit.legacy | number:'1.0-0' }}</span>
+                      ใหม่ <span class="font-mono tabular-nums text-slate-600">฿{{ p.net_extra_budget_used.new_system | number:'1.0-0' }}</span><br>
+                      เก่า <span class="font-mono tabular-nums text-slate-600">฿{{ p.net_extra_budget_used.legacy | number:'1.0-0' }}</span>
                     </p>
                   </div>
 

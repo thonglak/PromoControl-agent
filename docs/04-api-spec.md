@@ -151,6 +151,7 @@ GET    /api/public/monitor/{token}                 (ดู KPI หลายโ�
                                                      # response: { link:{name}, projects:[{project:{code,name},
                                                      #            budget_remaining:{total,new_system,legacy},
                                                      #            profit:{total,new_system,legacy},
+                                                     #            net_extra_budget_used:{total,new_system,legacy},  (Y; legacy=legacy_total_profit)
                                                      #            sold_count:{total,active,legacy},
                                                      #            legacy_as_of}], fetched_at }
 
