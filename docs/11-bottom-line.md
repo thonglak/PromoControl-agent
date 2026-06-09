@@ -6,7 +6,7 @@
 
 - **ราคา Bottom Line** — ราคาต้นทุนจริงของยูนิต ใช้คำนวณหาราคาขายและกำไร → อัปเดต `unit_cost` ใน `project_units`
 - **ราคาประเมินจากกรมที่ดิน** — ใช้คำนวณค่าใช้จ่ายโอนกรรมสิทธิ์ (ค่าธรรมเนียมโอน, ภาษี) → อัปเดต `appraisal_price` ใน `project_units`
-- **งบมาตรฐาน (Standard Budget)** — งบที่จัดสรรให้ยูนิต (ไม่บังคับ) → อัปเดต `standard_budget` ใน `project_units`
+- **งบยูนิต (Standard Budget)** — งบที่จัดสรรให้ยูนิต (ไม่บังคับ) → อัปเดต `standard_budget` ใน `project_units`
 - **ราคาฐาน (Base Price)** — ราคาขายยูนิต (ไม่บังคับ) → อัปเดต `base_price` ใน `project_units`
 
 ---
@@ -62,7 +62,7 @@
 | unit_code           | VARCHAR(50)   | เลขที่ยูนิตจาก Excel (e.g., `SRP-1`)       |
 | bottom_line_price   | DECIMAL(15,2) | ราคา Bottom Line จาก Excel                 |
 | appraisal_price     | DECIMAL(15,2) | ราคาประเมินจากกรมที่ดินจาก Excel            |
-| standard_budget     | DECIMAL(15,2) NULL | งบมาตรฐานจาก Excel (เฉพาะเมื่อ mapping ระบุ) |
+| standard_budget     | DECIMAL(15,2) NULL | งบยูนิตจาก Excel (เฉพาะเมื่อ mapping ระบุ) |
 | base_price          | DECIMAL(15,2) NULL | ราคาฐานจาก Excel (เฉพาะเมื่อ mapping ระบุ) |
 | matched_unit_id     | BIGINT NULL   | FK → `project_units.id` (NULL ถ้า match ไม่ได้) |
 | old_unit_cost       | DECIMAL(15,2) NULL | ค่า unit_cost เดิมก่อน import            |
@@ -119,7 +119,7 @@
 5. **อัปเดต fields ที่เกี่ยวข้อง:**
    - `unit_cost` ← ราคา Bottom Line
    - `appraisal_price` ← ราคาประเมินจากกรมที่ดิน
-   - `standard_budget` ← งบมาตรฐาน (เฉพาะเมื่อ mapping ระบุ standard_budget_column)
+   - `standard_budget` ← งบยูนิต (เฉพาะเมื่อ mapping ระบุ standard_budget_column)
    - `base_price` ← ราคาฐาน (เฉพาะเมื่อ mapping ระบุ base_price_column)
    - `bottom_line_key` ← key ของการ import ครั้งนี้
 6. **Column mapping บันทึกเป็น preset** — สามารถ save/load/set default ได้ ไม่ต้องตั้งค่าใหม่ทุกรอบ
@@ -237,7 +237,7 @@
   - เลขที่ยูนิต → เลือก column (A, B, C...) — บังคับ
   - ราคา Bottom Line → เลือก column — บังคับ
   - ราคาประเมินกรมที่ดิน → เลือก column — บังคับ
-  - งบมาตรฐาน (Standard Budget) → เลือก column — ไม่บังคับ
+  - งบยูนิต (Standard Budget) → เลือก column — ไม่บังคับ
   - ราคาฐาน (Base Price) → เลือก column — ไม่บังคับ
 - Preview table: แสดง 5 แถวแรกตาม mapping ที่เลือก (`mat-table`)
 - Checkbox: "บันทึก mapping นี้เป็น preset" + ช่องชื่อ preset
@@ -245,7 +245,7 @@
 
 **Step 3 — Review ข้อมูล**
 - `mat-table` แสดงข้อมูลทั้งหมดพร้อมสถานะ:
-  - Columns: เลขที่ยูนิต, ราคา Bottom Line (ใหม่), ราคาประเมิน (ใหม่), งบมาตรฐาน (ใหม่, ถ้ามี), ราคาฐาน (ใหม่, ถ้ามี), Unit Cost (เดิม), Appraisal (เดิม), สถานะ
+  - Columns: เลขที่ยูนิต, ราคา Bottom Line (ใหม่), ราคาประเมิน (ใหม่), งบยูนิต (ใหม่, ถ้ามี), ราคาฐาน (ใหม่, ถ้ามี), Unit Cost (เดิม), Appraisal (เดิม), สถานะ
   - Status chips (`MatChipsModule`):
     - `matched` = green — พร้อม import
     - `unmatched` = red — ไม่พบยูนิตนี้ในระบบ

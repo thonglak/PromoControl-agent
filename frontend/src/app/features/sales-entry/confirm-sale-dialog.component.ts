@@ -44,7 +44,7 @@ export interface ConfirmSaleDialogData {
           </div>
           <div class="flex justify-between"
             [class.text-red-600]="data.totalBudgetRemaining < 0">
-            <span class="text-slate-500">งบคงเหลือรวม:</span>
+            <span class="text-slate-500">งบคงเหลือรวม (X):</span>
             <span class="font-medium tabular-nums">{{ data.totalBudgetRemaining | number:'1.0-0' }}</span>
           </div>
         </div>

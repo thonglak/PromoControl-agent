@@ -329,7 +329,7 @@ class ReportService
     private function buildBudgetSummary(int $projectId): array
     {
         $sources = [
-            'UNIT_STANDARD'      => 'งบมาตรฐาน',
+            'UNIT_STANDARD'      => 'งบยูนิต',
             'PROJECT_POOL'       => 'งบ Pool',
             'MANAGEMENT_SPECIAL' => 'งบผู้บริหาร',
         ];
@@ -346,7 +346,7 @@ class ReportService
         foreach ($sources as $source => $label) {
             // Allocated
             if ($source === 'UNIT_STANDARD') {
-                // งบมาตรฐานมาจาก standard_budget ของยูนิต (ไม่ได้มาจาก movements)
+                // งบยูนิตมาจาก standard_budget ของยูนิต (ไม่ได้มาจาก movements)
                 $allocated = (float) ($this->db->table('project_units')
                     ->selectSum('standard_budget', 'total')
                     ->where('project_id', $projectId)
@@ -724,7 +724,7 @@ class ReportService
         ];
 
         $sourceLabels = [
-            'UNIT_STANDARD'      => 'งบมาตรฐาน',
+            'UNIT_STANDARD'      => 'งบยูนิต',
             'PROJECT_POOL'       => 'งบ Pool',
             'MANAGEMENT_SPECIAL' => 'งบผู้บริหาร',
         ];

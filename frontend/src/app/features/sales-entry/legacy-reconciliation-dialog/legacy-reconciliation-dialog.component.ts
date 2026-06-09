@@ -64,16 +64,16 @@ export interface LegacyReconciliationDialogData {
             <mat-error>กรุณาระบุงบคงเหลือรวม</mat-error>
           </mat-form-field>
 
-          <!-- กำไร Y (ระบบเก่า) -->
+          <!-- งบนอกสุทธิที่ใช้ Y (ระบบเก่า) -->
           <mat-form-field appearance="outline" class="w-full">
-            <mat-label>กำไร Y (ระบบเก่า)</mat-label>
+            <mat-label>งบนอกสุทธิที่ใช้ Y (ระบบเก่า)</mat-label>
             <input matInput
                    currencyMask
                    [options]="{ allowNegative: true }"
                    formControlName="legacy_total_profit"
                    class="text-right font-mono tabular-nums" />
             <span matTextPrefix class="text-slate-400 mr-1">฿</span>
-            <mat-error>กรุณาระบุกำไร</mat-error>
+            <mat-error>กรุณาระบุงบนอกสุทธิที่ใช้</mat-error>
           </mat-form-field>
 
           <!-- ณ วันที่ -->

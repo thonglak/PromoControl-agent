@@ -38,8 +38,9 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: 'profit',        label: 'กำไร',       visible: true },
   { key: 'status',        label: 'สถานะ',      visible: true },
   { key: 'transfer_status',       label: 'สถานะโอน',        visible: true },
-  { key: 'total_budget_remaining', label: 'งบคงเหลือรวม',    visible: true },
-  { key: 'net_extra_budget_used',  label: 'งบนอกสุทธิที่ใช้', visible: true },
+  { key: 'total_budget_remaining', label: 'งบคงเหลือรวม (X)',    visible: true },
+  { key: 'net_extra_budget_used',  label: 'งบนอกสุทธิที่ใช้ (Y)', visible: true },
+  { key: 'management_budget_allocated', label: 'งบผู้บริหาร (Quota)', visible: true },
   { key: 'actions',                label: 'จัดการ',           visible: true },
 ];
 
@@ -123,10 +124,10 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
               }
             </div>
 
-            <!-- กำไร (Y) -->
-            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-r border-slate-100 sm:border-r-0">
+            <!-- งบนอกสุทธิที่ใช้ (Y) -->
+            <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5 border-b border-r border-slate-100 sm:border-b-0 sm:border-r-0">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">กำไร (Y)</span>
+                <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบนอกสุทธิที่ใช้ (Y)</span>
                 @if (canEdit()) {
                   <button mat-icon-button class="!w-5 !h-5 -mt-0.5 !text-slate-400 hover:!text-primary-500"
                           matTooltip="กระทบยอดระบบเก่า" (click)="openLegacyDialog()">
@@ -135,9 +136,10 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
                 }
               </div>
               <span class="text-sm font-semibold tabular-nums mt-1.5"
-                    [class.text-green-600]="totalProfitCombined() >= 0"
-                    [class.text-red-600]="totalProfitCombined() < 0">
-                ฿{{ totalProfitCombined() | number:'1.0-0' }}
+                    [class.text-amber-600]="totalNetExtraCombined() > 0"
+                    [class.text-slate-400]="totalNetExtraCombined() === 0"
+                    [class.text-red-600]="totalNetExtraCombined() < 0">
+                ฿{{ totalNetExtraCombined() | number:'1.0-0' }}
               </span>
               @if (summary()!.legacy) {
                 <p class="text-[10px] text-slate-400 mt-0.5 leading-tight">
@@ -153,6 +155,10 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
             <div class="w-1/2 sm:flex-1 px-4 py-3 flex flex-col gap-0.5">
               <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide leading-none">งบผู้บริหาร</span>
               <div class="flex items-end gap-4 mt-1.5">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[10px] text-slate-400">งบจัดสรรรวม</span>
+                  <span class="text-sm font-semibold tabular-nums text-slate-700">฿{{ summary()!.management_budget_allocated | number:'1.0-0' }}</span>
+                </div>
                 <div class="flex flex-col gap-0.5">
                   <span class="text-[10px] text-slate-400">ใช้แล้ว</span>
                   <span class="text-sm font-semibold tabular-nums text-amber-600">฿{{ summary()!.management_budget_used | number:'1.0-0' }}</span>
@@ -284,17 +290,23 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
                     }
                   </div>
                   <div class="min-w-0">
-                    <p class="text-xs text-slate-400 mb-0.5">งบคงเหลือรวม</p>
+                    <p class="text-xs text-slate-400 mb-0.5">งบคงเหลือรวม (X)</p>
                     <p class="text-xs tabular-nums text-slate-700 truncate">
                       {{ row.total_budget_remaining != null ? '฿' + (row.total_budget_remaining | number:'1.0-0') : '—' }}
                     </p>
                   </div>
                   <div class="min-w-0">
-                    <p class="text-xs text-slate-400 mb-0.5">งบนอกสุทธิที่ใช้</p>
+                    <p class="text-xs text-slate-400 mb-0.5">งบนอกสุทธิที่ใช้ (Y)</p>
                     <p class="text-xs tabular-nums truncate"
                        [class.text-amber-600]="(row.net_extra_budget_used ?? 0) > 0"
                        [class.text-slate-400]="!row.net_extra_budget_used">
                       {{ (row.net_extra_budget_used ?? 0) > 0 ? '฿' + (row.net_extra_budget_used | number:'1.0-0') : '—' }}
+                    </p>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs text-slate-400 mb-0.5">งบผู้บริหาร (Quota)</p>
+                    <p class="text-xs tabular-nums text-slate-700 truncate">
+                      {{ row.management_budget_allocated != null ? '฿' + (row.management_budget_allocated | number:'1.0-0') : '—' }}
                     </p>
                   </div>
                 </div>
@@ -387,7 +399,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
               <!-- งบคงเหลือรวม -->
               <ng-container matColumnDef="total_budget_remaining">
-                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">งบคงเหลือรวม</th>
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">งบคงเหลือรวม (X)</th>
                 <td mat-cell *matCellDef="let row" class="!text-right !text-sm tabular-nums !text-slate-700">
                   @if (row.total_budget_remaining != null) {
                     ฿{{ row.total_budget_remaining | number:'1.0-0' }}
@@ -399,7 +411,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
 
               <!-- งบนอกสุทธิที่ใช้ -->
               <ng-container matColumnDef="net_extra_budget_used">
-                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">งบนอกสุทธิที่ใช้</th>
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">งบนอกสุทธิที่ใช้ (Y)</th>
                 <td mat-cell *matCellDef="let row" class="!text-right !text-sm tabular-nums"
                   [class.!text-amber-600]="row.net_extra_budget_used > 0"
                   [class.!text-slate-400]="!row.net_extra_budget_used || row.net_extra_budget_used === 0">
@@ -407,6 +419,18 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
                     ฿{{ row.net_extra_budget_used | number:'1.0-0' }}
                   } @else {
                     <span>—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- งบผู้บริหาร (Quota) -->
+              <ng-container matColumnDef="management_budget_allocated">
+                <th mat-header-cell *matHeaderCellDef class="!text-xs !font-semibold !text-slate-500 !uppercase !tracking-wide !bg-slate-50 !text-right">งบผู้บริหาร (Quota)</th>
+                <td mat-cell *matCellDef="let row" class="!text-right !text-sm tabular-nums !text-slate-700">
+                  @if (row.management_budget_allocated != null) {
+                    ฿{{ row.management_budget_allocated | number:'1.0-0' }}
+                  } @else {
+                    <span class="text-slate-400">—</span>
                   }
                 </td>
               </ng-container>
@@ -489,11 +513,13 @@ export class SalesListComponent implements OnInit {
     unit_budget_remaining: number;
     pool_budget_used: number;
     pool_budget_remaining: number;
+    management_budget_allocated: number;
     management_budget_used: number;
     management_budget_remaining: number;
     management_budget_returned: number;
     total_budget_remaining_all_units: number;
     total_profit: number;
+    net_extra_budget_used_total: number;
     sold_count_active: number;
     sold_count_legacy: number;
     sold_count_total: number;
@@ -533,11 +559,11 @@ export class SalesListComponent implements OnInit {
     return this.totalRemaining() + (s.legacy?.total_budget_remaining ?? 0);
   });
 
-  /** กำไร (Y) ที่แสดงในการ์ด = ระบบเก่า + ระบบใหม่ */
-  readonly totalProfitCombined = computed(() => {
+  /** งบนอกสุทธิที่ใช้ (Y) ที่แสดงในการ์ด = ระบบใหม่ + ระบบเก่า (legacy.total_profit = Y ระบบเก่า) */
+  readonly totalNetExtraCombined = computed(() => {
     const s = this.summary();
     if (!s) return 0;
-    return (s.total_profit ?? 0) + (s.legacy?.total_profit ?? 0);
+    return (s.net_extra_budget_used_total ?? 0) + (s.legacy?.total_profit ?? 0);
   });
 
   ngOnInit(): void {

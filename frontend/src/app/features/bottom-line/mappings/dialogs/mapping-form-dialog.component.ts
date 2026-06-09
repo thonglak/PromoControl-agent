@@ -77,7 +77,7 @@ const COLUMNS = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z'.split(' ')
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Column งบมาตรฐาน (Standard Budget)</mat-label>
+          <mat-label>Column งบยูนิต (Standard Budget)</mat-label>
           <mat-select formControlName="standard_budget_column">
             <mat-option [value]="''">— ไม่ระบุ —</mat-option>
             @for (c of columnOptions; track c) { <mat-option [value]="c">{{ c }}</mat-option> }

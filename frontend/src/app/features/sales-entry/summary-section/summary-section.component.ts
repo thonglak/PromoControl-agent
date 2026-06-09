@@ -142,7 +142,7 @@ export interface BudgetSummary {
 
         <!-- 14. งบคงเหลือรวม -->
         <div class="flex justify-between py-1">
-          <span class="text-slate-600">งบคงเหลือรวม</span>
+          <span class="text-slate-600">งบคงเหลือรวม (X)</span>
           <span class="tabular-nums font-medium"
             [class.text-loss]="totalBudgetRemaining() < 0"
             [class.text-profit]="totalBudgetRemaining() > 0"
@@ -153,7 +153,7 @@ export interface BudgetSummary {
 
         <!-- 15. งบนอกสุทธิที่ใช้ -->
         <div class="flex justify-between py-1">
-          <span class="text-slate-600">งบนอกสุทธิที่ใช้</span>
+          <span class="text-slate-600">งบนอกสุทธิที่ใช้ (Y)</span>
           <span class="tabular-nums font-medium"
             [class.text-discount]="netExtraBudgetUsed() > 0"
             [class.text-profit]="netExtraBudgetUsed() <= 0">

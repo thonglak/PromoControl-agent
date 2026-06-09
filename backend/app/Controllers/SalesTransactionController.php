@@ -128,8 +128,9 @@ class SalesTransactionController extends BaseController
         foreach ($data as &$row) {
             // legacy: ระบบเก่ากระทบยอดงบไปแล้ว — ไม่นับงบคงเหลือ/งบนอก/กำไร ในระบบนี้
             if (($row['status'] ?? null) === 'legacy') {
-                $row['total_budget_remaining'] = null;
-                $row['net_extra_budget_used']  = null;
+                $row['total_budget_remaining']     = null;
+                $row['net_extra_budget_used']      = null;
+                $row['management_budget_allocated'] = null;
                 continue;
             }
 
@@ -153,9 +154,13 @@ class SalesTransactionController extends BaseController
                 }
                 $netExtra      = $otherUsed - $unitRemaining;
                 $row['net_extra_budget_used'] = $netExtra > 0 ? round($netExtra, 2) : 0;
+
+                // งบผู้บริหารที่จัดสรร (Quota) — MANAGEMENT_SPECIAL allocated ของยูนิต
+                $row['management_budget_allocated'] = $summary['MANAGEMENT_SPECIAL']['allocated'] ?? 0;
             } catch (\Throwable $e) {
-                $row['total_budget_remaining'] = null;
-                $row['net_extra_budget_used']  = null;
+                $row['total_budget_remaining']     = null;
+                $row['net_extra_budget_used']      = null;
+                $row['management_budget_allocated'] = null;
             }
         }
         unset($row);
@@ -166,7 +171,7 @@ class SalesTransactionController extends BaseController
 
         $unitBreakdown = $bd['UNIT_STANDARD']      ?? ['used' => 0, 'remaining' => 0];
         $poolBreakdown = $bd['PROJECT_POOL']       ?? ['used' => 0, 'remaining' => 0];
-        $mgmtBreakdown = $bd['MANAGEMENT_SPECIAL'] ?? ['used' => 0, 'remaining' => 0];
+        $mgmtBreakdown = $bd['MANAGEMENT_SPECIAL'] ?? ['allocated' => 0, 'used' => 0, 'remaining' => 0];
 
         // งบส่วนกลาง (Pool) คงเหลือ — ใช้ getPoolBalance เพราะ breakdown['PROJECT_POOL']['remaining']
         // คำนวณแบบ unit-level (allocated − used − returned) ทำให้ RETURN กลับ Pool ไม่สะท้อนยอดเหลือ
@@ -207,6 +212,51 @@ class SalesTransactionController extends BaseController
         $this->applyIndexFilters($profitBuilder, $pid, false);
         $profitBuilder->whereNotIn('st.status', ['cancelled', 'legacy']);
         $totalProfit = (float) ($profitBuilder->get()->getRowArray()['total_profit'] ?? 0);
+
+        // ═══ sum "งบนอกสุทธิที่ใช้" (Y) — ทุก row ตรง filter ยกเว้นยกเลิก/ระบบเก่า (ไม่ paginate) ═══
+        // per-row Y = max(งบอื่นที่ใช้ − งบยูนิตคงเหลือ, 0) — สูตรเดียวกับ per-row ด้านบน
+        $netExtraBuilder = $this->db()->table('sales_transactions st')
+            ->select('st.id, st.unit_id, st.additional_expense_mode, st.additional_expense_amount')
+            ->join('project_units pu', 'pu.id = st.unit_id', 'left');
+        $this->applyIndexFilters($netExtraBuilder, $pid, false);
+        $netExtraBuilder->whereNotIn('st.status', ['cancelled', 'legacy']);
+        $netExtraRows = $netExtraBuilder->get()->getResultArray();
+
+        // งบอื่นที่ใช้ per-transaction (items funding_source != UNIT_STANDARD) สำหรับทุก tx ที่ตรง filter
+        $netExtraTxIds = array_column($netExtraRows, 'id');
+        $otherUsedAllMap = [];
+        if (!empty($netExtraTxIds)) {
+            $otherRows = $this->db()->table('sales_transaction_items')
+                ->select('sales_transaction_id, SUM(used_value) as other_total')
+                ->where('funding_source_type !=', 'UNIT_STANDARD')
+                ->whereIn('sales_transaction_id', $netExtraTxIds)
+                ->groupBy('sales_transaction_id')
+                ->get()->getResultArray();
+            foreach ($otherRows as $or) {
+                $otherUsedAllMap[(int) $or['sales_transaction_id']] = (float) $or['other_total'];
+            }
+        }
+
+        $totalNetExtraUsed = 0;
+        foreach ($netExtraRows as $r) {
+            $uid = (int) $r['unit_id'];
+            if ($uid <= 0) continue;
+            $cacheKey = "{$pid}_{$uid}";
+            try {
+                if (!isset($summaryCache[$cacheKey])) {
+                    $summaryCache[$cacheKey] = $this->budgetSvc->getUnitBudgetSummary($pid, $uid);
+                }
+                $unitRemaining = (float) ($summaryCache[$cacheKey]['UNIT_STANDARD']['remaining'] ?? 0);
+                $otherUsed     = $otherUsedAllMap[(int) $r['id']] ?? 0;
+                if (($r['additional_expense_mode'] ?? null) === 'as_premium') {
+                    $otherUsed += (float) ($r['additional_expense_amount'] ?? 0);
+                }
+                $netExtra = $otherUsed - $unitRemaining;
+                if ($netExtra > 0) $totalNetExtraUsed += $netExtra;
+            } catch (\Throwable $e) {
+                // ข้ามยูนิตที่ดึง summary ไม่ได้
+            }
+        }
 
         // ═══ นับยอดขาย — แยกระบบใหม่ (active) / ระบบเก่า (legacy sync จาก Caldiscount) ═══
         $countBuilder2 = $this->db()->table('sales_transactions st')
@@ -255,6 +305,7 @@ class SalesTransactionController extends BaseController
                 'pool_budget_used'            => $poolBreakdown['used'],
                 'pool_budget_remaining'       => $poolRemaining,
                 // งบผู้บริหาร — ทั้งโครงการ
+                'management_budget_allocated' => $mgmtBreakdown['allocated'] ?? 0,
                 'management_budget_used'      => $mgmtBreakdown['used'],
                 'management_budget_remaining' => $mgmtBreakdown['remaining'],
                 // งบผู้บริหารที่คืนแล้ว — รวมจากการยกเลิกขายและคืนแบบ manual
@@ -263,6 +314,8 @@ class SalesTransactionController extends BaseController
                 'total_budget_remaining_all_units' => round((float) $totalColumnSum, 2),
                 // กำไรรวม — ทุก row ตรง filter ยกเว้นรายการยกเลิก
                 'total_profit' => round($totalProfit, 2),
+                // งบนอกสุทธิที่ใช้รวม (Y) — sum per-row Y ทุก row ตรง filter ยกเว้นยกเลิก/ระบบเก่า
+                'net_extra_budget_used_total' => round($totalNetExtraUsed, 2),
                 // จำนวนขายแล้วรวม — แยกระบบใหม่ (active) + ระบบเก่า (legacy sync)
                 'sold_count_active' => $soldActiveCount,
                 'sold_count_legacy' => $soldLegacyCount,

@@ -51,7 +51,7 @@ import { SvgIconComponent } from '../../../shared/components/svg-icon/svg-icon.c
           <mat-label>แหล่งงบ</mat-label>
           <mat-select formControlName="budget_source_type">
             <mat-option value="">ทั้งหมด</mat-option>
-            <mat-option value="UNIT_STANDARD">งบมาตรฐาน</mat-option>
+            <mat-option value="UNIT_STANDARD">งบยูนิต</mat-option>
             <mat-option value="PROJECT_POOL">งบ Pool</mat-option>
             <mat-option value="MANAGEMENT_SPECIAL">งบผู้บริหาร</mat-option>
             </mat-select>
@@ -403,7 +403,7 @@ export class BudgetReportTabComponent implements OnInit {
 
   sourceLabel(source: string): string {
     const map: Record<string, string> = {
-      UNIT_STANDARD: 'งบมาตรฐาน',
+      UNIT_STANDARD: 'งบยูนิต',
       PROJECT_POOL: 'งบ Pool',
       MANAGEMENT_SPECIAL: 'งบผู้บริหาร',
     };

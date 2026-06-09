@@ -266,6 +266,14 @@ app-icon svg {
   max-width: 300px;
 }
 
+// tooltip หลายบรรทัด — รักษาการขึ้นบรรทัดใหม่ (\n) สำหรับอธิบายสูตร
+.tooltip-multiline .mdc-tooltip__surface {
+  white-space: pre-line;
+  max-width: 340px !important;
+  text-align: left;
+  line-height: 1.5;
+}
+
 // ── Option list (ใน select/autocomplete) ──
 .mat-mdc-option {
   background-color: var(--color-surface, #FFFFFF);

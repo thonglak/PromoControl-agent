@@ -69,7 +69,7 @@ export class StatusChipComponent {
         voided:   { label: 'ยกเลิก',   bgColor: Nb, textColor: G },
       },
       budget_source: {
-        unit_standard: { label: 'งบมาตรฐาน',  bgColor: Ib, textColor: I },
+        unit_standard: { label: 'งบยูนิต',  bgColor: Ib, textColor: I },
         pool:          { label: 'งบ Pool',     bgColor: Sb, textColor: S },
         executive:     { label: 'งบผู้บริหาร',  bgColor: Wb, textColor: W },
       },

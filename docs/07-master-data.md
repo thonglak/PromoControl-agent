@@ -103,7 +103,7 @@ Every unit belongs to exactly one project. Budget pools and approval settings ar
 
 Manage house model templates per project. A house model defines a standard design type (e.g., "Type A - 3 Bedroom") with base specifications.
 
-Units reference a house model for physical specs (bedrooms, area, etc.) only. **ราคาขาย ต้นทุน และงบมาตรฐาน ต้องกรอกที่ยูนิตเท่านั้น** เพราะยูนิตแบบเดียวกันอาจมีราคาต่างกันได้
+Units reference a house model for physical specs (bedrooms, area, etc.) only. **ราคาขาย ต้นทุน และงบยูนิต ต้องกรอกที่ยูนิตเท่านั้น** เพราะยูนิตแบบเดียวกันอาจมีราคาต่างกันได้
 
 ## Data Model — Table: `house_models`
 
@@ -413,7 +413,7 @@ UNIQUE(project_id, unit_code)
 - **Unit Type:**
   - `project_type = mixed` → แสดง `mat-select` เลือกจาก unit_types ของโครงการ (required)
   - `project_type = condo / house / townhouse` → **ไม่แสดง dropdown** แสดงเป็น read-only text ตาม project_type
-- **หมายเหตุ:** ราคาขาย, ต้นทุน, งบมาตรฐาน ต้องกรอกที่ยูนิตเสมอ — ไม่มี default จากแบบบ้าน
+- **หมายเหตุ:** ราคาขาย, ต้นทุน, งบยูนิต ต้องกรอกที่ยูนิตเสมอ — ไม่มี default จากแบบบ้าน
 - Auto-compute: Gross Margin = base_price - unit_cost (read-only)
 
 ### Bulk Import

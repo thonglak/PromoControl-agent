@@ -78,6 +78,8 @@ export interface SalesTransaction {
   total_budget_remaining?: number | null;
   /** งบนอกสุทธิที่ใช้ไป (API ส่งมาในรายการ list) */
   net_extra_budget_used?: number;
+  /** งบผู้บริหารที่จัดสรร (MANAGEMENT_SPECIAL allocated) ของยูนิต (API ส่งมาในรายการ list) */
+  management_budget_allocated?: number | null;
   sale_date: string;
   contract_price: number | null;
   /** ขอบวกเพิ่ม (virtual — แสดงคู่ขนานในราคาสุทธิยื่นกู้ ไม่กระทบงบ/กำไรจริง) */
@@ -138,7 +140,7 @@ export class SalesEntryService {
       .pipe(map(r => r.data));
   }
 
-  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number; total_budget_remaining_all_units: number; total_profit: number; sold_count_active: number; sold_count_legacy: number; sold_count_total: number; legacy: { total_budget_remaining: number; total_profit: number; as_of_date: string; note: string | null } | null } }> {
+  getTransactions(params: Record<string, any> = {}): Observable<{ data: SalesTransaction[]; total: number; page: number; per_page: number; summary?: { unit_budget_used: number; unit_budget_remaining: number; pool_budget_used: number; pool_budget_remaining: number; management_budget_allocated: number; management_budget_used: number; management_budget_remaining: number; management_budget_returned: number; total_budget_remaining_all_units: number; total_profit: number; net_extra_budget_used_total: number; sold_count_active: number; sold_count_legacy: number; sold_count_total: number; legacy: { total_budget_remaining: number; total_profit: number; as_of_date: string; note: string | null } | null } }> {
     let p = new HttpParams();
     Object.entries(params).forEach(([k, v]) => { if (v != null && v !== '') p = p.set(k, v); });
     return this.http.get<any>('/api/sales-transactions', { params: p });

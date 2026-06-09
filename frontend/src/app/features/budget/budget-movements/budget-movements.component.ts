@@ -158,7 +158,7 @@ export class BudgetMovementsComponent implements OnInit {
 
   sourceLabel(s: string): string {
     const map: Record<string, string> = {
-      UNIT_STANDARD: 'งบมาตรฐาน', PROJECT_POOL: 'งบ Pool',
+      UNIT_STANDARD: 'งบยูนิต', PROJECT_POOL: 'งบ Pool',
       MANAGEMENT_SPECIAL: 'งบพิเศษ',
     };
     return map[s] ?? s;

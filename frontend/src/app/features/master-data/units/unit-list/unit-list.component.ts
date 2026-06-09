@@ -38,7 +38,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: 'base_price',       label: 'ราคาขาย',      visible: true },
   { key: 'unit_cost',        label: 'ต้นทุน',        visible: true },
   { key: 'appraisal_price',  label: 'ราคาประเมิน',   visible: true },
-  { key: 'standard_budget',  label: 'งบมาตรฐาน',    visible: true },
+  { key: 'standard_budget',  label: 'งบยูนิต',    visible: true },
   { key: 'status',           label: 'สถานะ',         visible: true },
   { key: 'actions',          label: 'จัดการ',         visible: true, locked: true },
 ];

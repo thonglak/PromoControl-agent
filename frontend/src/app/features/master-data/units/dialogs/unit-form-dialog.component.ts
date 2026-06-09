@@ -133,11 +133,11 @@ export interface UnitFormDialogData {
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="sm:col-span-2">
-          <mat-label>งบมาตรฐาน (บาท)</mat-label>
+          <mat-label>งบยูนิต (บาท)</mat-label>
           <span matPrefix class="text-slate-400 ml-2 mr-1">฿</span>
           <input matInput currencyMask formControlName="standard_budget">
           @if (form.get('standard_budget')?.hasError('required')) {
-            <mat-error>กรุณากรอกงบมาตรฐาน</mat-error>
+            <mat-error>กรุณากรอกงบยูนิต</mat-error>
           }
         </mat-form-field>
 
