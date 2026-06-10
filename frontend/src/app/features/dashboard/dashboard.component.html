@@ -329,14 +329,16 @@
 
             <div class="border-b border-gray-100 mx-2"></div>
 
-            <!-- มูลค่าส่วนต่าง -->
+            <!-- มูลค่าส่วนต่าง = มูลค่าโครงการที่ทำได้ − มูลค่าโครงการที่อนุมัติ -->
             <div class="flex items-center justify-between px-2 py-3 rounded-md hover:bg-gray-50 transition-colors">
               <span class="text-body text-gray-700">มูลค่าส่วนต่าง</span>
-              @let valDiff = (hasLegacyUnits() || hasLegacy()) ? combinedValueDifference() : discountResult()!.value_difference;
+              @let valueDiff = (hasLegacy() ? combinedValueAchieved() : discountResult()!.value_achieved)
+                             - (hasLegacyUnits() ? combinedApprovedProjectValue() : discountResult()!.approved_project_value);
               <span class="text-body-lg font-semibold tabular-nums"
-                    [class.text-profit]="valDiff >= 0"
-                    [class.text-loss]="valDiff < 0">
-                {{ formatNumber(valDiff) }}
+                    [class.text-amber-600]="valueDiff > 0"
+                    [class.text-gray-400]="valueDiff === 0"
+                    [class.text-loss]="valueDiff < 0">
+                {{ formatNumber(valueDiff) }}
               </span>
             </div>
 
