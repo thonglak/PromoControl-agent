@@ -387,8 +387,10 @@ class SalesTransactionService
             }
         }
 
+        // ปัดผลรวมเป็นหน่วยสตางค์ (2 ตำแหน่ง) ก่อนเทียบ — ป้องกัน error สะสมจาก float
+        // (IEEE-754) ที่ทำให้งบ "พอดีเป๊ะ" ถูกบล็อกทั้งที่ผลรวมเท่ากับคงเหลือจริง
         $unitStandardRemaining = $unitSummary['UNIT_STANDARD']['remaining'] ?? 0;
-        if ($unitStandardTotal > $unitStandardRemaining) {
+        if (round($unitStandardTotal, 2) > $unitStandardRemaining) {
             throw new RuntimeException('งบยูนิตคงเหลือไม่พอ (คงเหลือ: ' . number_format($unitStandardRemaining, 2) . ' บาท)');
         }
 
@@ -398,7 +400,7 @@ class SalesTransactionService
                 continue;
             }
             $remaining = $unitSummary[$source]['remaining'] ?? 0;
-            if ($total > $remaining) {
+            if (round($total, 2) > $remaining) {
                 throw new RuntimeException("งบ {$source} คงเหลือไม่พอ (คงเหลือ: " . number_format($remaining, 2) . " บาท)");
             }
         }
