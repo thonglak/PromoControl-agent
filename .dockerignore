@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────
+# Docker build context ignore — กัน node_modules/artifacts ของโฮสต์
+# ไปทับของที่ติดตั้งในคอนเทนเนอร์ (สาเหตุ esbuild SIGSEGV: glibc binary ทับ musl)
+# ─────────────────────────────────────────────────────────────
+
+# Node — ต้องให้ npm ci ในคอนเทนเนอร์ติดตั้งเอง (binary ตรง platform)
+**/node_modules
+
+# Angular build artifacts / cache
+frontend/dist
+frontend/.angular
+frontend/test-results
+
+# VCS / editor
+.git
+.gitignore
+.vscode
+.idea
+**/.DS_Store
+
+# Logs (ตัดไฟล์ log จริง แต่คงโครงสร้างโฟลเดอร์ writable/* ไว้)
+**/*.log
+
+# DB backups / data dumps / one-off artifacts
+db-recovery-snapshot-*/
+*.xlsx
