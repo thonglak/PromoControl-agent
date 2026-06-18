@@ -6,8 +6,8 @@
 # Node — ต้องให้ npm ci ในคอนเทนเนอร์ติดตั้งเอง (binary ตรง platform)
 **/node_modules
 
-# Angular build artifacts / cache
-frontend/dist
+# Angular cache / test artifacts
+# (หมายเหตุ: ไม่ ignore frontend/dist เพราะ Dockerfile.serve ใช้ COPY dist ที่ prebuilt มา)
 frontend/.angular
 frontend/test-results
 
