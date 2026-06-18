@@ -216,9 +216,16 @@ export class BudgetOverviewSectionComponent implements OnDestroy {
 
     const s = this.summary();
     const src = s ? (s as any)[SOURCE_KEY] : null;
-    if (!src || src.remaining <= 0) return;
+    if (!src) return;
 
-    const amtStr = src.remaining.toLocaleString('th-TH');
+    // ยกเลิกได้ตราบใดที่มีงบที่ "ตั้งไว้" (allocated สุทธิ) — สอดคล้องกับเงื่อนไขปุ่มและ backend
+    // ไม่บล็อกเมื่อ remaining ≤ 0 เพราะงบที่ใช้ไปแล้วก็ต้องยกเลิกการตั้งงบได้ (remaining ติดลบได้)
+    const allocatedNet = src.allocated - (src.returned ?? 0);
+    if (allocatedNet <= 0) return;
+
+    // ยอดที่จะยกเลิก: remaining > 0 → ยอดคงเหลือ, remaining ≤ 0 → ยอดที่ตั้งไว้ทั้งก้อน
+    const voidAmt = src.remaining > 0 ? src.remaining : allocatedNet;
+    const amtStr = voidAmt.toLocaleString('th-TH');
     const warnUsed = src.used > 0
       ? `\n\n⚠️ มีการใช้งบไปแล้ว ฿${src.used.toLocaleString('th-TH')} — หลังยกเลิก คงเหลือจะติดลบ`
       : '';
