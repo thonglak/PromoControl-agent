@@ -196,14 +196,21 @@ function restoreValueBasis(): 'selling' | 'cost' {
                 </div>
                 <div class="px-4 py-2.5 flex items-center justify-between">
                   <span class="text-xs text-slate-500">มูลค่าโครงการที่ทำได้</span>
-                  <span class="text-sm font-semibold tabular-nums"
-                        [class.text-green-600]="combinedValueAchieved() >= 0"
-                        [class.text-red-600]="combinedValueAchieved() < 0">
+                  <span class="text-sm font-semibold tabular-nums text-slate-800">
                     ฿{{ combinedValueAchieved() | number:'1.0-0' }}
                   </span>
                 </div>
                 <div class="px-4 py-2.5 flex items-center justify-between">
-                  <span class="text-xs text-slate-500">มูลค่าส่วนต่าง</span>
+                  <span class="text-xs text-slate-500 flex items-center gap-1">
+                    มูลค่าส่วนต่าง
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                         class="w-3.5 h-3.5 text-slate-400 cursor-help shrink-0"
+                         matTooltip="มูลค่าส่วนต่าง = มูลค่าโครงการที่ทำได้ − มูลค่าโครงการที่อนุมัติ&#10;฿{{ combinedValueAchieved() | number:'1.0-0' }} − ฿{{ combinedApprovedProjectValue() | number:'1.0-0' }} = ฿{{ combinedValueDifference() | number:'1.0-0' }}"
+                         matTooltipClass="tooltip-multiline"
+                         matTooltipPosition="above">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd" />
+                    </svg>
+                  </span>
                   <div class="text-right">
                     <span class="text-sm font-semibold tabular-nums block"
                           [class.text-green-600]="combinedValueDifference() >= 0"

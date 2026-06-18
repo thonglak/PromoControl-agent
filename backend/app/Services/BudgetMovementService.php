@@ -691,10 +691,12 @@ class BudgetMovementService
      *
      * กฎ:
      * - ยกเลิกได้เฉพาะ MANAGEMENT_SPECIAL / PROJECT_POOL
-     * - ยกเลิกได้แม้มีการใช้งบไปบ้างแล้ว — สำหรับ MGMT_SPECIAL remaining ติดลบได้
+     * - ยกเลิกได้ตราบใดที่ยังมีงบที่ "ตั้งไว้" (มี movement ALLOCATE/ADD/TRANSFER_IN ที่ approved)
+     *   แม้ใช้งบไปแล้วทั้งหมด (remaining ≤ 0) — สำหรับ MGMT_SPECIAL remaining ติดลบได้
      * - note optional (default 'ยกเลิกงบ')
-     * - สร้าง movement type = SPECIAL_BUDGET_VOID, amount = -(remaining)
-     * - void ALLOCATE movements ทีละก้อนจนครอบ remaining (อาจ over-void เมื่อ used > 0)
+     * - สร้าง movement type = SPECIAL_BUDGET_VOID, amount = -(ยอดที่ยกเลิก)
+     * - remaining > 0 → void ALLOCATE เฉพาะยอดคงเหลือสุทธิ (อาจ over-void เมื่อ used > 0)
+     *   remaining ≤ 0 → void ALLOCATE ทั้งก้อนที่ตั้งไว้
      */
     public function voidSpecialBudget(array $data): array
     {
@@ -725,49 +727,58 @@ class BudgetMovementService
             throw new RuntimeException('ไม่พบยูนิตในโครงการนี้');
         }
 
-        // 4. Check summary — used must be 0, remaining > 0
+        // 4. Summary + movements ที่จะยกเลิก
+        //    ยกเลิกได้ตราบใดที่ยังมี "งบที่ตั้งไว้" (movement ALLOCATE/ADD/TRANSFER_IN ที่ approved)
+        //    ไม่เช็ค remaining > 0 เพราะงบที่ถูกใช้ไปแล้ว (remaining ≤ 0) ก็ต้องยกเลิกการตั้งงบได้
+        //    — งบผู้บริหารยอมให้ remaining ติดลบหลังยกเลิก (งบบริหารจัดการเอง)
         $summary   = $this->getUnitBudgetSummary($projectId, $unitId);
         $srcData   = $summary[$sourceType] ?? ['allocated' => 0, 'used' => 0, 'remaining' => 0];
         $allocated = $srcData['allocated'];
         $used      = $srcData['used'];
         $remaining = $srcData['remaining'];
 
-        if ($remaining <= 0) {
+        // void จากใหม่สุดไปเก่าสุด
+        $voidMoveTypes = $sourceType === 'MANAGEMENT_SPECIAL'
+            ? ['SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE', 'SPECIAL_BUDGET_TRANSFER_IN']
+            : ['ALLOCATE'];
+
+        $allocMovements = $this->db->table('budget_movements')
+            ->where('project_id', $projectId)
+            ->where('unit_id', $unitId)
+            ->where('budget_source_type', $sourceType)
+            ->whereIn('movement_type', $voidMoveTypes)
+            ->where('status', 'approved')
+            ->orderBy('created_at', 'DESC')
+            ->get()->getResultArray();
+
+        // ไม่มีงบที่ตั้งไว้ (ไม่มี movement ให้ void) → ยกเลิกไม่ได้
+        if (empty($allocMovements)) {
             throw new RuntimeException('ไม่มีงบที่จะยกเลิก');
         }
-
-        // อนุญาตให้ยกเลิกได้แม้ used > 0 — สำหรับ MGMT_SPECIAL ยอมให้ remaining ติดลบหลัง void
-        // (ตาม business rule: งบผู้บริหารบริหารจัดการเอง ติดลบได้)
 
         $now = date('Y-m-d H:i:s');
 
         $this->db->transBegin();
         try {
-            // 5. Void ALLOCATE เฉพาะยอดสุทธิ (remaining) ไม่ void ทั้งหมด
-            //    เพื่อรักษา RETURN จากยกเลิกขายที่เคยเพิ่ม Pool ไว้ไม่ให้กระทบ
-            //    void จากใหม่สุดไปเก่าสุด
-            $voidMoveTypes = $sourceType === 'MANAGEMENT_SPECIAL'
-                ? ['SPECIAL_BUDGET_ADD', 'SPECIAL_BUDGET_ALLOCATE', 'SPECIAL_BUDGET_TRANSFER_IN']
-                : ['ALLOCATE'];
-
-            $allocMovements = $this->db->table('budget_movements')
-                ->where('project_id', $projectId)
-                ->where('unit_id', $unitId)
-                ->where('budget_source_type', $sourceType)
-                ->whereIn('movement_type', $voidMoveTypes)
-                ->where('status', 'approved')
-                ->orderBy('created_at', 'DESC')
-                ->get()->getResultArray();
-
-            $toVoid = $remaining;
+            // 5. Void ALLOCATE
+            //    - remaining > 0 → void เฉพาะยอดคงเหลือสุทธิ (remaining) คงประวัติ used /
+            //      RETURN จากยกเลิกขายที่เคยเพิ่ม Pool ไว้ไม่ให้กระทบ
+            //    - remaining ≤ 0 (ใช้งบเกินที่ตั้ง) → void ทั้งก้อน, remaining จะติดลบ = -used หลัง void
+            $voidAll = $remaining <= 0;
+            $toVoid  = $remaining;
+            $voided  = 0;
             foreach ($allocMovements as $mov) {
-                if ($toVoid <= 0) break;
+                if (!$voidAll && $toVoid <= 0) break;
                 $movAmt = abs((float) $mov['amount']);
                 $this->db->table('budget_movements')
                     ->where('id', $mov['id'])
                     ->update(['status' => 'voided', 'updated_at' => $now]);
                 $toVoid -= $movAmt;
+                $voided += $movAmt;
             }
+
+            // ยอดที่บันทึกใน VOID log: remaining > 0 → ยอดคงเหลือสุทธิ, remaining ≤ 0 → ยอด gross ที่ void จริง
+            $voidLogAmount = $remaining > 0 ? $remaining : $voided;
 
             // 6. สร้าง void movement (เป็น log record)
             //    MANAGEMENT_SPECIAL → SPECIAL_BUDGET_VOID (ไม่ถูกนับในสูตร remaining)
@@ -782,7 +793,7 @@ class BudgetMovementService
                     'unit_id'            => $unitId,
                     'movement_type'      => 'SPECIAL_BUDGET_VOID',
                     'budget_source_type' => $sourceType,
-                    'amount'             => -$remaining,
+                    'amount'             => -$voidLogAmount,
                     'status'             => 'approved',
                     'note'               => $note,
                     'created_by'         => $createdBy,
